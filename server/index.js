@@ -356,6 +356,42 @@ setInterval(() => {
   }
 }, 15_000);
 
+// Natural grass spreading: exposed dirt blocks next to grass gradually turn into grass!
+setInterval(() => {
+  if (players.size === 0) return;
+  const candidates = [];
+  for (const [k, val] of store.deltas.entries()) {
+    if (val === 'dirt') candidates.push(k);
+  }
+  if (candidates.length === 0) return;
+
+  let converted = 0;
+  const checks = Math.min(24, candidates.length);
+  for (let i = 0; i < checks && converted < 3; i++) {
+    const k = candidates[Math.floor(Math.random() * candidates.length)];
+    const [x, y, z] = k.split(',').map(Number);
+    if (!store.inBounds(x, y + 1, z)) continue;
+    if (store.getBlock(x, y, z) !== 'dirt') continue;
+    if (store.getBlock(x, y + 1, z) !== null) continue;
+    if (store.findProtectingRegion(x, y, z)) continue;
+
+    let hasGrassNeighbor = false;
+    for (let dx = -1; dx <= 1 && !hasGrassNeighbor; dx++) {
+      for (let dz = -1; dz <= 1 && !hasGrassNeighbor; dz++) {
+        for (let dy = -1; dy <= 1 && !hasGrassNeighbor; dy++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          if (store.getBlock(x + dx, y + dy, z + dz) === 'grass') hasGrassNeighbor = true;
+        }
+      }
+    }
+    if (!hasGrassNeighbor) continue;
+
+    store.setBlock(x, y, z, 'grass');
+    broadcast({ type: 'block_update', x, y, z, block: 'grass' });
+    converted++;
+  }
+}, 12_000);
+
 const FUSE_STEP_DIRS = [
   [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
   [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1],
