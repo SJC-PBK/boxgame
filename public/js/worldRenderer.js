@@ -1,4 +1,5 @@
 import * as THREE from '../vendor/three/three.module.min.js';
+import { getBaseBlock } from '../shared/terrainGen.js';
 
 const CHUNK_SIZE = 16;
 
@@ -25,7 +26,13 @@ export class WorldRenderer {
     this.sizeZ = bounds.maxZ - bounds.minZ + 1;
     this.volume = this.sizeX * this.sizeY * this.sizeZ;
 
-    this.grid = new Uint8Array(this.volume);
+    this.streaming = false;
+    this.viewRadius = 5; // chunks around player (5 -> 11x11 = 176x176 blocks)
+    this.grid = null;    // Used in fixed RLE mode (Job Village)
+    this.deltas = new Map();
+    this.chunkData = new Map(); // "cx,cz" -> Uint8Array(16 * sizeY * 16)
+    this.chunkGroups = new Map();
+
     this.numToId = {};
     this.idToNum = {};
     this.transparentNum = new Uint8Array(256);
@@ -40,11 +47,18 @@ export class WorldRenderer {
       }
     }
 
-    this.chunkGroups = new Map();
+    this.crossNums = new Set([
+      this.idToNum['sapling'],
+      this.idToNum['wheat_1'],
+      this.idToNum['wheat_2'],
+      this.idToNum['wheat_3'],
+      this.idToNum['ladder'],
+      this.idToNum['sign']
+    ].filter(Boolean));
+
     this.worldGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
 
-    // Selection wireframe box
     const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01, 1.01, 1.01));
     this.highlightBox = new THREE.LineSegments(
       edges,
@@ -53,7 +67,6 @@ export class WorldRenderer {
     this.highlightBox.visible = false;
     this.scene.add(this.highlightBox);
 
-    // Mining crack overlay box (10-stage pixel fracture texture)
     this.crackMat = new THREE.MeshBasicMaterial({
       map: this.textures.crackTextures?.[0] || null,
       transparent: true,
@@ -66,13 +79,11 @@ export class WorldRenderer {
     this.crackBox.visible = false;
     this.scene.add(this.crackBox);
 
-    // 3D voxel block break particles
     this.particles = [];
     this.particlesEnabled = true;
     this.particleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
     this._lastCrackStage = -1;
 
-    // Live 3D Brush Preview pool (up to 25 cubes for 5x5 / row / col / wall)
     this.brushGroup = new THREE.Group();
     this.brushBoxes = [];
     const brushEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.005, 1.005, 1.005));
@@ -86,20 +97,8 @@ export class WorldRenderer {
     this.scene.add(this.brushGroup);
   }
 
-  updateBrushPreview(positions) {
-    if (!positions || positions.length === 0) {
-      for (const b of this.brushBoxes) b.visible = false;
-      return;
-    }
-    for (let i = 0; i < this.brushBoxes.length; i++) {
-      if (i < positions.length) {
-        const p = positions[i];
-        this.brushBoxes[i].position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
-        this.brushBoxes[i].visible = true;
-      } else {
-        this.brushBoxes[i].visible = false;
-      }
-    }
+  setViewDistance(distBlocks) {
+    this.viewRadius = Math.max(3, Math.min(8, Math.round(distBlocks / 24)));
   }
 
   inBounds(x, y, z) {
@@ -111,15 +110,58 @@ export class WorldRenderer {
   }
 
   flatIndex(x, y, z) {
-    const ix = x - this.bounds.minX;
-    const iy = y - this.bounds.minY;
-    const iz = z - this.bounds.minZ;
-    return ix + this.sizeX * (iz + this.sizeZ * iy);
+    return (x - this.bounds.minX) + this.sizeX * ((z - this.bounds.minZ) + this.sizeZ * (y - this.bounds.minY));
+  }
+
+  _chunkLocalIdx(lx, y, lz) {
+    return lx + CHUNK_SIZE * (lz + CHUNK_SIZE * (y - this.bounds.minY));
+  }
+
+  _ensureChunkData(cx, cz) {
+    const ck = `${cx},${cz}`;
+    let data = this.chunkData.get(ck);
+    if (data) return data;
+
+    data = new Uint8Array(CHUNK_SIZE * this.sizeY * CHUNK_SIZE);
+    const baseX = cx * CHUNK_SIZE;
+    const baseZ = cz * CHUNK_SIZE;
+
+    for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+      const wx = 0;
+      const wz = baseZ + lz;
+      if (wz < this.bounds.minZ || wz > this.bounds.maxZ) continue;
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        const x = baseX + lx;
+        if (x < this.bounds.minX || x > this.bounds.maxX) continue;
+        for (let y = this.bounds.minY; y <= this.bounds.maxY; y++) {
+          const k = `${x},${y},${wz}`;
+          const id = this.deltas.has(k) ? this.deltas.get(k) : getBaseBlock(x, y, wz);
+          if (id) data[this._chunkLocalIdx(lx, y, lz)] = this.idToNum[id] || 0;
+        }
+      }
+      void wx;
+    }
+
+    this.chunkData.set(ck, data);
+    return data;
   }
 
   getNum(x, y, z) {
     if (!this.inBounds(x, y, z)) return 0;
-    return this.grid[this.flatIndex(x, y, z)];
+    if (!this.streaming) {
+      return this.grid ? this.grid[this.flatIndex(x, y, z)] : 0;
+    }
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const data = this.chunkData.get(`${cx},${cz}`);
+    if (data) {
+      const lx = x - cx * CHUNK_SIZE;
+      const lz = z - cz * CHUNK_SIZE;
+      return data[this._chunkLocalIdx(lx, y, lz)];
+    }
+    const k = `${x},${y},${z}`;
+    const id = this.deltas.has(k) ? this.deltas.get(k) : getBaseBlock(x, y, z);
+    return id ? (this.idToNum[id] || 0) : 0;
   }
 
   getBlock(x, y, z) {
@@ -132,13 +174,20 @@ export class WorldRenderer {
     return num !== 0 && this.solidNum[num] === 1;
   }
 
-  loadFromRLE(rle) {
+  _clearAllChunks() {
     for (const g of this.chunkGroups.values()) {
       this._disposeGroup(g);
       this.worldGroup.remove(g);
     }
     this.chunkGroups.clear();
-    this.grid.fill(0);
+    this.chunkData.clear();
+  }
+
+  // Fixed RLE mode (used by Job Experience Village 64x24x64)
+  loadFromRLE(rle) {
+    this.streaming = false;
+    this._clearAllChunks();
+    this.grid = new Uint8Array(this.volume);
 
     let pos = 0;
     for (let i = 0; i < rle.length; i += 2) {
@@ -153,17 +202,99 @@ export class WorldRenderer {
     const maxCx = Math.floor(this.bounds.maxX / CHUNK_SIZE);
     const minCz = Math.floor(this.bounds.minZ / CHUNK_SIZE);
     const maxCz = Math.floor(this.bounds.maxZ / CHUNK_SIZE);
-
     for (let cx = minCx; cx <= maxCx; cx++) {
-      for (let cz = minCz; cz <= maxCz; cz++) {
-        this.rebuildChunk(cx, cz);
+      for (let cz = minCz; cz <= maxCz; cz++) this.rebuildChunk(cx, cz);
+    }
+  }
+
+  // Dynamic Chunk Streaming mode (used by 1024x96x1024 Sandbox World!)
+  loadStreaming(deltasObj, initialPos) {
+    this.streaming = true;
+    this.grid = null;
+    this._clearAllChunks();
+    this.deltas.clear();
+    for (const [k, v] of Object.entries(deltasObj || {})) {
+      this.deltas.set(k, v);
+    }
+    // Synchronously build immediate 3x3 chunks around spawn so the ground is ready on frame 1!
+    const pcx = Math.floor((initialPos?.x || 0) / CHUNK_SIZE);
+    const pcz = Math.floor((initialPos?.z || 0) / CHUNK_SIZE);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this._ensureChunkData(pcx + dx, pcz + dz);
+        this.rebuildChunk(pcx + dx, pcz + dz);
       }
+    }
+  }
+
+  // Called each frame: streams in up to 3 nearest chunks & unloads distant chunks
+  updateStreaming(playerPos) {
+    if (!this.streaming) return;
+    const pcx = Math.floor(playerPos.x / CHUNK_SIZE);
+    const pcz = Math.floor(playerPos.z / CHUNK_SIZE);
+    const r = this.viewRadius;
+    const unloadR = r + 2;
+
+    const minCx = Math.floor(this.bounds.minX / CHUNK_SIZE);
+    const maxCx = Math.floor(this.bounds.maxX / CHUNK_SIZE);
+    const minCz = Math.floor(this.bounds.minZ / CHUNK_SIZE);
+    const maxCz = Math.floor(this.bounds.maxZ / CHUNK_SIZE);
+
+    // 1. Unload distant chunks
+    for (const ck of [...this.chunkGroups.keys()]) {
+      const [cx, cz] = ck.split(',').map(Number);
+      if (Math.abs(cx - pcx) > unloadR || Math.abs(cz - pcz) > unloadR) {
+        const g = this.chunkGroups.get(ck);
+        if (g) { this._disposeGroup(g); this.worldGroup.remove(g); }
+        this.chunkGroups.delete(ck);
+        this.chunkData.delete(ck);
+      }
+    }
+
+    // 2. Find closest unloaded chunks within viewRadius
+    const missing = [];
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (dx * dx + dz * dz > r * r + 2) continue;
+        const cx = pcx + dx, cz = pcz + dz;
+        if (cx < minCx || cx > maxCx || cz < minCz || cz > maxCz) continue;
+        const ck = `${cx},${cz}`;
+        if (!this.chunkGroups.has(ck)) {
+          missing.push({ cx, cz, distSq: dx * dx + dz * dz });
+        }
+      }
+    }
+
+    if (missing.length === 0) return;
+    missing.sort((a, b) => a.distSq - b.distSq);
+
+    const budget = 3; // Build 3 chunks per frame for silky 60fps streaming
+    for (let i = 0; i < Math.min(budget, missing.length); i++) {
+      const { cx, cz } = missing[i];
+      this._ensureChunkData(cx, cz);
+      this.rebuildChunk(cx, cz);
+    }
+  }
+
+  _writeBlockInternal(x, y, z, blockId) {
+    const num = blockId ? (this.idToNum[blockId] || 0) : 0;
+    if (!this.streaming) {
+      if (this.grid) this.grid[this.flatIndex(x, y, z)] = num;
+      return;
+    }
+    const k = `${x},${y},${z}`;
+    this.deltas.set(k, blockId || null);
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const data = this.chunkData.get(`${cx},${cz}`);
+    if (data) {
+      data[this._chunkLocalIdx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE)] = num;
     }
   }
 
   setBlock(x, y, z, blockId) {
     if (!this.inBounds(x, y, z)) return;
-    this.grid[this.flatIndex(x, y, z)] = blockId ? (this.idToNum[blockId] || 0) : 0;
+    this._writeBlockInternal(x, y, z, blockId);
 
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
@@ -176,8 +307,10 @@ export class WorldRenderer {
     if (localZ === CHUNK_SIZE - 1) toRebuild.add(`${cx},${cz + 1}`);
 
     for (const ck of toRebuild) {
-      const [rx, rz] = ck.split(',').map(Number);
-      this.rebuildChunk(rx, rz);
+      if (!this.streaming || this.chunkGroups.has(ck)) {
+        const [rx, rz] = ck.split(',').map(Number);
+        this.rebuildChunk(rx, rz);
+      }
     }
   }
 
@@ -185,7 +318,7 @@ export class WorldRenderer {
     const dirty = new Set();
     for (const c of changes) {
       if (!this.inBounds(c.x, c.y, c.z)) continue;
-      this.grid[this.flatIndex(c.x, c.y, c.z)] = c.block ? (this.idToNum[c.block] || 0) : 0;
+      this._writeBlockInternal(c.x, c.y, c.z, c.block);
       const cx = Math.floor(c.x / CHUNK_SIZE);
       const cz = Math.floor(c.z / CHUNK_SIZE);
       dirty.add(`${cx},${cz}`);
@@ -197,15 +330,15 @@ export class WorldRenderer {
       if (lz === CHUNK_SIZE - 1) dirty.add(`${cx},${cz + 1}`);
     }
     for (const ck of dirty) {
-      const [rx, rz] = ck.split(',').map(Number);
-      this.rebuildChunk(rx, rz);
+      if (!this.streaming || this.chunkGroups.has(ck)) {
+        const [rx, rz] = ck.split(',').map(Number);
+        this.rebuildChunk(rx, rz);
+      }
     }
   }
 
   _disposeGroup(group) {
-    group.traverse((obj) => {
-      if (obj.geometry) obj.geometry.dispose();
-    });
+    group.traverse((obj) => { if (obj.geometry) obj.geometry.dispose(); });
   }
 
   rebuildChunk(cx, cz) {
@@ -223,16 +356,11 @@ export class WorldRenderer {
     const endZ = Math.min(this.bounds.maxZ, cz * CHUNK_SIZE + CHUNK_SIZE - 1);
     if (startX > endX || startZ > endZ) return;
 
-    const buckets = new Map();
-    const crossNums = new Set([
-      this.idToNum['sapling'],
-      this.idToNum['wheat_1'],
-      this.idToNum['wheat_2'],
-      this.idToNum['wheat_3'],
-      this.idToNum['ladder'],
-      this.idToNum['sign']
-    ].filter(Boolean));
+    const cData = this.streaming ? this._ensureChunkData(cx, cz) : null;
+    const baseX = cx * CHUNK_SIZE;
+    const baseZ = cz * CHUNK_SIZE;
 
+    const buckets = new Map();
     const getBucket = (blockId, faceKind) => {
       const key = `${blockId}:${faceKind}`;
       let buf = buckets.get(key);
@@ -246,13 +374,14 @@ export class WorldRenderer {
     for (let y = this.bounds.minY; y <= this.bounds.maxY; y++) {
       for (let z = startZ; z <= endZ; z++) {
         for (let x = startX; x <= endX; x++) {
-          const num = this.grid[this.flatIndex(x, y, z)];
+          const num = cData
+            ? cData[this._chunkLocalIdx(x - baseX, y, z - baseZ)]
+            : this.grid[this.flatIndex(x, y, z)];
           if (num === 0) continue;
           const blockId = this.numToId[num];
           if (!blockId) continue;
 
-          // Saplings & wheat crops render as cute X-shaped cross quads!
-          if (crossNums.has(num)) {
+          if (this.crossNums.has(num)) {
             const buf = getBucket(blockId, 'side');
             const quads = [
               [[0.15, 0, 0.15], [0.85, 0, 0.85], [0.85, 0.92, 0.85], [0.15, 0.92, 0.15]],
@@ -276,7 +405,13 @@ export class WorldRenderer {
             const nx = x + face.dir[0];
             const ny = y + face.dir[1];
             const nz = z + face.dir[2];
-            const nNum = this.getNum(nx, ny, nz);
+
+            let nNum;
+            if (cData && nx >= baseX && nx < baseX + CHUNK_SIZE && nz >= baseZ && nz < baseZ + CHUNK_SIZE && ny >= this.bounds.minY && ny <= this.bounds.maxY) {
+              nNum = cData[this._chunkLocalIdx(nx - baseX, ny, nz - baseZ)];
+            } else {
+              nNum = this.getNum(nx, ny, nz);
+            }
 
             if (nNum !== 0) {
               const nTrans = this.transparentNum[nNum] === 1;
@@ -298,7 +433,6 @@ export class WorldRenderer {
       }
     }
 
-    if (buckets.size === 0) return;
     const group = new THREE.Group();
     for (const buf of buckets.values()) {
       const geo = new THREE.BufferGeometry();
@@ -316,36 +450,24 @@ export class WorldRenderer {
   }
 
   raycast(origin, direction, maxDist = 7) {
-    let x = Math.floor(origin.x);
-    let y = Math.floor(origin.y);
-    let z = Math.floor(origin.z);
-
+    let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
     const stepX = direction.x > 0 ? 1 : (direction.x < 0 ? -1 : 0);
     const stepY = direction.y > 0 ? 1 : (direction.y < 0 ? -1 : 0);
     const stepZ = direction.z > 0 ? 1 : (direction.z < 0 ? -1 : 0);
-
     const tDeltaX = stepX !== 0 ? Math.abs(1 / direction.x) : Infinity;
     const tDeltaY = stepY !== 0 ? Math.abs(1 / direction.y) : Infinity;
     const tDeltaZ = stepZ !== 0 ? Math.abs(1 / direction.z) : Infinity;
-
     let tMaxX = stepX > 0 ? (x + 1 - origin.x) * tDeltaX : (stepX < 0 ? (origin.x - x) * tDeltaX : Infinity);
     let tMaxY = stepY > 0 ? (y + 1 - origin.y) * tDeltaY : (stepY < 0 ? (origin.y - y) * tDeltaY : Infinity);
     let tMaxZ = stepZ > 0 ? (z + 1 - origin.z) * tDeltaZ : (stepZ < 0 ? (origin.z - z) * tDeltaZ : Infinity);
 
-    let dist = 0;
-    let nx = 0, ny = 0, nz = 0;
+    let dist = 0, nx = 0, ny = 0, nz = 0;
     const waterNum = this.idToNum['water'] || -1;
 
     while (dist <= maxDist) {
       const num = this.getNum(x, y, z);
       if (num !== 0 && num !== waterNum) {
-        return {
-          x, y, z,
-          block: this.numToId[num],
-          placeX: x + nx,
-          placeY: y + ny,
-          placeZ: z + nz
-        };
+        return { x, y, z, block: this.numToId[num], placeX: x + nx, placeY: y + ny, placeZ: z + nz };
       }
       if (tMaxX < tMaxY && tMaxX < tMaxZ) {
         dist = tMaxX; tMaxX += tDeltaX; x += stepX; nx = -stepX; ny = 0; nz = 0;
@@ -356,6 +478,22 @@ export class WorldRenderer {
       }
     }
     return null;
+  }
+
+  updateBrushPreview(positions) {
+    if (!positions || positions.length === 0) {
+      for (const b of this.brushBoxes) b.visible = false;
+      return;
+    }
+    for (let i = 0; i < this.brushBoxes.length; i++) {
+      if (i < positions.length) {
+        const p = positions[i];
+        this.brushBoxes[i].position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
+        this.brushBoxes[i].visible = true;
+      } else {
+        this.brushBoxes[i].visible = false;
+      }
+    }
   }
 
   updateHighlight(hit, miningProgress = 0) {
@@ -390,11 +528,7 @@ export class WorldRenderer {
     const toSpawn = Math.min(count, Math.max(0, MAX_PARTICLES - this.particles.length));
     for (let i = 0; i < toSpawn; i++) {
       const m = new THREE.Mesh(this.particleGeo, mat);
-      m.position.set(
-        x + 0.2 + Math.random() * 0.6,
-        y + 0.2 + Math.random() * 0.6,
-        z + 0.2 + Math.random() * 0.6
-      );
+      m.position.set(x + 0.2 + Math.random() * 0.6, y + 0.2 + Math.random() * 0.6, z + 0.2 + Math.random() * 0.6);
       this.scene.add(m);
       this.particles.push({
         mesh: m,
@@ -421,8 +555,7 @@ export class WorldRenderer {
       p.mesh.position.z += p.vz * dt;
       p.mesh.rotation.x += dt * 7;
       p.mesh.rotation.y += dt * 5;
-      const sc = Math.min(1, p.life * 2.5);
-      p.mesh.scale.setScalar(sc);
+      p.mesh.scale.setScalar(Math.min(1, p.life * 2.5));
     }
   }
 }

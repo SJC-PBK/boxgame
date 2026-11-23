@@ -122,7 +122,7 @@ export class SkySystem {
     return `🌙 밤 ${hh}:${mm}${wIcon}`;
   }
 
-  update(dt, playerPos) {
+  update(dt, playerPos, surfaceY = 36) {
     // Smooth local progression between server sync ticks
     this.time = (this.time + dt / 360) % 1;
 
@@ -148,7 +148,7 @@ export class SkySystem {
     if (sunHeight > 0.15) {
       this.curSky.copy(this.colDay);
     } else if (sunHeight > -0.15) {
-      const f = (sunHeight + 0.15) / 0.3; // 0 at night edge, 1 at day edge
+      const f = (sunHeight + 0.15) / 0.3;
       if (f > 0.5) {
         this.curSky.copy(this.colSunset).lerp(this.colDay, (f - 0.5) * 2);
       } else {
@@ -163,8 +163,8 @@ export class SkySystem {
       this.curSky.lerp(this.colRain, 0.45);
     }
 
-    // Darken sky slightly when deep underground
-    const ug = Math.max(0, Math.min(1, (13 - playerPos.y) / 9));
+    // Darken sky when deep underground (relative to world's surfaceY)
+    const ug = surfaceY > 10 ? Math.max(0, Math.min(1, (surfaceY - 7 - playerPos.y) / 10)) : 0;
     this.curSky.lerp(this.colUnderground, ug * 0.9);
 
     this.scene.background.copy(this.curSky);

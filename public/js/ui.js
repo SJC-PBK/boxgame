@@ -1,5 +1,6 @@
 import { PixelSkinEditor } from './skinEditor.js';
 import { ImageAutoBuilder } from './imageBuilder.js';
+import { getSurfaceHeight, getBiomeAt, SEA_LEVEL } from '../shared/terrainGen.js';
 
 const SMELT_INPUTS = new Set(['raw_iron', 'raw_gold', 'sand', 'cobble', 'raw_meat']);
 const FUEL_ITEMS = new Set(['coal', 'wood', 'planks', 'stick']);
@@ -1031,49 +1032,66 @@ export class GameUI {
     const { worldRenderer, playerPos, remotes, portals } = this.cb.getMinimapData();
     if (!worldRenderer) return;
 
-    const b = worldRenderer.bounds;
-    const W = b.maxX - b.minX + 1;
-    const H = b.maxZ - b.minZ + 1;
-    const img = ctx.createImageData(W, H);
+    const W = 128, H = 128;
+    const minX = worldRenderer.streaming ? Math.floor(playerPos.x) - 64 : worldRenderer.bounds.minX;
+    const minZ = worldRenderer.streaming ? Math.floor(playerPos.z) - 64 : worldRenderer.bounds.minZ;
+    const spanX = worldRenderer.streaming ? 128 : (worldRenderer.bounds.maxX - worldRenderer.bounds.minX + 1);
+    const spanZ = worldRenderer.streaming ? 128 : (worldRenderer.bounds.maxZ - worldRenderer.bounds.minZ + 1);
+
+    const img = ctx.createImageData(spanX, spanZ);
     const COLORS = {
       grass: [94, 168, 50], dirt: [134, 96, 67], stone: [127, 132, 138], cobble: [118, 122, 128],
       wood: [110, 76, 44], planks: [184, 141, 86], leaves: [45, 135, 50], sand: [226, 211, 156],
       water: [37, 99, 235], gold: [250, 204, 21], brick: [169, 72, 59], farmland: [92, 61, 40],
-      wheat_3: [234, 179, 8], portal: [168, 85, 247], jumppad: [34, 211, 238]
+      wheat_3: [234, 179, 8], portal: [168, 85, 247], jumppad: [34, 211, 238], wool_white: [236, 242, 248]
     };
 
-    for (let iz = 0; iz < H; iz++) {
-      for (let ix = 0; ix < W; ix++) {
-        const wx = b.minX + ix;
-        const wz = b.minZ + iz;
+    for (let iz = 0; iz < spanZ; iz++) {
+      for (let ix = 0; ix < spanX; ix++) {
+        const wx = minX + ix;
+        const wz = minZ + iz;
         let col = [30, 41, 59];
-        for (let wy = b.maxY; wy >= 12; wy--) {
-          const blk = worldRenderer.getBlock(wx, wy, wz);
-          if (blk) {
-            col = COLORS[blk] || [148, 163, 184];
-            break;
+        if (worldRenderer.streaming) {
+          if (Math.abs(wx) <= 5 && Math.abs(wz) <= 5) {
+            col = [250, 204, 21];
+          } else {
+            const surf = getSurfaceHeight(wx, wz);
+            const biome = getBiomeAt(wx, wz);
+            if (surf <= SEA_LEVEL) col = [37, 99, 235];
+            else if (surf === SEA_LEVEL + 1 || biome === 'desert') col = [226, 211, 156];
+            else if (biome === 'snow' && surf >= 40) col = [236, 242, 248];
+            else if (biome === 'forest') col = [52, 130, 56];
+            else col = [94, 168, 50];
+          }
+        } else {
+          for (let wy = worldRenderer.bounds.maxY; wy >= 2; wy--) {
+            const blk = worldRenderer.getBlock(wx, wy, wz);
+            if (blk) { col = COLORS[blk] || [148, 163, 184]; break; }
           }
         }
-        const idx = (iz * W + ix) * 4;
+        const idx = (iz * spanX + ix) * 4;
         img.data[idx] = col[0]; img.data[idx + 1] = col[1]; img.data[idx + 2] = col[2]; img.data[idx + 3] = 255;
       }
     }
 
     const tmp = document.createElement('canvas');
-    tmp.width = W; tmp.height = H;
+    tmp.width = spanX; tmp.height = spanZ;
     tmp.getContext('2d').putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
 
-    const sx = canvas.width / W;
-    const sz = canvas.height / H;
+    const sx = canvas.width / spanX;
+    const sz = canvas.height / spanZ;
+    void W; void H;
 
-    // Portals (purple)
     const warpRow = document.getElementById('map-portal-warps');
     warpRow.innerHTML = '';
     for (const p of Object.values(portals || {})) {
-      ctx.fillStyle = '#c084fc';
-      ctx.fillRect((p.x - b.minX) * sx - 3, (p.z - b.minZ) * sz - 3, 6, 6);
+      const px = (p.x - minX) * sx, pz = (p.z - minZ) * sz;
+      if (px >= 0 && px <= canvas.width && pz >= 0 && pz <= canvas.height) {
+        ctx.fillStyle = '#c084fc';
+        ctx.fillRect(px - 3, pz - 3, 6, 6);
+      }
       const btn = document.createElement('button');
       btn.className = 'btn-sm';
       btn.textContent = `🌀 ${p.channel} (${p.x},${p.y},${p.z})`;
@@ -1084,20 +1102,19 @@ export class GameUI {
       warpRow.appendChild(btn);
     }
 
-    // Remote players (green)
     for (const r of remotes) {
-      ctx.fillStyle = '#22c55e';
-      ctx.beginPath();
-      ctx.arc((r.x - b.minX) * sx, (r.z - b.minZ) * sz, 4, 0, Math.PI * 2);
-      ctx.fill();
+      const rx = (r.x - minX) * sx, rz = (r.z - minZ) * sz;
+      if (rx >= 0 && rx <= canvas.width && rz >= 0 && rz <= canvas.height) {
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath(); ctx.arc(rx, rz, 4, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
-    // Self (bright blue)
     ctx.fillStyle = '#38bdf8';
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc((playerPos.x - b.minX) * sx, (playerPos.z - b.minZ) * sz, 5, 0, Math.PI * 2);
+    ctx.arc((playerPos.x - minX) * sx, (playerPos.z - minZ) * sz, 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }

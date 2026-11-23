@@ -18,7 +18,7 @@ export class AnimalManager {
   }
 
   _findSurfaceY(x, z) {
-    for (let y = WORLD_BOUNDS.maxY - 2; y >= 10; y--) {
+    for (let y = 74; y >= 26; y--) {
       const b = this.store.getBlock(x, y, z);
       if (b && BLOCKS[b]?.solid) {
         if (b === 'water') return null;

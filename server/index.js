@@ -78,16 +78,18 @@ app.use(express.json());
 const router = express.Router();
 const threeBuildDir = path.join(ROOT_DIR, 'node_modules', 'three', 'build');
 router.use('/vendor/three', express.static(threeBuildDir, { maxAge: '7d' }));
+router.use('/shared', express.static(path.join(ROOT_DIR, 'shared'), { maxAge: '1d' }));
 router.use(express.static(path.join(ROOT_DIR, 'public')));
 
 router.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
     app: 'Boxworld',
-    version: '4.0',
+    version: '5.0',
+    worldSize: '1024x96x1024',
     players: players.size,
     maxPlayers: MAX_PLAYERS,
-    blocks: store.countNonAir(),
+    modifiedBlocks: store.countModified(),
     chests: Object.keys(store.chests).length,
     furnaces: Object.keys(store.furnaces).length,
     signs: Object.keys(store.signs).length,
@@ -294,7 +296,7 @@ wss.on('connection', (ws) => {
       const bag = worldMode === 'job' ? Array(BAG_SIZE).fill(null) : createStarterBag();
       const startPos = worldMode === 'job'
         ? { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z }
-        : { x: 0.5 + (Math.random() - 0.5) * 3, y: 17.1, z: 0.5 + (Math.random() - 0.5) * 3 };
+        : { x: 0.5 + (Math.random() - 0.5) * 3, y: 37.1, z: 0.5 + (Math.random() - 0.5) * 3 };
 
       const initialOrder = worldMode === 'job' ? pickRandomCafeOrder() : null;
 
@@ -324,7 +326,8 @@ wss.on('connection', (ws) => {
         jobScore: player.jobScore,
         jobCompleted: player.jobCompleted,
         worldBounds: worldMode === 'job' ? jobWorld.bounds : WORLD_BOUNDS,
-        worldRLE: worldMode === 'job' ? jobWorld.rle : store.getWorldRLE(),
+        worldRLE: worldMode === 'job' ? jobWorld.rle : null,
+        worldDeltas: worldMode === 'job' ? null : store.getDeltasObject(),
         worldTime,
         worldWeather,
         animals: worldMode === 'job' ? [] : animals.serializeAll(),

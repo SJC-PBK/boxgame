@@ -1,17 +1,17 @@
 // Boxworld v3 — Unified Catalog of Blocks, Ores, Farming, Furnaces, Items, Tools & Recipes
 
 export const WORLD_BOUNDS = {
-  minX: -64,
-  maxX: 63,
+  minX: -512,
+  maxX: 511,
   minY: 0,
-  maxY: 47,
-  minZ: -64,
-  maxZ: 63
+  maxY: 95,
+  minZ: -512,
+  maxZ: 511
 };
 
-export const WORLD_SIZE_X = WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX + 1; // 128
-export const WORLD_SIZE_Y = WORLD_BOUNDS.maxY - WORLD_BOUNDS.minY + 1; // 48
-export const WORLD_SIZE_Z = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ + 1; // 128
+export const WORLD_SIZE_X = WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX + 1; // 1024
+export const WORLD_SIZE_Y = WORLD_BOUNDS.maxY - WORLD_BOUNDS.minY + 1; // 96
+export const WORLD_SIZE_Z = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ + 1; // 1024
 export const WORLD_VOLUME = WORLD_SIZE_X * WORLD_SIZE_Y * WORLD_SIZE_Z;
 
 export const BAG_SIZE = 27;

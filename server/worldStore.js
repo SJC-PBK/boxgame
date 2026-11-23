@@ -1,42 +1,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BLOCKS, NUM_TO_BLOCK, SMELT_MAP, FUEL_POWER, WORLD_BOUNDS, WORLD_VOLUME, CHEST_SIZE
+  BLOCKS, SMELT_MAP, FUEL_POWER, WORLD_BOUNDS, CHEST_SIZE
 } from './blocks.js';
 import {
-  generateInitialWorld, generateDefaultBlueprints, generateDefaultSkins,
-  keyOf, flatIndex, placeTreeOnGrid
+  generateDefaultBlueprints, generateDefaultSkins, keyOf
 } from './defaultData.js';
+import { getBaseBlock, SURFACE_BASE } from '../shared/terrainGen.js';
 
+// Kept for Job Village compact RLE encoding
 export function encodeRLE(grid) {
   const out = [];
   if (grid.length === 0) return out;
   let cur = grid[0];
   let run = 1;
   for (let i = 1; i < grid.length; i++) {
-    if (grid[i] === cur) {
-      run++;
-    } else {
-      out.push(cur, run);
-      cur = grid[i];
-      run = 1;
-    }
+    if (grid[i] === cur) run++;
+    else { out.push(cur, run); cur = grid[i]; run = 1; }
   }
   out.push(cur, run);
   return out;
-}
-
-export function decodeRLE(rle, expectedLen = WORLD_VOLUME) {
-  const grid = new Uint8Array(expectedLen);
-  let pos = 0;
-  for (let i = 0; i < rle.length; i += 2) {
-    const val = rle[i];
-    const count = rle[i + 1];
-    grid.fill(val, pos, Math.min(expectedLen, pos + count));
-    pos += count;
-    if (pos >= expectedLen) break;
-  }
-  return grid;
 }
 
 export class WorldStore {
@@ -45,7 +28,7 @@ export class WorldStore {
     fs.mkdirSync(this.dataDir, { recursive: true });
 
     this.files = {
-      world: path.join(this.dataDir, 'world-v2.json'),
+      deltas: path.join(this.dataDir, 'world-deltas.json'),
       chests: path.join(this.dataDir, 'chests.json'),
       furnaces: path.join(this.dataDir, 'furnaces.json'),
       signs: path.join(this.dataDir, 'signs.json'),
@@ -55,34 +38,25 @@ export class WorldStore {
       skins: path.join(this.dataDir, 'skins.json')
     };
 
-    this.grid = new Uint8Array(WORLD_VOLUME);
+    // Delta overrides on top of deterministic 1024x96x1024 terrainGen:
+    // "x,y,z" -> blockId (string) | null (dug air)
+    this.deltas = new Map();
     this.chests = {};
     this.furnaces = {};
-    this.signs = {};   // "x,y,z" -> { x, y, z, text, author }
-    this.portals = {}; // "x,y,z" -> { x, y, z, channel }
+    this.signs = {};
+    this.portals = {};
     this.regions = [];
     this.blueprints = [];
     this.skins = [];
 
     this._saveTimers = {};
-    this._cachedRLE = null;
-    this._cachedNonAir = null;
     this._loadAll();
-  }
-
-  _invalidateWorldCache() {
-    this._cachedRLE = null;
-    this._cachedNonAir = null;
   }
 
   _readJson(filePath) {
     if (!fs.existsSync(filePath)) return null;
-    try {
-      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch (err) {
-      console.error(`[WorldStore] Failed to parse ${filePath}:`, err.message);
-      return null;
-    }
+    try { return JSON.parse(fs.readFileSync(filePath, 'utf8')); }
+    catch (err) { console.error(`[WorldStore] Parse error ${filePath}:`, err.message); return null; }
   }
 
   _writeJsonAtomic(filePath, data) {
@@ -91,8 +65,7 @@ export class WorldStore {
     fs.renameSync(tmpPath, filePath);
   }
 
-  _scheduleSave(kind, delayMs = 450) {
-    if (kind === 'world') this._invalidateWorldCache();
+  _scheduleSave(kind, delayMs = 400) {
     if (this._saveTimers[kind]) return;
     this._saveTimers[kind] = setTimeout(() => {
       delete this._saveTimers[kind];
@@ -102,23 +75,14 @@ export class WorldStore {
 
   saveNow(kind) {
     try {
-      if (kind === 'world') {
-        this._writeJsonAtomic(this.files.world, { version: 2, bounds: WORLD_BOUNDS, rle: encodeRLE(this.grid) });
-      } else if (kind === 'chests') {
-        this._writeJsonAtomic(this.files.chests, this.chests);
-      } else if (kind === 'furnaces') {
-        this._writeJsonAtomic(this.files.furnaces, this.furnaces);
-      } else if (kind === 'signs') {
-        this._writeJsonAtomic(this.files.signs, this.signs);
-      } else if (kind === 'portals') {
-        this._writeJsonAtomic(this.files.portals, this.portals);
-      } else if (kind === 'regions') {
-        this._writeJsonAtomic(this.files.regions, this.regions);
-      } else if (kind === 'blueprints') {
-        this._writeJsonAtomic(this.files.blueprints, this.blueprints);
-      } else if (kind === 'skins') {
-        this._writeJsonAtomic(this.files.skins, this.skins);
-      }
+      if (kind === 'world') this._writeJsonAtomic(this.files.deltas, Object.fromEntries(this.deltas));
+      else if (kind === 'chests') this._writeJsonAtomic(this.files.chests, this.chests);
+      else if (kind === 'furnaces') this._writeJsonAtomic(this.files.furnaces, this.furnaces);
+      else if (kind === 'signs') this._writeJsonAtomic(this.files.signs, this.signs);
+      else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
+      else if (kind === 'regions') this._writeJsonAtomic(this.files.regions, this.regions);
+      else if (kind === 'blueprints') this._writeJsonAtomic(this.files.blueprints, this.blueprints);
+      else if (kind === 'skins') this._writeJsonAtomic(this.files.skins, this.skins);
     } catch (err) {
       console.error(`[WorldStore] Save error (${kind}):`, err);
     }
@@ -133,7 +97,7 @@ export class WorldStore {
   }
 
   _loadAll() {
-    const savedWorld = this._readJson(this.files.world);
+    const savedDeltas = this._readJson(this.files.deltas);
     const savedChests = this._readJson(this.files.chests);
     const savedFurnaces = this._readJson(this.files.furnaces);
     const savedSigns = this._readJson(this.files.signs);
@@ -142,24 +106,42 @@ export class WorldStore {
     const savedBlueprints = this._readJson(this.files.blueprints);
     const savedSkins = this._readJson(this.files.skins);
 
-    if (savedWorld && savedWorld.version === 2 && Array.isArray(savedWorld.rle)) {
-      this.grid = decodeRLE(savedWorld.rle, WORLD_VOLUME);
+    if (savedDeltas && typeof savedDeltas === 'object') {
+      for (const [k, v] of Object.entries(savedDeltas)) this.deltas.set(k, v);
       this.chests = savedChests || {};
       this.furnaces = savedFurnaces || {};
       this.signs = savedSigns || {};
       this.portals = savedPortals || {};
     } else {
-      console.log('[WorldStore] Generating Boxworld v4 (128x48x128 + portals + bed + sign + jumppad)...');
-      const init = generateInitialWorld();
-      this.grid = init.grid;
-      this.chests = init.chests;
+      console.log('[WorldStore] Initializing 1024x96x1024 Streaming Multi-Biome World...');
+      const starterChestSlots = Array(CHEST_SIZE).fill(null);
+      starterChestSlots[0] = { block: 'stone_pickaxe', count: 1 };
+      starterChestSlots[1] = { block: 'coal', count: 16 };
+      starterChestSlots[2] = { block: 'raw_iron', count: 8 };
+      starterChestSlots[3] = { block: 'iron_ingot', count: 6 };
+      starterChestSlots[4] = { block: 'brick', count: 64 };
+      starterChestSlots[5] = { block: 'glass', count: 32 };
+      starterChestSlots[6] = { block: 'wool_red', count: 32 };
+      starterChestSlots[7] = { block: 'wool_yellow', count: 32 };
+      starterChestSlots[8] = { block: 'lamp', count: 16 };
+
+      const sy = SURFACE_BASE + 1; // 37
+      this.chests = {
+        [`3,${sy},3`]: {
+          x: 3, y: sy, z: 3,
+          label: '공용 보관 상자',
+          owner: 'System',
+          createdAt: new Date().toISOString(),
+          slots: starterChestSlots
+        }
+      };
       this.furnaces = {};
       this.signs = {
-        '0,17,-4': { x: 0, y: 17, z: -4, text: 'Boxworld 광장!\n🌀 포털→지하광산\n🚀 점프패드 체험!', author: 'System' }
+        [`0,${sy},-4`]: { x: 0, y: sy, z: -4, text: 'Boxworld 대륙!\n1024×1024 다중 바이옴\n🌀 포털→지하광산', author: 'System' }
       };
       this.portals = {
-        '-4,17,-4': { x: -4, y: 17, z: -4, channel: '지하광산' },
-        '-21,4,-9': { x: -21, y: 4, z: -9, channel: '지하광산' }
+        [`-4,${sy},-4`]: { x: -4, y: sy, z: -4, channel: '지하광산' },
+        '-21,8,-9':      { x: -21, y: 8, z: -9, channel: '지하광산' }
       };
       this.saveNow('world');
       this.saveNow('chests');
@@ -172,36 +154,26 @@ export class WorldStore {
     if (!savedRegions) this.saveNow('regions');
 
     this.blueprints = (Array.isArray(savedBlueprints) && savedBlueprints.length > 0)
-      ? savedBlueprints
-      : generateDefaultBlueprints();
+      ? savedBlueprints : generateDefaultBlueprints();
     if (!savedBlueprints) this.saveNow('blueprints');
 
     this.skins = (Array.isArray(savedSkins) && savedSkins.length > 0)
-      ? savedSkins
-      : generateDefaultSkins();
+      ? savedSkins : generateDefaultSkins();
     if (!savedSkins) this.saveNow('skins');
 
     console.log(
-      `[WorldStore] Loaded v2 world (${this.countNonAir()} blocks, RLE=${encodeRLE(this.grid).length}), ` +
+      `[WorldStore] Ready (1024x96x1024 streaming, ${this.deltas.size} modified blocks, ` +
       `${Object.keys(this.chests).length} chests, ${this.regions.length} regions, ` +
-      `${this.blueprints.length} blueprints, ${this.skins.length} skins.`
+      `${this.blueprints.length} blueprints, ${this.skins.length} skins).`
     );
   }
 
-  countNonAir() {
-    if (this._cachedNonAir === null) {
-      let n = 0;
-      for (let i = 0; i < this.grid.length; i++) if (this.grid[i] !== 0) n++;
-      this._cachedNonAir = n;
-    }
-    return this._cachedNonAir;
+  getDeltasObject() {
+    return Object.fromEntries(this.deltas);
   }
 
-  getWorldRLE() {
-    if (!this._cachedRLE) {
-      this._cachedRLE = encodeRLE(this.grid);
-    }
-    return this._cachedRLE;
+  countModified() {
+    return this.deltas.size;
   }
 
   inBounds(x, y, z) {
@@ -215,17 +187,14 @@ export class WorldStore {
 
   getBlock(x, y, z) {
     if (!this.inBounds(x, y, z)) return null;
-    const num = this.grid[flatIndex(x, y, z)];
-    return num === 0 ? null : (NUM_TO_BLOCK[num] || null);
+    const k = keyOf(x, y, z);
+    if (this.deltas.has(k)) return this.deltas.get(k);
+    return getBaseBlock(x, y, z);
   }
 
   findProtectingRegion(x, y, z) {
     for (const r of this.regions) {
-      if (
-        x >= r.minX && x <= r.maxX &&
-        y >= r.minY && y <= r.maxY &&
-        z >= r.minZ && z <= r.maxZ
-      ) {
+      if (x >= r.minX && x <= r.maxX && y >= r.minY && y <= r.maxY && z >= r.minZ && z <= r.maxZ) {
         return r;
       }
     }
@@ -235,71 +204,52 @@ export class WorldStore {
   setBlock(x, y, z, blockId, ownerName = '') {
     if (!this.inBounds(x, y, z)) return false;
     const k = keyOf(x, y, z);
-    if (!blockId) {
-      this.grid[flatIndex(x, y, z)] = 0;
-      if (this.chests[k]) {
-        delete this.chests[k];
-        this._scheduleSave('chests', 100);
-      }
-      if (this.furnaces[k]) {
-        delete this.furnaces[k];
-        this._scheduleSave('furnaces', 100);
-      }
-      if (this.signs[k]) {
-        delete this.signs[k];
-        this._scheduleSave('signs', 100);
-      }
-      if (this.portals[k]) {
-        delete this.portals[k];
-        this._scheduleSave('portals', 100);
-      }
+    const val = blockId || null;
+    if (val && !BLOCKS[val]) return false;
+
+    const base = getBaseBlock(x, y, z);
+    if (val === base) this.deltas.delete(k);
+    else this.deltas.set(k, val);
+
+    if (!val) {
+      if (this.chests[k]) { delete this.chests[k]; this._scheduleSave('chests', 100); }
+      if (this.furnaces[k]) { delete this.furnaces[k]; this._scheduleSave('furnaces', 100); }
+      if (this.signs[k]) { delete this.signs[k]; this._scheduleSave('signs', 100); }
+      if (this.portals[k]) { delete this.portals[k]; this._scheduleSave('portals', 100); }
     } else {
-      const def = BLOCKS[blockId];
-      if (!def) return false;
-      this.grid[flatIndex(x, y, z)] = def.numId;
-      if (blockId === 'chest' && !this.chests[k]) {
+      if (val === 'chest' && !this.chests[k]) {
         this.chests[k] = {
-          x, y, z,
-          label: `${ownerName || '플레이어'}의 상자`,
-          owner: ownerName || 'Unknown',
-          createdAt: new Date().toISOString(),
-          slots: Array(CHEST_SIZE).fill(null)
+          x, y, z, label: `${ownerName || '플레이어'}의 상자`, owner: ownerName || 'Unknown',
+          createdAt: new Date().toISOString(), slots: Array(CHEST_SIZE).fill(null)
         };
         this._scheduleSave('chests', 100);
       }
-      if (blockId === 'furnace' && !this.furnaces[k]) {
+      if (val === 'furnace' && !this.furnaces[k]) {
         this.furnaces[k] = {
-          x, y, z,
-          owner: ownerName || 'Unknown',
-          input: null,
-          fuel: null,
-          output: null,
-          burnLeft: 0,
-          progress: 0
+          x, y, z, owner: ownerName || 'Unknown',
+          input: null, fuel: null, output: null, burnLeft: 0, progress: 0
         };
         this._scheduleSave('furnaces', 100);
       }
-      if (blockId === 'sign' && !this.signs[k]) {
+      if (val === 'sign' && !this.signs[k]) {
         this.signs[k] = { x, y, z, text: `${ownerName || '플레이어'}의 표지판`, author: ownerName || 'Unknown' };
         this._scheduleSave('signs', 100);
       }
-      if (blockId === 'portal' && !this.portals[k]) {
+      if (val === 'portal' && !this.portals[k]) {
         this.portals[k] = { x, y, z, channel: '기본' };
         this._scheduleSave('portals', 100);
       }
     }
-    this._scheduleSave('world', 450);
+    this._scheduleSave('world', 400);
     return true;
   }
 
-  // Tree felling when chopping the bottom log of a tree
   tryFellTree(x, y, z, isAdmin) {
     if (this.getBlock(x, y, z) !== 'wood') return null;
     const below = this.getBlock(x, y - 1, z);
-    if (below !== 'grass' && below !== 'dirt') return null;
+    if (below !== 'grass' && below !== 'dirt' && below !== 'wool_white') return null;
     if (this.getBlock(x, y + 1, z) !== 'wood') return null;
 
-    // Collect vertical trunk
     const trunk = [];
     let ty = y;
     while (ty <= WORLD_BOUNDS.maxY && this.getBlock(x, ty, z) === 'wood' && trunk.length < 10) {
@@ -309,15 +259,12 @@ export class WorldStore {
     }
     if (trunk.length < 2) return null;
 
-    // Verify leaves exist near the top of the trunk (distinguishes trees from wooden walls)
     const topY = trunk[trunk.length - 1].y;
     const leaves = [];
     for (let dx = -2; dx <= 2; dx++) {
       for (let dz = -2; dz <= 2; dz++) {
         for (let dy = -2; dy <= 2; dy++) {
-          const lx = x + dx;
-          const ly = topY + dy;
-          const lz = z + dz;
+          const lx = x + dx, ly = topY + dy, lz = z + dz;
           if (this.getBlock(lx, ly, lz) === 'leaves') {
             if (!isAdmin && this.findProtectingRegion(lx, ly, lz)) continue;
             leaves.push({ x: lx, y: ly, z: lz });
@@ -325,30 +272,21 @@ export class WorldStore {
         }
       }
     }
-    if (leaves.length < 4) return null; // Not a real tree
+    if (leaves.length < 4) return null;
 
     const changes = [];
-    for (const p of trunk) {
-      this.grid[flatIndex(p.x, p.y, p.z)] = 0;
+    for (const p of [...trunk, ...leaves]) {
+      this.setBlock(p.x, p.y, p.z, null);
       changes.push({ x: p.x, y: p.y, z: p.z, block: null });
     }
-    for (const p of leaves) {
-      this.grid[flatIndex(p.x, p.y, p.z)] = 0;
-      changes.push({ x: p.x, y: p.y, z: p.z, block: null });
-    }
-    this._scheduleSave('world', 300);
-
-    const saplingCount = 1 + Math.floor(Math.random() * 2); // 1~2 saplings
-    const appleCount = 1 + Math.floor(Math.random() * 2);   // 1~2 apples
     return {
       changes,
       woodCount: trunk.length,
-      saplingCount,
-      appleCount
+      saplingCount: 1 + Math.floor(Math.random() * 2),
+      appleCount: 1 + Math.floor(Math.random() * 2)
     };
   }
 
-  // Grow a planted sapling into a full tree
   growSapling(x, y, z) {
     if (this.getBlock(x, y, z) !== 'sapling') return null;
     const changes = [];
@@ -356,12 +294,21 @@ export class WorldStore {
       if (!this.inBounds(bx, by, bz)) return;
       const cur = this.getBlock(bx, by, bz);
       if (cur && cur !== 'sapling' && cur !== 'leaves') return;
-      this.grid[flatIndex(bx, by, bz)] = BLOCKS[blockId].numId;
+      this.setBlock(bx, by, bz, blockId);
       changes.push({ x: bx, y: by, z: bz, block: blockId });
     };
-    this.grid[flatIndex(x, y, z)] = 0;
-    placeTreeOnGrid(this.grid, x, y - 1, z, set);
-    this._scheduleSave('world', 300);
+    const trunkH = 4 + (Math.abs(x + z) % 2);
+    for (let dy = 0; dy < trunkH; dy++) set(x, y + dy, z, 'wood');
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dy = trunkH - 2; dy <= trunkH; dy++) {
+          if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && dy === trunkH) continue;
+          if (dx === 0 && dz === 0 && dy < trunkH) continue;
+          set(x + dx, y + dy, z + dz, 'leaves');
+        }
+      }
+    }
+    set(x, y + trunkH + 1, z, 'leaves');
     return changes;
   }
 
@@ -370,11 +317,8 @@ export class WorldStore {
     if (this.getBlock(x, y, z) !== 'chest') return null;
     if (!this.chests[k]) {
       this.chests[k] = {
-        x, y, z,
-        label: '보관 상자',
-        owner: 'Unknown',
-        createdAt: new Date().toISOString(),
-        slots: Array(CHEST_SIZE).fill(null)
+        x, y, z, label: '보관 상자', owner: 'Unknown',
+        createdAt: new Date().toISOString(), slots: Array(CHEST_SIZE).fill(null)
       };
       this._scheduleSave('chests', 100);
     }
@@ -383,13 +327,10 @@ export class WorldStore {
 
   isChestEmpty(x, y, z) {
     const chest = this.chests[keyOf(x, y, z)];
-    if (!chest) return true;
-    return chest.slots.every(s => !s || s.count <= 0);
+    return !chest || chest.slots.every(s => !s || s.count <= 0);
   }
 
-  saveChestsSoon() {
-    this._scheduleSave('chests', 100);
-  }
+  saveChestsSoon() { this._scheduleSave('chests', 100); }
 
   getFurnace(x, y, z) {
     const k = keyOf(x, y, z);
@@ -403,35 +344,27 @@ export class WorldStore {
 
   isFurnaceEmpty(x, y, z) {
     const f = this.furnaces[keyOf(x, y, z)];
-    if (!f) return true;
-    return !f.input && !f.fuel && !f.output;
+    return !f || (!f.input && !f.fuel && !f.output);
   }
 
-  saveFurnacesSoon() {
-    this._scheduleSave('furnaces', 100);
-  }
+  saveFurnacesSoon() { this._scheduleSave('furnaces', 100); }
 
-  // Advance all active furnaces by 1 second; returns array of updated furnace keys
   tickFurnaces() {
     const updatedKeys = [];
     for (const [k, f] of Object.entries(this.furnaces)) {
       if (this.getBlock(f.x, f.y, f.z) !== 'furnace') continue;
       const recipe = f.input ? SMELT_MAP[f.input.block] : null;
       const canOutput = recipe && (!f.output || (f.output.block === recipe.out && f.output.count + recipe.count <= 64));
-
       if (!canOutput) {
         if (f.progress > 0) { f.progress = 0; updatedKeys.push(k); }
         continue;
       }
-
-      // Consume fuel if burnLeft == 0
       if (f.burnLeft <= 0 && f.fuel && FUEL_POWER[f.fuel.block]) {
-        f.burnLeft = FUEL_POWER[f.fuel.block] * 3; // seconds of burn time
+        f.burnLeft = FUEL_POWER[f.fuel.block] * 3;
         f.fuel.count -= 1;
         if (f.fuel.count <= 0) f.fuel = null;
         updatedKeys.push(k);
       }
-
       if (f.burnLeft > 0) {
         f.burnLeft -= 1;
         f.progress += 1;
@@ -481,9 +414,7 @@ export class WorldStore {
     const src = this.portals[k];
     if (!src) return null;
     for (const [ok, p] of Object.entries(this.portals)) {
-      if (ok !== k && p.channel === src.channel && this.getBlock(p.x, p.y, p.z) === 'portal') {
-        return p;
-      }
+      if (ok !== k && p.channel === src.channel && this.getBlock(p.x, p.y, p.z) === 'portal') return p;
     }
     return null;
   }
@@ -513,14 +444,10 @@ export class WorldStore {
     const region = {
       id: `reg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: String(name || '보호 구역').trim().slice(0, 30),
-      minX: Math.min(pos1.x, pos2.x),
-      maxX: Math.max(pos1.x, pos2.x),
-      minY: Math.min(pos1.y, pos2.y),
-      maxY: Math.max(pos1.y, pos2.y),
-      minZ: Math.min(pos1.z, pos2.z),
-      maxZ: Math.max(pos1.z, pos2.z),
-      createdBy,
-      createdAt: new Date().toISOString()
+      minX: Math.min(pos1.x, pos2.x), maxX: Math.max(pos1.x, pos2.x),
+      minY: Math.min(pos1.y, pos2.y), maxY: Math.max(pos1.y, pos2.y),
+      minZ: Math.min(pos1.z, pos2.z), maxZ: Math.max(pos1.z, pos2.z),
+      createdBy, createdAt: new Date().toISOString()
     };
     this.regions.push(region);
     this.saveNow('regions');
@@ -536,13 +463,9 @@ export class WorldStore {
   }
 
   captureBlueprint({ name, pos1, pos2, author }) {
-    const minX = Math.min(pos1.x, pos2.x);
-    const maxX = Math.max(pos1.x, pos2.x);
-    const minY = Math.min(pos1.y, pos2.y);
-    const maxY = Math.max(pos1.y, pos2.y);
-    const minZ = Math.min(pos1.z, pos2.z);
-    const maxZ = Math.max(pos1.z, pos2.z);
-
+    const minX = Math.min(pos1.x, pos2.x), maxX = Math.max(pos1.x, pos2.x);
+    const minY = Math.min(pos1.y, pos2.y), maxY = Math.max(pos1.y, pos2.y);
+    const minZ = Math.min(pos1.z, pos2.z), maxZ = Math.max(pos1.z, pos2.z);
     const blocks = [];
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
@@ -556,7 +479,6 @@ export class WorldStore {
     }
     if (blocks.length === 0) return { error: '선택한 영역에 블록이 없습니다.' };
     if (blocks.length > 1500) return { error: '설계도는 최대 1,500개 블록까지 저장할 수 있습니다.' };
-
     const bp = {
       id: `bp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: String(name || '새 설계도').trim().slice(0, 30),
@@ -591,8 +513,7 @@ export class WorldStore {
         eyeColor: String(skin?.eyeColor || '#0f172a').slice(0, 16),
         blush: !!skin?.blush,
         pixelDataUrl: (typeof skin?.pixelDataUrl === 'string' && skin.pixelDataUrl.startsWith('data:image/png;base64,') && skin.pixelDataUrl.length < 32000)
-          ? skin.pixelDataUrl
-          : null
+          ? skin.pixelDataUrl : null
       }
     };
     this.skins.unshift(entry);
@@ -622,8 +543,7 @@ export class WorldStore {
       eyeColor: String(skin?.eyeColor || '#0f172a').slice(0, 16),
       blush: !!skin?.blush,
       pixelDataUrl: (typeof skin?.pixelDataUrl === 'string' && skin.pixelDataUrl.startsWith('data:image/png;base64,') && skin.pixelDataUrl.length < 32000)
-        ? skin.pixelDataUrl
-        : null
+        ? skin.pixelDataUrl : null
     };
     this.saveNow('skins');
     return entry;

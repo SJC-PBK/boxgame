@@ -11,6 +11,7 @@ import { AnimalRenderer } from './animals.js';
 import { WorldExtras } from './worldExtras.js';
 import { TouchControls } from './touchControls.js';
 import { GameUI } from './ui.js';
+import { getBiomeAt, getBiomeLabel } from '../shared/terrainGen.js';
 
 // Global contextmenu suppression (fixes right-click browser menu when opening chests/furnaces!)
 window.addEventListener('contextmenu', (e) => {
@@ -256,7 +257,10 @@ function applyGameSettings(s) {
   invertY = !!s.invertY;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, s.quality || 2));
   sound.setVolume(typeof s.volume === 'number' ? s.volume : 1.0);
-  if (worldRenderer) worldRenderer.particlesEnabled = s.particles !== false;
+  if (worldRenderer) {
+    worldRenderer.particlesEnabled = s.particles !== false;
+    worldRenderer.setViewDistance(s.viewDist || 125);
+  }
   elHudCoords.classList.toggle('hidden', s.showCoords === false);
   touchControls.setEnabled(!!s.touchUI);
   document.getElementById('play-hint').classList.toggle('hidden', pointerLocked || !!s.touchUI);
@@ -417,7 +421,11 @@ function handleServerMessage(msg) {
         projector = null;
       }
       worldRenderer = new WorldRenderer(scene, textures, catalog, worldBounds);
-      worldRenderer.loadFromRLE(msg.worldRLE);
+      if (msg.worldRLE) {
+        worldRenderer.loadFromRLE(msg.worldRLE);
+      } else {
+        worldRenderer.loadStreaming(msg.worldDeltas, playerPos);
+      }
 
       if (!fpHand) fpHand = new FirstPersonHand(camera, catalog, textures);
       fpHand.setSkin(selfPlayer.skin);
@@ -979,7 +987,10 @@ function updatePhysics(dt) {
 
   playerPos.x = Math.max(worldBounds.minX + 0.5, Math.min(worldBounds.maxX + 0.5, playerPos.x));
   playerPos.z = Math.max(worldBounds.minZ + 0.5, Math.min(worldBounds.maxZ + 0.5, playerPos.z));
-  if (playerPos.y < -5) { playerPos.set(0.5, 18, 0.5); playerVel.set(0, 0, 0); }
+  if (playerPos.y < -5) {
+    playerPos.set(0.5, currentWorldMode === 'job' ? 5.5 : 38, 0.5);
+    playerVel.set(0, 0, 0);
+  }
   return isMoving;
 }
 
@@ -1032,7 +1043,7 @@ function animate(now) {
     remotePlayers.update(dt);
     animalRenderer.update(dt);
     worldExtras.update(dt);
-    sky.update(dt, playerPos);
+    sky.update(dt, playerPos, currentWorldMode === 'job' ? 4 : 36);
     sound.updateListener(playerPos, yaw);
 
     const { eyePos, lookDir } = getEyeAndLook();
@@ -1065,6 +1076,7 @@ function animate(now) {
     }
 
     if (worldRenderer) {
+      worldRenderer.updateStreaming(playerPos);
       currentHit = worldRenderer.raycast(eyePos, lookDir, 7);
       updateMining(dt);
       const ratio = miningTargetKey && Number.isFinite(miningDuration) ? Math.min(1, miningElapsed / miningDuration) : 0;
@@ -1080,7 +1092,9 @@ function animate(now) {
 
     if (fpHand) fpHand.update(dt, isMoving, (isLeftDown && pointerLocked) || (isTouchMining && touchControls.enabled));
 
-    const coordsStr = `XYZ: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)}`;
+    const bx = Math.floor(playerPos.x), by = Math.floor(playerPos.y), bz = Math.floor(playerPos.z);
+    const biomePrefix = currentWorldMode === 'sandbox' ? `${getBiomeLabel(getBiomeAt(bx, bz))} ` : '';
+    const coordsStr = `${biomePrefix}XYZ: ${bx}, ${by}, ${bz}`;
     if (coordsStr !== lastCoordsStr) { lastCoordsStr = coordsStr; elHudCoords.textContent = coordsStr; }
     const timeStr = sky.getTimeLabel();
     if (timeStr !== lastTimeStr) { lastTimeStr = timeStr; elHudTime.textContent = timeStr; }
