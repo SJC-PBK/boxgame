@@ -38,8 +38,16 @@ scene.add(hemiLight);
 const dirLight = new THREE.DirectionalLight(0xfffbe6, 0.78);
 dirLight.position.set(45, 80, 35);
 scene.add(dirLight);
-const playerLight = new THREE.PointLight(0xffe6b3, 0, 10, 1.6);
+const playerLight = new THREE.PointLight(0xffe6b3, 0, 10, 1.35);
 scene.add(playerLight);
+const HELD_LIGHT_PROPS = {
+  lamp:    { intensity: 3.4, distance: 16, color: new THREE.Color(0xffe49c) },
+  portal:  { intensity: 2.3, distance: 12, color: new THREE.Color(0xc084fc) },
+  furnace: { intensity: 1.9, distance: 10, color: new THREE.Color(0xfb923c) },
+  jumppad: { intensity: 1.6, distance: 9,  color: new THREE.Color(0x38bdf8) }
+};
+const DEFAULT_PLAYER_LIGHT_COLOR = new THREE.Color(0xffe6b3);
+let cameraShake = 0;
 
 const sky = new SkySystem(scene, hemiLight, dirLight);
 const sound = new SoundEngine();
@@ -537,13 +545,20 @@ function handleServerMessage(msg) {
       ui.toast('🧨 치이익... 3초 후 TNT가 폭발합니다!', 'warn');
       break;
 
-    case 'tnt_explode':
-      sound.playExplosion({ x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
+    case 'tnt_explode': {
+      const ex = msg.x + 0.5, ey = msg.y + 0.5, ez = msg.z + 0.5;
+      sound.playExplosion({ x: ex, y: ey, z: ez });
+      worldExtras.explodeTNT(msg.x, msg.y, msg.z);
       if (worldRenderer) {
-        worldRenderer.spawnBreakParticles(msg.x, msg.y, msg.z, 'tnt', 28);
-        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'stone', 18);
+        worldRenderer.spawnBreakParticles(msg.x, msg.y, msg.z, 'tnt', 34);
+        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'stone', 22);
+      }
+      const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
+      if (dist < 26) {
+        cameraShake = Math.max(cameraShake, (1 - dist / 26) * 0.65);
       }
       break;
+    }
 
     case 'warp_to':
       warpPlayer(msg.x, msg.y, msg.z, msg.label);
@@ -1098,20 +1113,40 @@ function animate(now) {
     sky.update(dt, playerPos, currentWorldMode === 'job' ? 4 : 36);
     sound.updateListener(playerPos, yaw);
 
-    // Smoothly brighten first-person hand & nearby entities based on voxel block-light at player position
+    const { eyePos, lookDir } = getEyeAndLook();
+
+    // Handheld light-emitting block (lamp/portal/furnace/jumppad) OR local voxel block-light
     if (worldRenderer) {
+      const heldLight = HELD_LIGHT_PROPS[ui.getActiveItemId()];
       const bl = worldRenderer.getBlockLightAt(
         Math.floor(playerPos.x),
         Math.floor(playerPos.y + 1.1),
         Math.floor(playerPos.z)
       );
       const nightFactor = 1 - (sky.dayLight ?? 1) * 0.7;
-      const targetInt = (bl / 14) * 1.15 * nightFactor;
-      playerLight.position.set(playerPos.x, playerPos.y + 1.4, playerPos.z);
-      playerLight.intensity += (targetInt - playerLight.intensity) * Math.min(1, dt * 10);
+      let targetInt = (bl / 14) * 1.15 * nightFactor;
+      let targetDist = 10;
+      let targetColor = DEFAULT_PLAYER_LIGHT_COLOR;
+
+      if (heldLight) {
+        const flicker = 1 + Math.sin(now * 0.009) * 0.045;
+        targetInt = Math.max(targetInt, heldLight.intensity * flicker);
+        targetDist = heldLight.distance;
+        targetColor = heldLight.color;
+        playerLight.position.set(
+          eyePos.x + lookDir.x * 0.45,
+          eyePos.y + lookDir.y * 0.35 - 0.12,
+          eyePos.z + lookDir.z * 0.45
+        );
+      } else {
+        playerLight.position.set(playerPos.x, playerPos.y + 1.4, playerPos.z);
+      }
+      const lerpAmt = Math.min(1, dt * 12);
+      playerLight.intensity += (targetInt - playerLight.intensity) * lerpAmt;
+      playerLight.distance += (targetDist - playerLight.distance) * lerpAmt;
+      playerLight.color.lerp(targetColor, lerpAmt);
     }
 
-    const { eyePos, lookDir } = getEyeAndLook();
     if (thirdPerson) {
       _camPos.copy(eyePos).addScaledVector(lookDir, -3.8);
       _camPos.y += 0.6;
@@ -1121,6 +1156,13 @@ function animate(now) {
       camera.position.copy(eyePos);
       camera.rotation.y = yaw;
       camera.rotation.x = pitch;
+    }
+
+    if (cameraShake > 0.002) {
+      camera.position.x += (Math.random() - 0.5) * cameraShake;
+      camera.position.y += (Math.random() - 0.5) * cameraShake;
+      camera.position.z += (Math.random() - 0.5) * cameraShake;
+      cameraShake = Math.max(0, cameraShake - dt * 1.35);
     }
 
     if (selfRig) {
