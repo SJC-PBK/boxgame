@@ -771,8 +771,9 @@ export class TextureLibrary {
         const opts = {
           transparent: isTransparent,
           opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : 1.0),
+          depthWrite: def.id !== 'water',
           alphaTest: (def.id === 'leaves' || isCross || def.id === 'door_closed' || def.id === 'door_open') ? 0.25 : 0,
-          side: (isCross || def.id === 'door_closed' || def.id === 'door_open' || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
+          side: (isCross || def.id === 'water' || def.id === 'door_closed' || def.id === 'door_open' || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
           emissive: def.id === 'lamp' ? new THREE.Color('#fef08a')
             : def.id === 'portal' ? new THREE.Color('#a855f7')
             : def.id === 'furnace' ? new THREE.Color('#f97316')

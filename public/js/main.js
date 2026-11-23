@@ -619,6 +619,7 @@ function handleServerMessage(msg) {
       const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
       if (dist < 18) {
         cameraShake = Math.max(cameraShake, (1 - dist / 18) * 0.24);
+        ui.toast('💧 주변 빈 공간에 물 블록을 채웠습니다!', 'success');
       }
       break;
     }
@@ -1249,6 +1250,19 @@ function animate(now) {
       camera.position.y += (Math.random() - 0.5) * cameraShake;
       camera.position.z += (Math.random() - 0.5) * cameraShake;
       cameraShake = Math.max(0, cameraShake - dt * 1.35);
+    }
+
+    // Subtle underwater blue tint when camera is submerged inside a water block
+    if (worldRenderer) {
+      const camBlock = worldRenderer.getBlock(
+        Math.floor(camera.position.x),
+        Math.floor(camera.position.y),
+        Math.floor(camera.position.z)
+      );
+      if (camBlock === 'water') {
+        scene.fog.color.setHex(0x0369a1);
+        scene.background.setHex(0x0369a1);
+      }
     }
 
     if (selfRig) {
