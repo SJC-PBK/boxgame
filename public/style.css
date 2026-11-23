@@ -372,8 +372,15 @@ input[type="text"], input[type="password"] {
 }
 .req-chip.have { background: rgba(22, 163, 74, 0.3); color: #bbf7d0; border-color: rgba(34, 197, 94, 0.65); }
 
-.top-right-wrap { position: relative; pointer-events: auto; }
+.top-right-wrap {
+  position: relative; pointer-events: auto;
+  display: flex; align-items: center; gap: 6px;
+}
+.top-right-pinned { display: flex; align-items: center; gap: 6px; order: 2; }
 .mobile-menu-btn { display: none; }
+.fullscreen-btn {
+  font-size: 15px; line-height: 1; padding: 6px 9px;
+}
 
 /* Mobile / Tablet Touch Controls */
 .touch-controls {
@@ -419,6 +426,8 @@ input[type="text"], input[type="password"] {
 .t-act-btn.pressed, .t-act-btn:active { transform: scale(0.93); background: rgba(56, 189, 248, 0.38); }
 
 @media (max-width: 920px) {
+  .top-right-wrap { width: 100%; justify-content: space-between; }
+  .top-right-pinned { width: 100%; justify-content: space-between; }
   .mobile-menu-btn { display: inline-flex; align-items: center; gap: 4px; }
   #hud-mode { display: none; }
   .top-right {
@@ -436,14 +445,14 @@ input[type="text"], input[type="password"] {
   .hotbar { gap: 3px; padding: 4px; max-width: 96vw; }
   .hotbar .slot { width: clamp(32px, 9.4vw, 44px); height: clamp(32px, 9.4vw, 44px); }
   .hotbar .slot img { width: 70%; height: 70%; }
-  .player-list { top: 48px; right: 10px; min-width: 100px; }
+  .player-list { top: 86px; right: 10px; min-width: 100px; }
   .chat-panel {
-    top: 84px; right: 10px; left: auto; bottom: auto;
+    top: 120px; right: 10px; left: auto; bottom: auto;
     width: min(235px, 60vw);
   }
   .chat-messages { max-height: 110px; font-size: 11.5px; padding: 6px 8px; }
   .chat-hint { text-align: right; font-size: 10.5px; }
-  .toast-container { top: 84px; right: 10px; }
+  .toast-container { top: 120px; right: 10px; }
   .info-pill { font-size: 11px; padding: 4px 7px; }
 }
 

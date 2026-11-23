@@ -71,6 +71,33 @@ export class GameUI {
         topRightMenu.classList.remove('mobile-open');
       });
     }
+    const fsBtn = document.getElementById('btn-fullscreen');
+    if (fsBtn) {
+      const updateFsIcon = () => {
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        fsBtn.textContent = isFs ? '✕' : '⛶';
+        fsBtn.title = isFs ? '전체화면 종료' : '전체화면 전환 (브라우저 표시줄 숨기기)';
+      };
+      document.addEventListener('fullscreenchange', updateFsIcon);
+      document.addEventListener('webkitfullscreenchange', updateFsIcon);
+      fsBtn.addEventListener('click', async () => {
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        try {
+          if (!isFs) {
+            const el = document.documentElement;
+            if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' });
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            else this.toast('📱 아이폰 Safari는 공유 → "홈 화면에 추가"로 전체화면 실행이 가능합니다.', 'info');
+          } else {
+            if (document.exitFullscreen) await document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+          }
+        } catch {
+          this.toast('전체화면 전환이 이 브라우저에서 제한되었습니다.', 'warn');
+        }
+      });
+    }
+
     document.getElementById('chat-hint')?.addEventListener('click', () => this.openChat());
     document.getElementById('btn-job-clear')?.addEventListener('click', () => this.cb.send({ type: 'job_clear_bag' }));
 
