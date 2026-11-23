@@ -28,27 +28,16 @@ export class RegionVisualizer {
       const h = r.maxY - r.minY + 1;
       const d = r.maxZ - r.minZ + 1;
 
-      const boxGeo = new THREE.BoxGeometry(w + 0.04, h + 0.04, d + 0.04);
+      // Crisp wireframe border only (zero transparent full-screen fill-rate lag!)
+      const boxGeo = new THREE.BoxGeometry(w + 0.06, h + 0.06, d + 0.06);
       const edges = new THREE.EdgesGeometry(boxGeo);
+      boxGeo.dispose();
       const line = new THREE.LineSegments(
         edges,
-        new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.9 })
+        new THREE.LineBasicMaterial({ color: r.id === 'beacon-auto-zone' ? 0x38bdf8 : 0xf59e0b })
       );
       line.position.set(r.minX + w / 2, r.minY + h / 2, r.minZ + d / 2);
       this.group.add(line);
-
-      const fill = new THREE.Mesh(
-        boxGeo,
-        new THREE.MeshBasicMaterial({
-          color: 0xf59e0b,
-          transparent: true,
-          opacity: 0.07,
-          depthWrite: false,
-          side: THREE.DoubleSide
-        })
-      );
-      fill.position.copy(line.position);
-      this.group.add(fill);
     }
 
     this.group.visible = this.visible;
