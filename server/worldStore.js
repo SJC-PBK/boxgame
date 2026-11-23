@@ -33,6 +33,7 @@ export class WorldStore {
       furnaces: path.join(this.dataDir, 'furnaces.json'),
       signs: path.join(this.dataDir, 'signs.json'),
       portals: path.join(this.dataDir, 'portals.json'),
+      beacons: path.join(this.dataDir, 'beacons.json'),
       regions: path.join(this.dataDir, 'regions.json'),
       blueprints: path.join(this.dataDir, 'blueprints.json'),
       skins: path.join(this.dataDir, 'skins.json')
@@ -45,6 +46,7 @@ export class WorldStore {
     this.furnaces = {};
     this.signs = {};
     this.portals = {};
+    this.beacons = {};
     this.regions = [];
     this.blueprints = [];
     this.skins = [];
@@ -80,6 +82,7 @@ export class WorldStore {
       else if (kind === 'furnaces') this._writeJsonAtomic(this.files.furnaces, this.furnaces);
       else if (kind === 'signs') this._writeJsonAtomic(this.files.signs, this.signs);
       else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
+      else if (kind === 'beacons') this._writeJsonAtomic(this.files.beacons, this.beacons);
       else if (kind === 'regions') this._writeJsonAtomic(this.files.regions, this.regions);
       else if (kind === 'blueprints') this._writeJsonAtomic(this.files.blueprints, this.blueprints);
       else if (kind === 'skins') this._writeJsonAtomic(this.files.skins, this.skins);
@@ -102,6 +105,7 @@ export class WorldStore {
     const savedFurnaces = this._readJson(this.files.furnaces);
     const savedSigns = this._readJson(this.files.signs);
     const savedPortals = this._readJson(this.files.portals);
+    const savedBeacons = this._readJson(this.files.beacons);
     const savedRegions = this._readJson(this.files.regions);
     const savedBlueprints = this._readJson(this.files.blueprints);
     const savedSkins = this._readJson(this.files.skins);
@@ -112,6 +116,7 @@ export class WorldStore {
       this.furnaces = savedFurnaces || {};
       this.signs = savedSigns || {};
       this.portals = savedPortals || {};
+      this.beacons = savedBeacons || {};
     } else {
       console.log('[WorldStore] Initializing 1024x96x1024 Streaming Multi-Biome World...');
       const starterChestSlots = Array(CHEST_SIZE).fill(null);
@@ -151,6 +156,7 @@ export class WorldStore {
     }
 
     this.regions = Array.isArray(savedRegions) ? savedRegions : [];
+    this._syncBeaconRegion(false);
     if (!savedRegions) this.saveNow('regions');
 
     this.blueprints = (Array.isArray(savedBlueprints) && savedBlueprints.length > 0)
@@ -216,6 +222,11 @@ export class WorldStore {
       if (this.furnaces[k]) { delete this.furnaces[k]; this._scheduleSave('furnaces', 100); }
       if (this.signs[k]) { delete this.signs[k]; this._scheduleSave('signs', 100); }
       if (this.portals[k]) { delete this.portals[k]; this._scheduleSave('portals', 100); }
+      if (this.beacons[k]) {
+        delete this.beacons[k];
+        this._scheduleSave('beacons', 100);
+        this._syncBeaconRegion(true);
+      }
     } else {
       if (val === 'chest' && !this.chests[k]) {
         this.chests[k] = {
@@ -239,9 +250,38 @@ export class WorldStore {
         this.portals[k] = { x, y, z, channel: '기본' };
         this._scheduleSave('portals', 100);
       }
+      if (val === 'protect_beacon' && !this.beacons[k]) {
+        this.beacons[k] = { x, y, z, owner: ownerName || '관리자' };
+        this._scheduleSave('beacons', 100);
+        this._syncBeaconRegion(true);
+      }
     }
     this._scheduleSave('world', 400);
     return true;
+  }
+
+  _syncBeaconRegion(save = true) {
+    const list = Object.values(this.beacons || {});
+    this.regions = this.regions.filter(r => r.id !== 'beacon-auto-zone');
+    if (list.length >= 2) {
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const b of list) {
+        if (b.x < minX) minX = b.x;
+        if (b.x > maxX) maxX = b.x;
+        if (b.z < minZ) minZ = b.z;
+        if (b.z > maxZ) maxZ = b.z;
+      }
+      this.regions.push({
+        id: 'beacon-auto-zone',
+        name: `🛡️ 비콘 보호 구역 (${list.length}개)`,
+        minX, maxX,
+        minY: WORLD_BOUNDS.minY, maxY: WORLD_BOUNDS.maxY,
+        minZ, maxZ,
+        createdBy: '보호 비콘',
+        createdAt: new Date().toISOString()
+      });
+    }
+    if (save) this._scheduleSave('regions', 100);
   }
 
   tryFellTree(x, y, z, isAdmin) {
@@ -444,6 +484,7 @@ export class WorldStore {
           if (!isAdmin && this.findProtectingRegion(x, y, z)) continue;
           if (b === 'chest' && !this.isChestEmpty(x, y, z)) continue;
           if (b === 'furnace' && !this.isFurnaceEmpty(x, y, z)) continue;
+          if (b === 'protect_beacon' && !isAdmin) continue;
 
           // Chain-ignite other nearby TNT blocks instead of silently erasing them!
           if (b === 'tnt' && !(x === cx && y === cy && z === cz)) {
@@ -522,7 +563,7 @@ export class WorldStore {
             continue;
           }
           // Only fill completely empty (air) spaces — never overwrite existing blocks/buildings!
-          if (b !== null) continue;
+          if (b) continue;
           this.setBlock(x, y, z, fillBlockId);
           changes.push({ x, y, z, block: fillBlockId });
         }

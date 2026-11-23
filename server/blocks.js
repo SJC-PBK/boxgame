@@ -65,7 +65,8 @@ export const BLOCKS = {
   job_pickup:   { numId: 43, id: 'job_pickup',   name: '🛎️ 픽업 서빙대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
   fuse:         { numId: 44, id: 'fuse',         name: '도화선 (심지)', transparent: true,  solid: false, hardness: 0.1,      preferredTool: null, minTier: 0,  drop: 'fuse', sound: 'dirt',  stackable: 64, category: '특수' },
   fill_bomb:    { numId: 45, id: 'fill_bomb',    name: '흙 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'fill_bomb', sound: 'dirt', stackable: 16, category: '특수' },
-  water_bomb:   { numId: 46, id: 'water_bomb',   name: '물 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'water_bomb', sound: 'glass', stackable: 16, category: '특수' }
+  water_bomb:   { numId: 46, id: 'water_bomb',   name: '물 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'water_bomb', sound: 'glass', stackable: 16, category: '특수' },
+  protect_beacon: { numId: 47, id: 'protect_beacon', name: '🛡️ 보호 비콘', transparent: false, solid: true, hardness: 1.0, preferredTool: null, minTier: 0, drop: 'protect_beacon', sound: 'glass', stackable: 16, category: '관리자' }
 };
 
 export const NUM_TO_BLOCK = {};

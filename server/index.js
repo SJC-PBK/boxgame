@@ -419,10 +419,23 @@ wss.on('connection', (ws) => {
       };
 
       const bag = worldMode === 'job' ? Array(BAG_SIZE).fill(null) : createStarterBag();
+      if (isAdminLogin && worldMode === 'sandbox') {
+        addItemToSlots(bag, 'protect_beacon', 16);
+      }
       const tools = worldMode === 'job' ? null : createStarterTools();
-      const startPos = worldMode === 'job'
-        ? { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z }
-        : { x: 0.5 + (Math.random() - 0.5) * 3, y: 37.1, z: 0.5 + (Math.random() - 0.5) * 3 };
+      let startPos;
+      if (worldMode === 'job') {
+        startPos = { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z };
+      } else {
+        const sx = 0.5 + (Math.random() - 0.5) * 3;
+        const sz = 0.5 + (Math.random() - 0.5) * 3;
+        let sy = 37;
+        const bx = Math.floor(sx), bz = Math.floor(sz);
+        while (sy < WORLD_BOUNDS.maxY - 2 && (store.getBlock(bx, sy, bz) || store.getBlock(bx, sy + 1, bz))) {
+          sy++;
+        }
+        startPos = { x: sx, y: sy + 0.1, z: sz };
+      }
 
       const initialOrder = worldMode === 'job' ? pickRandomCafeOrder() : null;
 
@@ -461,6 +474,7 @@ wss.on('connection', (ws) => {
         animals: worldMode === 'job' ? [] : animals.serializeAll(),
         signs: worldMode === 'job' ? jobWorld.signs : store.signs,
         portals: worldMode === 'job' ? {} : store.portals,
+        beacons: worldMode === 'job' ? {} : store.beacons,
         players: sameWorldPlayers.map(serializePlayer),
         regions: worldMode === 'job' ? [] : store.regions,
         blueprints: worldMode === 'job' ? [] : store.blueprints,
@@ -677,6 +691,10 @@ wss.on('connection', (ws) => {
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
 
         const blockId = slot.block;
+        if (blockId === 'protect_beacon' && !player.isAdmin) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 설치할 수 있습니다.' });
+          return;
+        }
         if (blockId === 'sapling') {
           const below = store.getBlock(x, y - 1, z);
           if (below !== 'grass' && below !== 'dirt') {
@@ -697,6 +715,19 @@ wss.on('connection', (ws) => {
         }
         if (blockId === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
         if (blockId === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
+        if (blockId === 'protect_beacon') {
+          broadcast({ type: 'beacons_update', beacons: store.beacons });
+          broadcast({ type: 'regions_update', regions: store.regions });
+          const bCount = Object.keys(store.beacons).length;
+          if (bCount < 2) {
+            send(ws, { type: 'toast', level: 'info', text: '🛡️ 첫 번째 보호 비콘 설치! 반대편 모서리에 1개 더 꽂으면 안쪽 공간이 모두 보호됩니다.' });
+          } else {
+            const zReg = store.regions.find(r => r.id === 'beacon-auto-zone');
+            const w = zReg ? (zReg.maxX - zReg.minX + 1) : 0;
+            const d = zReg ? (zReg.maxZ - zReg.minZ + 1) : 0;
+            send(ws, { type: 'toast', level: 'success', text: `🛡️ 비콘 보호 구역 활성화! (${bCount}개 비콘 · ${w}×${d} 영역 전체 보호)` });
+          }
+        }
         break;
       }
 
@@ -710,7 +741,7 @@ wss.on('connection', (ws) => {
         const slot = player.bag[idx];
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
         const blockId = slot.block;
-        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'sapling'].includes(blockId)) return;
+        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'fuse', 'protect_beacon', 'sapling'].includes(blockId)) return;
 
         const changes = [];
         for (const p of positions) {
@@ -1034,6 +1065,10 @@ wss.on('connection', (ws) => {
         if (!store.inBounds(x, y, z)) return;
         const existing = store.getBlock(x, y, z);
         if (!existing) return;
+        if (existing === 'protect_beacon' && !player.isAdmin) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 철거할 수 있습니다.' });
+          return;
+        }
         const bDef = BLOCKS[existing];
         if (!bDef || !Number.isFinite(bDef.hardness)) {
           send(ws, { type: 'toast', level: 'warn', text: '이 블록은 부술 수 없습니다.' });
@@ -1107,6 +1142,17 @@ wss.on('connection', (ws) => {
         broadcast({ type: 'block_update', x, y, z, block: null, by: player.nickname, brokenBlock: existing });
         if (existing === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
         if (existing === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
+        if (existing === 'protect_beacon') {
+          broadcast({ type: 'beacons_update', beacons: store.beacons });
+          broadcast({ type: 'regions_update', regions: store.regions });
+          const bCount = Object.keys(store.beacons).length;
+          send(ws, {
+            type: 'toast', level: 'info',
+            text: bCount >= 2
+              ? `🛡️ 보호 비콘 철거 (남은 비콘 ${bCount}개로 보호 구역 재계산됨)`
+              : '🛡️ 보호 비콘이 2개 미만이라 비콘 보호 구역이 해제되었습니다.'
+          });
+        }
         break;
       }
 
@@ -1198,6 +1244,10 @@ wss.on('connection', (ws) => {
         const itemId = String(msg.block || '');
         const def = CATALOG[itemId];
         if (!def) return;
+        if (itemId === 'protect_beacon' && !player.isAdmin) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 받을 수 있습니다.' });
+          return;
+        }
         const amount = def.stackable === 1 ? 1 : Math.max(1, Math.min(64, Number(msg.count || 32)));
         const leftover = addItemToSlots(player.bag, itemId, amount);
         send(ws, { type: 'bag_update', bag: player.bag });
@@ -1395,8 +1445,12 @@ wss.on('connection', (ws) => {
       case 'admin_auth': {
         if (String(msg.password || '') === adminPassword) {
           player.isAdmin = true;
+          if (player.world === 'sandbox') {
+            addItemToSlots(player.bag, 'protect_beacon', 16);
+            send(ws, { type: 'bag_update', bag: player.bag });
+          }
           send(ws, { type: 'admin_status', isAdmin: true });
-          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드가 활성화되었습니다.' });
+          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 가방에 보호 비콘 ×16이 지급되었습니다.' });
           broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
         } else {
           send(ws, { type: 'toast', level: 'error', text: '관리자 비밀번호가 올바르지 않습니다.' });

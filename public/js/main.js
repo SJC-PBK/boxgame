@@ -452,6 +452,7 @@ function handleServerMessage(msg) {
       currentPortals = msg.portals || {};
       worldExtras.syncSigns(currentSigns);
       worldExtras.syncPortals(currentPortals);
+      worldExtras.syncBeacons(msg.beacons || {});
 
       playerPos.set(selfPlayer.x, selfPlayer.y, selfPlayer.z);
       playerVel.set(0, 0, 0);
@@ -542,6 +543,10 @@ function handleServerMessage(msg) {
     case 'portals_update':
       currentPortals = msg.portals || {};
       worldExtras.syncPortals(currentPortals);
+      break;
+
+    case 'beacons_update':
+      worldExtras.syncBeacons(msg.beacons || {});
       break;
 
     case 'tnt_ignited':
@@ -1094,18 +1099,31 @@ function updatePhysics(dt) {
     if (!collides(playerPos.x, nextY, playerPos.z)) playerPos.y = nextY;
     onGround = false;
   } else {
-    // Ladder climbing check
+    // Ladder climbing & water swimming check
     const bx = Math.floor(playerPos.x), by = Math.floor(playerPos.y), bz = Math.floor(playerPos.z);
-    const onLadder = worldRenderer && (
-      worldRenderer.getBlock(bx, by, bz) === 'ladder' ||
-      worldRenderer.getBlock(bx, by + 1, bz) === 'ladder'
-    );
+    const bFeet = worldRenderer?.getBlock(bx, by, bz);
+    const bHead = worldRenderer?.getBlock(bx, by + 1, bz);
+    const onLadder = bFeet === 'ladder' || bHead === 'ladder';
+    const inWater = bFeet === 'water' || bHead === 'water';
 
     if (onLadder) {
       playerVel.y = (jumpActive || keys.has('KeyW') || touchControls.moveZ > 0.3) ? 4.8 : (descendActive ? -3.5 : 0);
       const nextY = playerPos.y + playerVel.y * dt;
       if (!collides(playerPos.x, nextY, playerPos.z)) playerPos.y = nextY;
       onGround = true;
+    } else if (inWater) {
+      // Gentle buoyancy & swimming (Space to swim up, Shift to dive down)
+      if (jumpActive) playerVel.y = Math.min(4.6, playerVel.y + 18 * dt);
+      else if (descendActive) playerVel.y = Math.max(-4.2, playerVel.y - 14 * dt);
+      else playerVel.y = Math.max(-1.6, playerVel.y - 5.5 * dt);
+      const nextY = playerPos.y + playerVel.y * dt;
+      if (collides(playerPos.x, nextY, playerPos.z)) {
+        if (playerVel.y < 0) { onGround = true; playerPos.y = Math.floor(nextY) + 1.001; }
+        playerVel.y = 0;
+      } else {
+        playerPos.y = nextY;
+        onGround = false;
+      }
     } else {
       // Jump Pad super launch!
       const underBlock = worldRenderer?.getBlock(bx, Math.floor(playerPos.y - 0.15), bz);
@@ -1252,17 +1270,22 @@ function animate(now) {
       cameraShake = Math.max(0, cameraShake - dt * 1.35);
     }
 
-    // Subtle underwater blue tint when camera is submerged inside a water block
+    // Subtle underwater blue tint & screen overlay when camera is submerged inside a water block
+    const uwEl = document.getElementById('underwater-tint');
     if (worldRenderer) {
       const camBlock = worldRenderer.getBlock(
         Math.floor(camera.position.x),
         Math.floor(camera.position.y),
         Math.floor(camera.position.z)
       );
-      if (camBlock === 'water') {
+      const isUw = camBlock === 'water';
+      if (uwEl) uwEl.classList.toggle('hidden', !isUw);
+      if (isUw) {
         scene.fog.color.setHex(0x0369a1);
         scene.background.setHex(0x0369a1);
       }
+    } else if (uwEl) {
+      uwEl.classList.add('hidden');
     }
 
     if (selfRig) {

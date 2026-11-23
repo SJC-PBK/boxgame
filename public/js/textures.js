@@ -422,6 +422,19 @@ function drawBlockFace(blockId, face) {
         }
         break;
       }
+      case 'protect_beacon': {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(2, 2, 12, 12);
+        ctx.fillStyle = '#e0f2fe';
+        ctx.fillRect(4, 4, 8, 8);
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(6, 6, 4, 4);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 13, 16, 3);
+        break;
+      }
       case 'portal': {
         fillNoise(ctx, ['rgba(147,51,234,0.78)', 'rgba(192,132,252,0.82)', 'rgba(88,28,135,0.82)', 'rgba(56,189,248,0.75)'], 990);
         ctx.fillStyle = 'rgba(255,255,255,0.65)';
@@ -778,8 +791,9 @@ export class TextureLibrary {
             : def.id === 'portal' ? new THREE.Color('#a855f7')
             : def.id === 'furnace' ? new THREE.Color('#f97316')
             : def.id === 'jumppad' ? new THREE.Color('#22d3ee')
+            : def.id === 'protect_beacon' ? new THREE.Color('#38bdf8')
             : new THREE.Color('#000000'),
-          emissiveIntensity: def.id === 'lamp' ? 0.78 : (def.id === 'portal' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))
+          emissiveIntensity: def.id === 'lamp' ? 0.78 : (def.id === 'portal' ? 0.65 : (def.id === 'protect_beacon' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0))))
         };
 
         const applyBlockLightShader = (mat) => {

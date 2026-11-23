@@ -34,7 +34,8 @@ export class WorldExtras {
     this.signGroup = new THREE.Group();
     this.portalGroup = new THREE.Group();
     this.remoteGroup = new THREE.Group();
-    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup);
+    this.beaconGroup = new THREE.Group();
+    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup, this.beaconGroup);
 
     this.ignitedTnts = []; // { mesh, mat, light, x, y, z, startTime, endTime, sparkAcc }
     this.explosions = [];  // { flashLight, core, outer, ring, debris, smokes, age, maxAge }
@@ -71,6 +72,40 @@ export class WorldExtras {
       const sp = makeBillboardSprite([`🌀 ${p.channel || '기본'}`], 'rgba(88, 28, 135, 0.85)', '#c084fc', '#f5d0fe', 1.5, 0.45);
       sp.position.set(p.x + 0.5, p.y + 1.45, p.z + 0.5);
       this.portalGroup.add(sp);
+    }
+  }
+
+  syncBeacons(beaconsObj) {
+    while (this.beaconGroup.children.length > 0) {
+      const ch = this.beaconGroup.children[0];
+      ch.geometry?.dispose?.();
+      ch.material?.map?.dispose?.();
+      ch.material?.dispose?.();
+      this.beaconGroup.remove(ch);
+    }
+    for (const b of Object.values(beaconsObj || {})) {
+      // Translucent cyan-gold vertical sky beam
+      const beamGeo = new THREE.CylinderGeometry(0.16, 0.16, 68, 8, 1, true);
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8, transparent: true, opacity: 0.42,
+        side: THREE.DoubleSide, depthWrite: false
+      });
+      const beam = new THREE.Mesh(beamGeo, beamMat);
+      beam.position.set(b.x + 0.5, b.y + 35, b.z + 0.5);
+      this.beaconGroup.add(beam);
+
+      const coreGeo = new THREE.CylinderGeometry(0.06, 0.06, 68, 6, 1, true);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0xfef08a, transparent: true, opacity: 0.72,
+        side: THREE.DoubleSide, depthWrite: false
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.position.set(b.x + 0.5, b.y + 35, b.z + 0.5);
+      this.beaconGroup.add(core);
+
+      const sp = makeBillboardSprite(['🛡️ 보호 비콘'], 'rgba(15, 23, 42, 0.86)', '#38bdf8', '#fde047', 1.45, 0.44);
+      sp.position.set(b.x + 0.5, b.y + 1.55, b.z + 0.5);
+      this.beaconGroup.add(sp);
     }
   }
 
