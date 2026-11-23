@@ -580,20 +580,23 @@ function handleServerMessage(msg) {
       worldExtras.igniteTNT(msg.x, msg.y, msg.z, msg.durationMs, 0x22c55e, 0x4ade80);
       sound.playHit('dirt', { x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
       if (!msg.durationMs || msg.durationMs >= 1800) {
-        ui.toast('🌱 흙 채움 폭탄 작동! 곧 주변 빈 공간이 흙으로 채워집니다...', 'success');
+        ui.toast('🌱 채움 폭탄 작동! 곧 주변 재질로 빈 공간이 채워집니다...', 'success');
       }
       break;
 
     case 'fill_bomb_explode': {
       const ex = msg.x + 0.5, ey = msg.y + 0.5, ez = msg.z + 0.5;
+      const fb = msg.filledBlock || 'dirt';
       sound.playCraft();
       worldExtras.explodeFillBomb(msg.x, msg.y, msg.z);
       if (worldRenderer) {
-        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'dirt', 24);
+        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, fb, 26);
       }
       const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
       if (dist < 18) {
         cameraShake = Math.max(cameraShake, (1 - dist / 18) * 0.28);
+        const name = catalog[fb]?.name || fb;
+        ui.toast(`🌱 주변 재질(${name})로 빈 공간을 채웠습니다!`, 'success');
       }
       break;
     }

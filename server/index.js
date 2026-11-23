@@ -247,8 +247,8 @@ function igniteFillBombAt(x, y, z, isAdmin, delayMs = 2200) {
   setTimeout(() => {
     ignitedTnts.delete(key);
     if (store.getBlock(x, y, z) !== 'fill_bomb') return;
-    const { changes, chainFills } = store.fillDirtAt(x, y, z, 4, isAdmin);
-    broadcast({ type: 'fill_bomb_explode', x, y, z });
+    const { changes, chainFills, filledBlock } = store.fillDirtAt(x, y, z, 4, isAdmin);
+    broadcast({ type: 'fill_bomb_explode', x, y, z, filledBlock });
     if (changes.length > 0) broadcast({ type: 'blocks_batch', changes });
     for (const p of players.values()) {
       if (p.linkedTnts?.delete(key)) {

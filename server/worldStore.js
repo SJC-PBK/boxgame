@@ -531,8 +531,62 @@ export class WorldStore {
     return { changes, chainFills };
   }
 
+  detectFillMaterial(cx, cy, cz) {
+    const EXCLUDE = new Set([
+      'bedrock', 'water', 'tnt', 'fill_bomb', 'water_bomb', 'fuse',
+      'chest', 'furnace', 'bed', 'door_closed', 'door_open', 'ladder',
+      'sign', 'portal', 'jumppad', 'sapling', 'wheat_1', 'wheat_2', 'wheat_3',
+      'leaves', 'job_counter', 'job_espresso', 'job_fridge', 'job_mixer', 'job_pickup'
+    ]);
+    const ORES = new Set(['diamond_ore', 'gold_ore', 'iron_ore', 'coal_ore']);
+    const scores = new Map();
+    const oreScores = new Map();
+
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          const dist2 = dx * dx + dy * dy + dz * dz;
+          if (dist2 > 5) continue;
+          const x = cx + dx, y = cy + dy, z = cz + dz;
+          if (!this.inBounds(x, y, z)) continue;
+          let b = this.getBlock(x, y, z);
+          if (!b || EXCLUDE.has(b)) continue;
+          if (b === 'grass' || b === 'farmland') b = 'dirt';
+
+          // Weight closer blocks much higher (directly touching = 4, underneath = 6)
+          let w = dist2 === 1 ? 4 : (dist2 <= 2 ? 2 : 1);
+          if (dx === 0 && dy === -1 && dz === 0) w += 2;
+
+          if (ORES.has(b)) {
+            oreScores.set(b, (oreScores.get(b) || 0) + w);
+          }
+          scores.set(b, (scores.get(b) || 0) + w);
+        }
+      }
+    }
+
+    // If placed near an ore vein (especially in deep mines), match that ore!
+    if (oreScores.size > 0) {
+      let bestOre = null, bestVal = -1;
+      for (const [k, v] of oreScores.entries()) {
+        if (v > bestVal) { bestVal = v; bestOre = k; }
+      }
+      if (bestOre) return bestOre;
+    }
+
+    // Otherwise pick the dominant surrounding terrain/building material (default: dirt)
+    let best = 'dirt', bestVal = -1;
+    for (const [k, v] of scores.entries()) {
+      if (v > bestVal) { bestVal = v; best = k; }
+    }
+    return best;
+  }
+
   fillDirtAt(cx, cy, cz, radius, isAdmin) {
-    return this.fillEmptyAt(cx, cy, cz, radius, isAdmin, 'dirt', 'fill_bomb');
+    const fillBlock = this.detectFillMaterial(cx, cy, cz);
+    const res = this.fillEmptyAt(cx, cy, cz, radius, isAdmin, fillBlock, 'fill_bomb');
+    return { ...res, filledBlock: fillBlock };
   }
 
   fillWaterAt(cx, cy, cz, radius, isAdmin) {
