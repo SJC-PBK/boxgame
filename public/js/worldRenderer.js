@@ -69,6 +69,7 @@ export class WorldRenderer {
     // 3D voxel block break particles
     this.particles = [];
     this.particleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+    this._lastCrackStage = -1;
   }
 
   inBounds(x, y, z) {
@@ -333,14 +334,19 @@ export class WorldRenderer {
       this.highlightBox.visible = true;
       if (miningProgress > 0.01 && this.textures.crackTextures?.length) {
         const stage = Math.min(9, Math.floor(miningProgress * 10));
-        this.crackMat.map = this.textures.crackTextures[stage];
-        this.crackMat.needsUpdate = true;
+        if (stage !== this._lastCrackStage) {
+          this._lastCrackStage = stage;
+          this.crackMat.map = this.textures.crackTextures[stage];
+          this.crackMat.needsUpdate = true;
+        }
         this.crackBox.position.copy(this.highlightBox.position);
         this.crackBox.visible = true;
       } else {
+        this._lastCrackStage = -1;
         this.crackBox.visible = false;
       }
     } else {
+      this._lastCrackStage = -1;
       this.highlightBox.visible = false;
       this.crackBox.visible = false;
     }
@@ -349,7 +355,9 @@ export class WorldRenderer {
   spawnBreakParticles(x, y, z, blockId, count = 12) {
     const mat = this.textures.getFaceMaterial(blockId, 'side');
     if (!mat) return;
-    for (let i = 0; i < count; i++) {
+    const MAX_PARTICLES = 140;
+    const toSpawn = Math.min(count, Math.max(0, MAX_PARTICLES - this.particles.length));
+    for (let i = 0; i < toSpawn; i++) {
       const m = new THREE.Mesh(this.particleGeo, mat);
       m.position.set(
         x + 0.2 + Math.random() * 0.6,

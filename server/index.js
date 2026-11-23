@@ -201,9 +201,11 @@ setInterval(() => {
   broadcast({ type: 'animals_update', animals: animals.serializeAll() });
 }, 250);
 
+let _timeSyncTick = 0;
 setInterval(() => {
   worldTime = (worldTime + 1 / DAY_LENGTH_SEC) % 1;
-  if (players.size > 0) {
+  _timeSyncTick = (_timeSyncTick + 1) % 10;
+  if (_timeSyncTick === 0 && players.size > 0) {
     broadcast({ type: 'world_time', time: worldTime });
   }
   const updatedFurnaces = store.tickFurnaces();

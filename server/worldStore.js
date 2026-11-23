@@ -65,7 +65,14 @@ export class WorldStore {
     this.skins = [];
 
     this._saveTimers = {};
+    this._cachedRLE = null;
+    this._cachedNonAir = null;
     this._loadAll();
+  }
+
+  _invalidateWorldCache() {
+    this._cachedRLE = null;
+    this._cachedNonAir = null;
   }
 
   _readJson(filePath) {
@@ -85,6 +92,7 @@ export class WorldStore {
   }
 
   _scheduleSave(kind, delayMs = 450) {
+    if (kind === 'world') this._invalidateWorldCache();
     if (this._saveTimers[kind]) return;
     this._saveTimers[kind] = setTimeout(() => {
       delete this._saveTimers[kind];
@@ -181,13 +189,19 @@ export class WorldStore {
   }
 
   countNonAir() {
-    let n = 0;
-    for (let i = 0; i < this.grid.length; i++) if (this.grid[i] !== 0) n++;
-    return n;
+    if (this._cachedNonAir === null) {
+      let n = 0;
+      for (let i = 0; i < this.grid.length; i++) if (this.grid[i] !== 0) n++;
+      this._cachedNonAir = n;
+    }
+    return this._cachedNonAir;
   }
 
   getWorldRLE() {
-    return encodeRLE(this.grid);
+    if (!this._cachedRLE) {
+      this._cachedRLE = encodeRLE(this.grid);
+    }
+    return this._cachedRLE;
   }
 
   inBounds(x, y, z) {

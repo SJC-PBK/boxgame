@@ -138,15 +138,23 @@ function cropCanvasTexture(img, sx, sy, sw, sh) {
   return new THREE.MeshLambertMaterial({ map: tex });
 }
 
+function disposeCustomSkinMats(rig) {
+  if (!rig._customSkinMats) return;
+  for (const m of rig._customSkinMats) {
+    m.map?.dispose();
+    m.dispose();
+  }
+  rig._customSkinMats = null;
+}
+
 export function applySkinToRig(rig, skin) {
   if (!rig || !skin) return;
 
   if (skin.pixelDataUrl) {
     const img = new Image();
     img.onload = () => {
-      // Standard 64x64 Minecraft UV layout:
-      // Head: +x(0,8), -x(16,8), +y(8,0), -y(16,0), +z(24,8 back), -z(8,8 front)
-      rig.headBox.material = [
+      disposeCustomSkinMats(rig);
+      const hMats = [
         cropCanvasTexture(img, 0, 8, 8, 8),
         cropCanvasTexture(img, 16, 8, 8, 8),
         cropCanvasTexture(img, 8, 0, 8, 8),
@@ -154,18 +162,18 @@ export function applySkinToRig(rig, skin) {
         cropCanvasTexture(img, 24, 8, 8, 8),
         cropCanvasTexture(img, 8, 8, 8, 8)
       ];
-      // Torso: front(20,20,8,12), back(32,20,8,12), sides(16,20,4,12)
       const bodyFront = cropCanvasTexture(img, 20, 20, 8, 12);
       const bodyBack = cropCanvasTexture(img, 32, 20, 8, 12);
       const bodySide = cropCanvasTexture(img, 16, 20, 4, 12);
       const bodyTop = cropCanvasTexture(img, 20, 16, 8, 4);
-      rig.torso.material = [bodySide, bodySide, bodyTop, bodyTop, bodyBack, bodyFront];
-
       const armMat = cropCanvasTexture(img, 44, 20, 4, 12);
+      const legMat = cropCanvasTexture(img, 4, 20, 4, 12);
+
+      rig._customSkinMats = [...hMats, bodyFront, bodyBack, bodySide, bodyTop, armMat, legMat];
+      rig.headBox.material = hMats;
+      rig.torso.material = [bodySide, bodySide, bodyTop, bodyTop, bodyBack, bodyFront];
       rig.leftArm.material = armMat;
       rig.rightArmMesh.material = armMat;
-
-      const legMat = cropCanvasTexture(img, 4, 20, 4, 12);
       rig.leftLeg.material = legMat;
       rig.rightLeg.material = legMat;
 
@@ -178,6 +186,7 @@ export function applySkinToRig(rig, skin) {
   }
 
   // Color-based skin
+  disposeCustomSkinMats(rig);
   rig.headBox.material = rig.mats.skinMat;
   rig.torso.material = rig.mats.shirtMat;
   rig.leftArm.material = rig.mats.shirtMat;

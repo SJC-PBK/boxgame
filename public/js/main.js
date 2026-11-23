@@ -93,6 +93,21 @@ const PLAYER_HEIGHT = 1.72;
 const EYE_HEIGHT = 1.54;
 const keys = new Set();
 
+// Pre-allocated scratch math objects & cached HUD refs (zero per-frame GC!)
+const _eyePos = new THREE.Vector3();
+const _lookDir = new THREE.Vector3();
+const _camPos = new THREE.Vector3();
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _move = new THREE.Vector3();
+const _loginSkyOrigin = new THREE.Vector3(0, 20, 0);
+const elHudCoords = document.getElementById('hud-coords');
+const elHudTime = document.getElementById('hud-time');
+let lastCoordsStr = '';
+let lastTimeStr = '';
+let lastSentPose = '';
+
 function buildWsUrl() {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const baseDir = window.location.pathname.endsWith('/')
@@ -475,9 +490,10 @@ function computeMiningTime(blockId) {
 }
 
 function getEyeAndLook() {
-  const eyePos = new THREE.Vector3(playerPos.x, playerPos.y + EYE_HEIGHT, playerPos.z);
-  const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
-  return { eyePos, lookDir };
+  _eyePos.set(playerPos.x, playerPos.y + EYE_HEIGHT, playerPos.z);
+  _euler.set(pitch, yaw, 0, 'YXZ');
+  _lookDir.set(0, 0, -1).applyEuler(_euler);
+  return { eyePos: _eyePos, lookDir: _lookDir };
 }
 
 function handleRightClickOrInteract(interactOnly = false) {
@@ -717,21 +733,21 @@ function collides(x, y, z) {
 
 function updatePhysics(dt) {
   if (!joined || ui.openModalId || ui.chatOpen) return false;
-  const forward = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-  const move = new THREE.Vector3();
+  _forward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+  _right.set(Math.cos(yaw), 0, -Math.sin(yaw));
+  _move.set(0, 0, 0);
 
-  if (keys.has('KeyW')) move.add(forward);
-  if (keys.has('KeyS')) move.sub(forward);
-  if (keys.has('KeyD')) move.add(right);
-  if (keys.has('KeyA')) move.sub(right);
-  const isMoving = move.lengthSq() > 0;
-  if (isMoving) move.normalize();
+  if (keys.has('KeyW')) _move.add(_forward);
+  if (keys.has('KeyS')) _move.sub(_forward);
+  if (keys.has('KeyD')) _move.add(_right);
+  if (keys.has('KeyA')) _move.sub(_right);
+  const isMoving = _move.lengthSq() > 0;
+  if (isMoving) _move.normalize();
 
   const speed = flyMode ? 10.5 : 5.8;
-  const nextX = playerPos.x + move.x * speed * dt;
+  const nextX = playerPos.x + _move.x * speed * dt;
   if (!collides(nextX, playerPos.y, playerPos.z)) playerPos.x = nextX;
-  const nextZ = playerPos.z + move.z * speed * dt;
+  const nextZ = playerPos.z + _move.z * speed * dt;
   if (!collides(playerPos.x, playerPos.y, nextZ)) playerPos.z = nextZ;
 
   if (flyMode) {
@@ -845,9 +861,9 @@ function animate(now) {
 
     const { eyePos, lookDir } = getEyeAndLook();
     if (thirdPerson) {
-      const camPos = eyePos.clone().addScaledVector(lookDir, -3.8);
-      camPos.y += 0.6;
-      camera.position.copy(camPos);
+      _camPos.copy(eyePos).addScaledVector(lookDir, -3.8);
+      _camPos.y += 0.6;
+      camera.position.copy(_camPos);
       camera.lookAt(eyePos);
     } else {
       camera.position.copy(eyePos);
@@ -882,23 +898,26 @@ function animate(now) {
 
     if (fpHand) fpHand.update(dt, isMoving, isLeftDown && pointerLocked);
 
-    document.getElementById('hud-coords').textContent =
-      `XYZ: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)}`;
-    document.getElementById('hud-time').textContent = sky.getTimeLabel();
+    const coordsStr = `XYZ: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)}`;
+    if (coordsStr !== lastCoordsStr) { lastCoordsStr = coordsStr; elHudCoords.textContent = coordsStr; }
+    const timeStr = sky.getTimeLabel();
+    if (timeStr !== lastTimeStr) { lastTimeStr = timeStr; elHudTime.textContent = timeStr; }
 
     if (now - lastNetSend > 50) {
       lastNetSend = now;
-      send({
-        type: 'move',
-        x: Number(playerPos.x.toFixed(3)),
-        y: Number(playerPos.y.toFixed(3)),
-        z: Number(playerPos.z.toFixed(3)),
-        yaw: Number(yaw.toFixed(3)),
-        pitch: Number(pitch.toFixed(3))
-      });
+      const sx = Number(playerPos.x.toFixed(3));
+      const sy = Number(playerPos.y.toFixed(3));
+      const sz = Number(playerPos.z.toFixed(3));
+      const syaw = Number(yaw.toFixed(3));
+      const spitch = Number(pitch.toFixed(3));
+      const poseKey = `${sx},${sy},${sz},${syaw},${spitch}`;
+      if (poseKey !== lastSentPose) {
+        lastSentPose = poseKey;
+        send({ type: 'move', x: sx, y: sy, z: sz, yaw: syaw, pitch: spitch });
+      }
     }
   } else {
-    sky.update(dt, new THREE.Vector3(0, 20, 0));
+    sky.update(dt, _loginSkyOrigin);
     const t = now * 0.0002;
     camera.position.set(Math.cos(t) * 24, 24, Math.sin(t) * 24);
     camera.lookAt(0, 16, 0);
