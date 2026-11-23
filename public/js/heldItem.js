@@ -10,7 +10,6 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
     const handleMat = new THREE.MeshLambertMaterial({ color: '#784820' });
     const headMat = new THREE.MeshLambertMaterial({ color: def.color || '#cbd5e1' });
 
-    // Wooden handle
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.48, 0.055), handleMat);
     handle.position.set(0, 0.14, 0);
     group.add(handle);
@@ -40,7 +39,7 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
       tip.position.set(0, 0.3, -0.15);
       group.add(bar, tip);
     }
-    group.rotation.x = -0.35;
+    group.rotation.set(-0.28, 0.12, 0.05);
     return group;
   }
 
@@ -49,11 +48,10 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
     if (!mats) return null;
     const cube = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), mats);
     cube.position.set(0, 0.12, -0.04);
-    cube.rotation.set(0.15, 0.6, 0);
+    cube.rotation.set(0.15, 0.65, 0);
     return cube;
   }
 
-  // Regular item / food (apple, coal, ingot, diamond_gem, stick)
   const tex = textures.getItemTexture(itemId);
   if (!tex) return null;
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide });
@@ -69,30 +67,34 @@ export class FirstPersonHand {
     this.catalog = catalog;
     this.textures = textures;
 
+    // Shoulder-like pivot positioned at bottom-right of camera view
     this.root = new THREE.Group();
-    this.root.position.set(0.42, -0.38, -0.62);
+    this.basePos = new THREE.Vector3(0.46, -0.42, -0.58);
+    this.root.position.copy(this.basePos);
     this.camera.add(this.root);
 
-    // Blocky arm
     this.skinMat = new THREE.MeshLambertMaterial({ color: '#f5cfa0' });
     this.sleeveMat = new THREE.MeshLambertMaterial({ color: '#38bdf8' });
 
-    const armGroup = new THREE.Group();
-    const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.16), this.skinMat);
-    forearm.position.set(0, -0.14, 0.08);
-    forearm.rotation.x = 0.7;
-    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.2, 0.17), this.sleeveMat);
-    sleeve.position.set(0, -0.26, 0.2);
-    sleeve.rotation.x = 0.7;
-    armGroup.add(forearm, sleeve);
-    this.root.add(armGroup);
+    // Minecraft / HANKAN style sleek diagonal right arm
+    this.armGroup = new THREE.Group();
+    this.armGroup.rotation.set(-0.55, 0.38, -0.22);
 
+    const handTip = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.22, 0.17), this.skinMat);
+    handTip.position.set(0, 0.04, -0.06);
+    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.185, 0.44, 0.185), this.sleeveMat);
+    sleeve.position.set(0, -0.24, 0.04);
+    this.armGroup.add(handTip, sleeve);
+    this.root.add(this.armGroup);
+
+    // Held tool/block anchor at the fist
     this.itemAnchor = new THREE.Group();
-    this.itemAnchor.position.set(-0.04, 0.04, -0.04);
+    this.itemAnchor.position.set(-0.02, 0.08, -0.08);
     this.root.add(this.itemAnchor);
 
     this.currentItemId = null;
-    this.swingTime = 0;
+    this.swingProgress = 0; // 0 = idle, 0..1 = active swing
+    this.swinging = false;
     this.bobPhase = 0;
   }
 
@@ -114,38 +116,57 @@ export class FirstPersonHand {
     }
     const mesh = buildHeldItemMesh(itemId, this.catalog, this.textures);
     if (mesh) this.itemAnchor.add(mesh);
+    // Show bare arm prominently when empty-handed, slightly tucked when holding a tool/block
+    this.armGroup.position.set(mesh ? 0.04 : 0, mesh ? -0.05 : 0.04, mesh ? 0.06 : 0);
   }
 
   triggerSwing() {
-    this.swingTime = 1.0;
+    if (!this.swinging || this.swingProgress > 0.65) {
+      this.swinging = true;
+      this.swingProgress = 0;
+    }
   }
 
   update(dt, isMoving, isMining) {
-    if (isMining && this.swingTime <= 0.1) {
-      this.swingTime = 1.0;
+    if (isMining && !this.swinging) {
+      this.swinging = true;
+      this.swingProgress = 0;
     }
 
-    if (this.swingTime > 0) {
-      this.swingTime = Math.max(0, this.swingTime - dt * 5.2);
+    if (this.swinging) {
+      this.swingProgress += dt * 4.4; // Snappy ~0.23s Minecraft chop cycle
+      if (this.swingProgress >= 1) {
+        if (isMining) {
+          this.swingProgress %= 1;
+        } else {
+          this.swingProgress = 0;
+          this.swinging = false;
+        }
+      }
     }
 
-    if (isMoving) {
-      this.bobPhase += dt * 9;
-    }
+    if (isMoving) this.bobPhase += dt * 9.5;
 
-    const swing = Math.sin(this.swingTime * Math.PI);
-    const bobX = isMoving ? Math.cos(this.bobPhase * 0.5) * 0.018 : 0;
-    const bobY = isMoving ? Math.abs(Math.sin(this.bobPhase * 0.5)) * 0.022 : 0;
+    // Authentic Minecraft sqrt-sine easing: fast downward strike, smooth ease-out return!
+    const p = this.swinging ? this.swingProgress : 0;
+    const s1 = Math.sin(Math.sqrt(p) * Math.PI);
+    const s2 = Math.sin(p * p * Math.PI);
 
+    const bobX = isMoving ? Math.cos(this.bobPhase * 0.5) * 0.02 : 0;
+    const bobY = isMoving ? Math.abs(Math.sin(this.bobPhase * 0.5)) * 0.024 : 0;
+
+    // Inward + forward + downward chop arc
     this.root.position.set(
-      0.42 + bobX - swing * 0.14,
-      -0.38 - bobY + swing * 0.06,
-      -0.62 - swing * 0.16
+      this.basePos.x + bobX - s1 * 0.24,
+      this.basePos.y - bobY + Math.sin(Math.sqrt(p) * Math.PI * 2) * 0.04 - s2 * 0.08,
+      this.basePos.z - s1 * 0.14
     );
+
+    // Natural wrist pitch forward & inward roll
     this.root.rotation.set(
-      -swing * 0.95,
-      swing * 0.35,
-      swing * 0.25
+      -s1 * 1.05,
+      s1 * 0.52 - s2 * 0.25,
+      s1 * 0.42
     );
   }
 }

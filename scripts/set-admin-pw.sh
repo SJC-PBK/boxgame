@@ -16,18 +16,22 @@ if [ -z "$NEW_PW" ]; then
   echo ""
   read -r -s -p "새 관리자 비밀번호 확인: " NEW_PW2
   echo ""
+  NEW_PW="${NEW_PW%$'\r'}"
+  NEW_PW2="${NEW_PW2%$'\r'}"
   if [ "$NEW_PW" != "$NEW_PW2" ]; then
     echo "오류: 비밀번호가 일치하지 않습니다." >&2
     exit 1
   fi
 fi
 
+NEW_PW="${NEW_PW%$'\r'}"
+
 if [ "${#NEW_PW}" -lt 4 ] || [ "${#NEW_PW}" -gt 64 ]; then
   echo "오류: 비밀번호는 4~64자 사이로 입력해주세요." >&2
   exit 1
 fi
 
-if printf '%s' "$NEW_PW" | grep -q $'\n'; then
+if [[ "$NEW_PW" == *$'\n'* || "$NEW_PW" == *$'\r'* ]]; then
   echo "오류: 비밀번호에 줄바꿈을 포함할 수 없습니다." >&2
   exit 1
 fi
