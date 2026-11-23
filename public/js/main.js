@@ -331,15 +331,46 @@ function resetToLogin() {
   if (projector) projector.clear();
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('login-overlay').classList.remove('hidden');
+  closeAdminLoginModal();
   document.getElementById('nickname-input').focus();
 }
 
-// Login (supports optional Admin Login right on entry!)
+// Login + Hidden Bottom-Right Corner Admin Login
 const loginForm = document.getElementById('login-form');
 const nickInput = document.getElementById('nickname-input');
-const adminLoginToggle = document.getElementById('admin-login-toggle');
-const loginAdminPw = document.getElementById('login-admin-pw');
 const loginError = document.getElementById('login-error');
+const adminCornerHotspot = document.getElementById('admin-corner-hotspot');
+const adminLoginModal = document.getElementById('admin-login-modal');
+const adminLoginForm = document.getElementById('admin-login-form');
+const adminLoginId = document.getElementById('admin-login-id');
+const adminLoginPw = document.getElementById('admin-login-pw');
+const adminLoginError = document.getElementById('admin-login-error');
+const btnAdminLoginClose = document.getElementById('btn-admin-login-close');
+
+function openAdminLoginModal() {
+  adminLoginModal.classList.remove('hidden');
+  adminLoginId.disabled = false;
+  adminLoginPw.disabled = false;
+  adminLoginError.textContent = '';
+  if (!adminLoginId.value && nickInput.value.trim()) {
+    adminLoginId.value = nickInput.value.trim();
+  }
+  (adminLoginId.value ? adminLoginPw : adminLoginId).focus();
+}
+
+function closeAdminLoginModal() {
+  adminLoginModal.classList.add('hidden');
+  adminLoginId.disabled = true;
+  adminLoginPw.disabled = true;
+  adminLoginPw.value = '';
+  adminLoginError.textContent = '';
+}
+
+adminCornerHotspot.addEventListener('click', openAdminLoginModal);
+btnAdminLoginClose.addEventListener('click', closeAdminLoginModal);
+adminLoginModal.addEventListener('click', (e) => {
+  if (e.target === adminLoginModal) closeAdminLoginModal();
+});
 
 // World mode selector on Login Screen
 document.querySelectorAll('.mode-card').forEach((card) => {
@@ -350,25 +381,8 @@ document.querySelectorAll('.mode-card').forEach((card) => {
   });
 });
 
-adminLoginToggle.addEventListener('change', () => {
-  const on = adminLoginToggle.checked;
-  loginAdminPw.classList.toggle('hidden', !on);
-  loginAdminPw.disabled = !on;
-  if (on) loginAdminPw.focus();
-  else loginAdminPw.value = '';
-});
-
-loginForm.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const nickname = nickInput.value.trim();
-  if (!nickname) return;
-  const adminPassword = adminLoginToggle.checked ? loginAdminPw.value : '';
-  if (adminLoginToggle.checked && !adminPassword) {
-    loginError.textContent = '관리자 비밀번호를 입력해주세요.';
-    return;
-  }
-  loginError.textContent = '서버에 연결 중...';
-
+function connectAndJoin(nickname, adminPassword, errorEl) {
+  errorEl.textContent = '서버에 연결 중...';
   if (ws) { ws.close(); ws = null; }
   ws = new WebSocket(buildWsUrl());
   ws.addEventListener('open', () => send({ type: 'join', nickname, adminPassword, world: selectedLoginWorld }));
@@ -379,17 +393,38 @@ loginForm.addEventListener('submit', (e) => {
       resetToLogin();
     }
   });
-  ws.addEventListener('error', () => { loginError.textContent = '서버에 연결할 수 없습니다.'; });
+  ws.addEventListener('error', () => { errorEl.textContent = '서버에 연결할 수 없습니다.'; });
+}
+
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const nickname = nickInput.value.trim();
+  if (!nickname) return;
+  connectAndJoin(nickname, '', loginError);
+});
+
+adminLoginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const nickname = adminLoginId.value.trim();
+  const adminPassword = adminLoginPw.value;
+  if (!nickname) { adminLoginError.textContent = '관리자 닉네임을 입력해주세요.'; return; }
+  if (!adminPassword) { adminLoginError.textContent = '관리자 비밀번호를 입력해주세요.'; return; }
+  connectAndJoin(nickname, adminPassword, adminLoginError);
 });
 
 function handleServerMessage(msg) {
   switch (msg.type) {
     case 'join_error':
-      loginError.textContent = msg.message || '입장에 실패했습니다.';
+      if (!adminLoginModal.classList.contains('hidden')) {
+        adminLoginError.textContent = msg.message || '관리자 로그인에 실패했습니다.';
+      } else {
+        loginError.textContent = msg.message || '입장에 실패했습니다.';
+      }
       break;
 
     case 'welcome': {
       loginError.textContent = '';
+      closeAdminLoginModal();
       joined = true;
       currentWorldMode = msg.worldMode || 'sandbox';
       selfPlayer = msg.self;

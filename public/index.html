@@ -36,13 +36,6 @@
         <label for="nickname-input">닉네임</label>
         <input id="nickname-input" name="bw_nick_field" type="text" maxlength="16" placeholder="사용할 닉네임을 입력하세요" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" required />
 
-        <div style="margin-top:10px;">
-          <label class="toggle-label" style="margin-bottom:6px;">
-            <input id="admin-login-toggle" type="checkbox" /> 🛡️ 관리자 권한으로 로그인
-          </label>
-          <input id="login-admin-pw" name="bw_adm_code" type="text" class="hidden masked-input" placeholder="관리자 비밀번호 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled />
-        </div>
-
         <button type="submit" class="btn-primary">월드 입장하기</button>
         <div id="login-error" class="error-text"></div>
       </form>
@@ -51,6 +44,27 @@
         <div class="rule-item">⛏️ <strong>채굴 & 도구 업그레이드</strong>: 나무→돌→철→다이아 도구로 업그레이드하고 지하 광물을 캐보세요!</div>
         <div class="rule-item">🌳 <strong>나무 벌목 & 묘목</strong>: 나무 밑둥을 도끼로 베면 나무가 통째로 쓰러지며 원목·묘목·사과가 나옵니다.</div>
         <div class="rule-item">🎒 <strong>가방 vs 보관 상자</strong>: 개인 가방은 로그아웃 시 자동 삭제되지만, <strong>상자에 넣은 아이템은 영구 보존</strong>됩니다.</div>
+      </div>
+    </div>
+
+    <!-- Hidden bottom-right corner trigger for Admin Login -->
+    <button id="admin-corner-hotspot" type="button" class="admin-corner-hotspot" aria-label="관리자 로그인 열기" tabindex="-1"></button>
+
+    <!-- Hidden Admin Login Popup -->
+    <div id="admin-login-modal" class="admin-login-modal hidden">
+      <div class="admin-login-box">
+        <div class="admin-login-header">
+          <span>🛡️ 관리자 로그인</span>
+          <button id="btn-admin-login-close" type="button" class="modal-close">✕</button>
+        </div>
+        <form id="admin-login-form" autocomplete="off">
+          <label for="admin-login-id">관리자 아이디 (닉네임)</label>
+          <input id="admin-login-id" name="bw_adm_id" type="text" maxlength="16" placeholder="관리자 닉네임 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled required />
+          <label for="admin-login-pw" style="margin-top:10px;">관리자 비밀번호</label>
+          <input id="admin-login-pw" name="bw_adm_code" type="text" class="masked-input" placeholder="관리자 비밀번호 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled required />
+          <button type="submit" class="btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);">🛡️ 관리자 권한으로 입장</button>
+          <div id="admin-login-error" class="error-text"></div>
+        </form>
       </div>
     </div>
   </div>

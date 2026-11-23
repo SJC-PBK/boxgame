@@ -55,6 +55,31 @@ html, body {
   width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
 }
 .masked-input { -webkit-text-security: disc; }
+.admin-corner-hotspot {
+  position: fixed; right: 0; bottom: 0; width: 52px; height: 52px;
+  background: transparent; border: none; padding: 0; margin: 0;
+  cursor: default; z-index: 105; opacity: 0;
+}
+.admin-login-modal {
+  position: fixed; inset: 0; z-index: 110;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(4px);
+}
+.admin-login-box {
+  width: min(360px, 90vw); padding: 20px 22px;
+  background: var(--bg-card); border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 14px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+}
+.admin-login-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 16px; font-weight: 800; color: #fde68a; margin-bottom: 14px;
+}
+#admin-login-form label { display: block; font-size: 13px; color: #cbd5e1; margin-bottom: 6px; }
+#admin-login-form input {
+  width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.85); color: #fff; font-size: 14.5px; outline: none; user-select: text;
+}
+#admin-login-form input:focus { border-color: var(--warn); }
 .btn-primary {
   width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 10px;
   background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff;
