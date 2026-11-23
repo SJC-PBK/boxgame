@@ -15,29 +15,41 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
     group.add(handle);
 
     if (def.toolType === 'pickaxe') {
-      const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.075, 0.36), headMat);
-      topBar.position.set(0, 0.36, 0);
-      const tipF = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.09, 0.07), headMat);
-      tipF.position.set(0, 0.31, -0.17);
-      const tipB = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.09, 0.07), headMat);
-      tipB.position.set(0, 0.31, 0.17);
+      // Wide arched Pickaxe head with sharp curved tips
+      const topBar = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.08, 0.42), headMat);
+      topBar.position.set(0, 0.37, 0);
+      const tipF = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.13, 0.08), headMat);
+      tipF.position.set(0, 0.30, -0.21);
+      tipF.rotation.x = 0.25;
+      const tipB = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.13, 0.08), headMat);
+      tipB.position.set(0, 0.30, 0.21);
+      tipB.rotation.x = -0.25;
       group.add(topBar, tipF, tipB);
     } else if (def.toolType === 'axe') {
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.18), headMat);
-      blade.position.set(0, 0.31, -0.09);
-      const back = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.07), headMat);
-      back.position.set(0, 0.34, 0.04);
-      group.add(blade, back);
+      // Wide heavy crescent Axe blade clearly facing forward
+      const bladeMain = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.24, 0.22), headMat);
+      bladeMain.position.set(0, 0.32, -0.11);
+      const bladeEdge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.06), headMat);
+      bladeEdge.position.set(0, 0.31, -0.22);
+      const poll = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.10, 0.08), headMat);
+      poll.position.set(0, 0.35, 0.05);
+      group.add(bladeMain, bladeEdge, poll);
     } else if (def.toolType === 'shovel') {
-      const scoop = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.18, 0.055), headMat);
-      scoop.position.set(0, 0.42, 0);
-      group.add(scoop);
+      // Broad flat diamond-spade Shovel scoop at the top
+      const collar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.08), headMat);
+      collar.position.set(0, 0.36, 0);
+      const scoop = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.22, 0.045), headMat);
+      scoop.position.set(0, 0.47, 0);
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.07, 0.04), headMat);
+      tip.position.set(0, 0.59, 0);
+      group.add(collar, scoop, tip);
     } else if (def.toolType === 'hoe') {
-      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.07, 0.22), headMat);
-      bar.position.set(0, 0.36, -0.07);
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.1, 0.06), headMat);
-      tip.position.set(0, 0.3, -0.15);
-      group.add(bar, tip);
+      // Distinct L-shaped hooked farming Hoe pointing forward only
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.075, 0.26), headMat);
+      bar.position.set(0, 0.37, -0.11);
+      const hook = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.15, 0.065), headMat);
+      hook.position.set(0, 0.28, -0.22);
+      group.add(bar, hook);
     }
     group.rotation.set(-0.28, 0.12, 0.05);
     return group;

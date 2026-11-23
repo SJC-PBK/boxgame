@@ -188,6 +188,7 @@ export class TouchControls {
     this._bindHoldBtn('touch-btn-jump', () => this.cb.onJumpStart(), () => this.cb.onJumpEnd());
     this._bindHoldBtn('touch-btn-descend', () => this.cb.onDescendStart(), () => this.cb.onDescendEnd());
     this._bindTapBtn('touch-btn-fly', () => this.cb.onFlyToggle());
+    this._bindTapBtn('touch-btn-tool', () => this.cb.onToolSwitch?.());
     this._bindTapBtn('touch-btn-chat', () => this.cb.onChat());
     this._bindTapBtn('touch-btn-view', () => this.cb.onViewToggle());
     this._bindTapBtn('touch-btn-undo', () => this.cb.onUndo());

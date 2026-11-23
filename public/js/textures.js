@@ -9,10 +9,10 @@ function mulberry32(seed) {
   };
 }
 
-function makeCanvas(drawFn) {
+function makeCanvas(drawFn, size = 16) {
   const c = document.createElement('canvas');
-  c.width = 16;
-  c.height = 16;
+  c.width = size;
+  c.height = size;
   const ctx = c.getContext('2d');
   drawFn(ctx);
   return c;
@@ -441,36 +441,74 @@ function drawBlockFace(blockId, face) {
 }
 
 function drawItemIcon(def) {
+  // Crisp 32x32 pixel-art icons with dark outlines & unmistakable tool silhouettes!
   return makeCanvas((ctx) => {
     const id = def.id;
+    const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+
     if (def.kind === 'tool') {
-      const col = def.color || '#cbd5e1';
-      // Diagonal wooden handle
-      ctx.fillStyle = '#8b5a2b';
-      for (let i = 2; i <= 11; i++) {
-        ctx.fillRect(i, 15 - i, 2, 2);
+      const tierColors = {
+        1: { main: '#b87a3d', hi: '#e0a96d', dark: '#5c3818' }, // Wood
+        2: { main: '#94a3b8', hi: '#cbd5e1', dark: '#475569' }, // Stone
+        3: { main: '#e2e8f0', hi: '#ffffff', dark: '#64748b' }, // Iron
+        4: { main: '#22d3ee', hi: '#a5f3fc', dark: '#0e7490' }  // Diamond
+      };
+      const tc = tierColors[def.tier] || tierColors[2];
+
+      // Crisp diagonal wooden handle with outline
+      for (let i = 4; i <= 21; i += 2) {
+        const x = i, y = 27 - i;
+        px(x - 1, y - 1, 4, 4, '#29170a');
+        px(x, y, 2, 2, '#9a6534');
+        px(x, y, 1, 1, '#c99055');
       }
-      ctx.fillStyle = col;
+
       if (def.toolType === 'pickaxe') {
-        ctx.fillRect(5, 2, 7, 2);
-        ctx.fillRect(11, 3, 2, 3);
-        ctx.fillRect(12, 5, 2, 4);
-        ctx.fillRect(9, 4, 3, 2);
+        // Wide curved symmetric T-shaped Pickaxe head
+        const pts = [
+          [7, 4], [9, 3], [11, 3], [13, 3], [15, 3], [17, 3], [19, 4], [21, 5],
+          [23, 7], [25, 9], [26, 11], [27, 13], [27, 15], [27, 17], [26, 19],
+          [24, 15], [23, 12], [21, 10], [19, 8], [16, 7], [13, 6], [10, 6]
+        ];
+        for (const [x, y] of pts) px(x - 1, y - 1, 4, 4, tc.dark);
+        for (const [x, y] of pts) px(x, y, 2, 2, tc.main);
+        px(13, 4, 5, 2, tc.hi);
+        px(24, 10, 2, 5, tc.hi);
       } else if (def.toolType === 'axe') {
-        ctx.fillRect(7, 2, 5, 3);
-        ctx.fillRect(9, 4, 4, 4);
-        ctx.fillRect(10, 8, 2, 2);
+        // Heavy curved Axe blade on the left-top side + small flat back
+        px(11, 3, 14, 14, tc.dark);
+        px(12, 4, 12, 12, tc.main);
+        // Hollow inner curve to make unmistakable axe shape
+        px(11, 13, 6, 6, 'rgba(0,0,0,0)');
+        ctx.clearRect(10, 14, 7, 6);
+        px(12, 4, 4, 10, tc.hi);   // Bright sharp cutting edge!
+        px(10, 5, 3, 8, tc.hi);
+        px(22, 6, 4, 4, tc.dark);  // Flat poll on back
+        px(23, 7, 2, 2, tc.main);
       } else if (def.toolType === 'shovel') {
-        ctx.fillRect(10, 2, 4, 4);
-        ctx.fillRect(9, 3, 2, 3);
-        ctx.fillRect(11, 1, 2, 2);
+        // Broad rounded diamond spade head at top-right tip
+        px(18, 2, 11, 11, tc.dark);
+        px(19, 3, 9, 9, tc.main);
+        px(21, 1, 7, 3, tc.dark);
+        px(22, 2, 5, 2, tc.main);
+        px(26, 3, 3, 7, tc.dark);
+        px(26, 4, 2, 5, tc.main);
+        px(21, 4, 4, 5, tc.hi);    // Center scoop shine
       } else if (def.toolType === 'hoe') {
-        ctx.fillRect(6, 2, 7, 2);
-        ctx.fillRect(6, 4, 2, 3);
+        // Sharp L-shaped farming Hoe blade (pointing left only — distinct from Pickaxe!)
+        px(7, 3, 16, 5, tc.dark);
+        px(8, 4, 14, 3, tc.main);
+        px(7, 7, 6, 8, tc.dark);
+        px(8, 7, 4, 6, tc.main);
+        px(8, 12, 3, 4, tc.dark);
+        px(9, 12, 2, 3, tc.hi);    // Sharp pointed tip
+        px(10, 4, 9, 1, tc.hi);
       }
       return;
     }
 
+    // Scale 16x16 item drawings cleanly to 32x32 (2x crisp pixels)
+    ctx.scale(2, 2);
     switch (id) {
       case 'wheat_seeds':
         ctx.fillStyle = '#84cc16';
@@ -621,7 +659,7 @@ function drawItemIcon(def) {
         ctx.fillStyle = '#94a3b8';
         ctx.fillRect(4, 4, 8, 8);
     }
-  });
+  }, 32);
 }
 
 export class TextureLibrary {

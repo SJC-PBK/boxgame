@@ -242,6 +242,7 @@ const touchControls = new TouchControls(canvas, {
   onDescendStart: () => { touchDescendHeld = true; },
   onDescendEnd: () => { touchDescendHeld = false; },
   onFlyToggle: () => { if (joined) toggleFlyMode(); },
+  onToolSwitch: () => { if (joined) ui.pressToolSwitchQ(); },
   onChat: () => { if (joined) ui.openChat(); },
   onViewToggle: () => { if (joined) toggleCameraView(); },
   onUndo: () => { if (joined) send({ type: 'block_undo_brush' }); }
@@ -749,24 +750,26 @@ function handleRightClickOrInteract(interactOnly = false) {
   const heldId = ui.getActiveItemId();
   const heldDef = heldId ? catalog[heldId] : null;
 
+  const activeIdx = ui.getActiveBagIndex();
+
   // 3. Hoe tilling grass/dirt -> farmland
   if (currentHit && heldDef?.toolType === 'hoe' && (currentHit.block === 'grass' || currentHit.block === 'dirt')) {
     fpHand?.triggerSwing();
-    send({ type: 'till_soil', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.activeSlot });
+    send({ type: 'till_soil', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: activeIdx });
     return;
   }
 
   // 4. Plant wheat seeds on farmland
   if (currentHit && heldDef?.kind === 'seed') {
     fpHand?.triggerSwing();
-    send({ type: 'plant_seed', x: currentHit.placeX, y: currentHit.placeY, z: currentHit.placeZ, slotIndex: ui.activeSlot });
+    send({ type: 'plant_seed', x: currentHit.placeX, y: currentHit.placeY, z: currentHit.placeZ, slotIndex: activeIdx });
     return;
   }
 
   // 5. Eat food
   if (heldDef?.kind === 'food') {
     fpHand?.triggerSwing();
-    send({ type: 'eat_food', slotIndex: ui.activeSlot });
+    send({ type: 'eat_food', slotIndex: activeIdx });
     return;
   }
 
@@ -777,7 +780,7 @@ function handleRightClickOrInteract(interactOnly = false) {
   const brushPositions = computeBrushPositions(px, py, pz);
   if (brushPositions && !['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'sapling'].includes(heldDef.id)) {
     fpHand?.triggerSwing();
-    send({ type: 'block_place_brush', positions: brushPositions, slotIndex: ui.activeSlot });
+    send({ type: 'block_place_brush', positions: brushPositions, slotIndex: activeIdx });
     return;
   }
 
@@ -789,7 +792,7 @@ function handleRightClickOrInteract(interactOnly = false) {
     if (overlapsPlayer) return;
   }
   fpHand?.triggerSwing();
-  send({ type: 'block_place', x: px, y: py, z: pz, slotIndex: ui.activeSlot });
+  send({ type: 'block_place', x: px, y: py, z: pz, slotIndex: activeIdx });
 }
 
 canvas.addEventListener('click', () => {
@@ -859,6 +862,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyP') { e.preventDefault(); ui.toggleModal('modal-admin'); return; }
   if (e.code === 'KeyM') { e.preventDefault(); ui.toggleModal('modal-map'); return; }
   if (e.code === 'KeyG') { e.preventDefault(); ui.toggleModal('modal-emote'); return; }
+  if (e.code === 'KeyQ') { e.preventDefault(); ui.pressToolSwitchQ(); return; }
   if (e.code === 'KeyR') { e.preventDefault(); toggleBrushMode(); return; }
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
     e.preventDefault();
@@ -1023,7 +1027,7 @@ function updateMining(dt) {
     send({
       type: 'block_break',
       x: currentHit.x, y: currentHit.y, z: currentHit.z,
-      slotIndex: ui.activeSlot
+      slotIndex: ui.getActiveBagIndex()
     });
     miningElapsed = 0;
     miningTargetKey = null;

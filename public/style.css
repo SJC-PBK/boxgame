@@ -204,6 +204,9 @@ html, body {
 }
 .slot:hover { border-color: rgba(226, 232, 240, 0.65); }
 .slot.active { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35); }
+.slot.tool-q-slot { border-color: rgba(250, 204, 21, 0.55); background: rgba(45, 36, 18, 0.82); margin-right: 4px; }
+.slot.tool-q-slot.active { border-color: #facc15; box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45); }
+.slot.tool-q-slot .slot-key { color: #fde047; font-weight: 800; }
 .slot.selected-move { border-color: #facc15; box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.45); }
 .slot img { width: 34px; height: 34px; image-rendering: pixelated; pointer-events: none; }
 .slot-key { position: absolute; top: 2px; left: 4px; font-size: 10px; color: var(--muted); }

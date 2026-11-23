@@ -222,17 +222,17 @@ export const RECIPES = [
 
 export function createStarterBag() {
   const slots = Array(BAG_SIZE).fill(null);
-  const starter = [
-    { block: 'wood_pickaxe', count: 1 },
-    { block: 'wood_axe', count: 1 },
-    { block: 'wood_shovel', count: 1 },
-    { block: 'wood_hoe', count: 1 },
-    { block: 'planks', count: 24 },
-    { block: 'wheat_seeds', count: 8 },
-    { block: 'sapling', count: 3 },
-    { block: 'apple', count: 4 },
-    { block: 'chest', count: 2 }
-  ];
-  for (let i = 0; i < starter.length; i++) slots[i] = { ...starter[i] };
+  // Hotbar slots 1..4 (indices 0..3) intentionally left EMPTY so newly mined items pop right into slots 1..4!
+  slots[4] = { block: 'planks', count: 24 };
+  slots[5] = { block: 'wheat_seeds', count: 8 };
+  slots[6] = { block: 'sapling', count: 3 };
+  slots[7] = { block: 'apple', count: 4 };
+  slots[8] = { block: 'chest', count: 2 };
+
+  // Starter tools live in bag slots 9..12 and are accessed anytime via the Q key (pickaxe -> axe -> shovel -> hoe)!
+  slots[9]  = { block: 'wood_pickaxe', count: 1 };
+  slots[10] = { block: 'wood_axe', count: 1 };
+  slots[11] = { block: 'wood_shovel', count: 1 };
+  slots[12] = { block: 'wood_hoe', count: 1 };
   return slots;
 }

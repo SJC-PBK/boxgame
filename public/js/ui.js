@@ -4,6 +4,7 @@ import { getSurfaceHeight, getBiomeAt, SEA_LEVEL } from '../shared/terrainGen.js
 
 const SMELT_INPUTS = new Set(['raw_iron', 'raw_gold', 'sand', 'cobble', 'raw_meat']);
 const FUEL_ITEMS = new Set(['coal', 'wood', 'planks', 'stick']);
+const TOOL_ORDER = ['pickaxe', 'axe', 'shovel', 'hoe'];
 
 export class GameUI {
   constructor(callbacks) {
@@ -13,6 +14,8 @@ export class GameUI {
     this.textures = null;
     this.bag = [];
     this.activeSlot = 0;
+    this.usingTool = false;
+    this.lastToolType = 'pickaxe';
     this.moveSourceIdx = null;
     this.currentChest = null;
     this.currentFurnace = null;
@@ -566,14 +569,75 @@ export class GameUI {
     this.cb.onModalChange(false);
   }
 
+  findBestToolSlot(toolType) {
+    let best = null;
+    for (let i = 0; i < this.bag.length; i++) {
+      const s = this.bag[i];
+      if (!s || !s.block) continue;
+      const def = this.catalog[s.block];
+      if (def && def.kind === 'tool' && def.toolType === toolType) {
+        if (!best || (def.tier || 0) > best.tier) {
+          best = { index: i, block: s.block, tier: def.tier || 0, slot: s };
+        }
+      }
+    }
+    return best;
+  }
+
+  pressToolSwitchQ() {
+    if (this.worldMode === 'job') return;
+    if (!this.usingTool) {
+      // Switch from block/empty -> last-used tool (or first owned tool in order)
+      let found = this.findBestToolSlot(this.lastToolType);
+      if (!found) {
+        for (const t of TOOL_ORDER) {
+          found = this.findBestToolSlot(t);
+          if (found) { this.lastToolType = t; break; }
+        }
+      }
+      if (!found) {
+        this.toast('가방에 보유한 도구가 없습니다. (C키로 제작)', 'warn');
+        return;
+      }
+      this.usingTool = true;
+      this.renderHotbar();
+      this.cb.onActiveSlotChange(this.getActiveItemId());
+      return;
+    }
+
+    // Already holding a tool -> cycle pickaxe -> axe -> shovel -> hoe
+    const curIdx = TOOL_ORDER.indexOf(this.lastToolType);
+    for (let step = 1; step <= TOOL_ORDER.length; step++) {
+      const nextType = TOOL_ORDER[(curIdx + step) % TOOL_ORDER.length];
+      const found = this.findBestToolSlot(nextType);
+      if (found) {
+        this.lastToolType = nextType;
+        this.renderHotbar();
+        this.cb.onActiveSlotChange(this.getActiveItemId());
+        return;
+      }
+    }
+  }
+
   setActiveSlot(idx) {
+    this.usingTool = false;
     this.activeSlot = ((idx % 9) + 9) % 9;
     this.renderHotbar();
     this.cb.onActiveSlotChange(this.getActiveItemId());
   }
 
+  getActiveBagIndex() {
+    if (this.usingTool) {
+      const found = this.findBestToolSlot(this.lastToolType);
+      if (found) return found.index;
+      this.usingTool = false;
+    }
+    return this.activeSlot;
+  }
+
   getActiveItemId() {
-    return this.bag[this.activeSlot]?.block || null;
+    const idx = this.getActiveBagIndex();
+    return this.bag[idx]?.block || null;
   }
 
   updateBag(bag) {
@@ -627,16 +691,36 @@ export class GameUI {
   renderHotbar() {
     const container = document.getElementById('hotbar');
     container.innerHTML = '';
+
+    // Dedicated [Q] Tool Quick-Switch slot (left of hotbar 1..9, hidden in Job Village)
+    if (this.worldMode !== 'job') {
+      const bestTool = this.findBestToolSlot(this.lastToolType)
+        || TOOL_ORDER.map(t => this.findBestToolSlot(t)).find(Boolean);
+      const qEl = this._makeSlotEl(bestTool?.slot || null, {
+        active: this.usingTool && !!bestTool,
+        keyLabel: 'Q'
+      });
+      qEl.classList.add('tool-q-slot');
+      qEl.title = 'Q키: 도구 꺼내기 / 순환 (곡괭이→도끼→삽→괭이)';
+      qEl.addEventListener('click', () => this.pressToolSwitchQ());
+      container.appendChild(qEl);
+    }
+
     for (let i = 0; i < 9; i++) {
-      const el = this._makeSlotEl(this.bag[i], { active: i === this.activeSlot, keyLabel: i + 1 });
+      const el = this._makeSlotEl(this.bag[i], {
+        active: !this.usingTool && i === this.activeSlot,
+        keyLabel: i + 1
+      });
       el.addEventListener('click', () => this.setActiveSlot(i));
       container.appendChild(el);
     }
-    const cur = this.bag[this.activeSlot];
+
+    const activeIdx = this.getActiveBagIndex();
+    const cur = this.bag[activeIdx];
     const def = cur ? this.catalog[cur.block] : null;
     document.getElementById('hotbar-label').textContent = def
-      ? `${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
-      : '맨손 (E 가방 · C 제작)';
+      ? `${this.usingTool ? '[Q 도구] ' : ''}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
+      : '맨손 (Q 도구 · E 가방 · C 제작)';
   }
 
   renderBagModal() {
