@@ -336,6 +336,7 @@ function resetToLogin() {
   ui.closeChat();
   remotePlayers.clear();
   animalRenderer.clear();
+  worldExtras.syncRemoteLinks([]);
   if (selfRig) { scene.remove(selfRig.group); selfRig = null; }
   if (fpHand) { camera.remove(fpHand.root); fpHand = null; }
   if (projector) projector.clear();
@@ -540,9 +541,20 @@ function handleServerMessage(msg) {
       break;
 
     case 'tnt_ignited':
-      worldExtras.igniteTNT(msg.x, msg.y, msg.z);
+      worldExtras.igniteTNT(msg.x, msg.y, msg.z, msg.durationMs);
       sound.playHit('dirt', { x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
-      ui.toast('🧨 치이익... 3초 후 TNT가 폭발합니다!', 'warn');
+      if (!msg.durationMs || msg.durationMs >= 2000) {
+        ui.toast('🧨 치이익... TNT가 곧 폭발합니다!', 'warn');
+      }
+      break;
+
+    case 'fuse_burn':
+      worldExtras.burnFuse(msg.x, msg.y, msg.z);
+      sound.playHit('dirt', { x: msg.x + 0.5, y: msg.y + 0.3, z: msg.z + 0.5 });
+      break;
+
+    case 'remote_links_update':
+      worldExtras.syncRemoteLinks(msg.links || []);
       break;
 
     case 'tnt_explode': {
@@ -774,7 +786,17 @@ function handleRightClickOrInteract(interactOnly = false) {
     }
     if (currentHit.block === 'tnt') {
       fpHand?.triggerSwing();
-      send({ type: 'tnt_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      const heldIdNow = ui.getActiveItemId();
+      if (heldIdNow === 'detonator') {
+        send({ type: 'tnt_link_remote', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+      } else {
+        send({ type: 'tnt_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      }
+      return;
+    }
+    if (currentHit.block === 'fuse') {
+      fpHand?.triggerSwing();
+      send({ type: 'fuse_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
     if (currentHit.block === 'sign') {
@@ -808,6 +830,13 @@ function handleRightClickOrInteract(interactOnly = false) {
   const heldDef = heldId ? catalog[heldId] : null;
 
   const activeIdx = ui.getActiveBagIndex();
+
+  // 2.5 Remote Detonator trigger (right-click anywhere away from TNT to detonate linked TNTs!)
+  if (heldId === 'detonator') {
+    fpHand?.triggerSwing();
+    send({ type: 'tnt_remote_detonate', slotIndex: activeIdx });
+    return;
+  }
 
   // 3. Hoe tilling grass/dirt -> farmland
   if (currentHit && heldDef?.toolType === 'hoe' && (currentHit.block === 'grass' || currentHit.block === 'dirt')) {

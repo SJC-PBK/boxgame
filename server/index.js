@@ -204,6 +204,73 @@ function broadcastFurnaceToViewers(fKey, f) {
   }
 }
 
+const ignitedTnts = new Set();
+const burningFuses = new Set();
+
+function igniteTNTAt(x, y, z, isAdmin, delayMs = 2800) {
+  const key = `${x},${y},${z}`;
+  if (ignitedTnts.has(key)) return false;
+  if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'tnt') return false;
+  if (!isAdmin && store.findProtectingRegion(x, y, z)) return false;
+
+  ignitedTnts.add(key);
+  broadcast({ type: 'tnt_ignited', x, y, z, durationMs: delayMs });
+  setTimeout(() => {
+    ignitedTnts.delete(key);
+    if (store.getBlock(x, y, z) !== 'tnt') return;
+    const { changes, fell, chainTnts } = store.explodeAt(x, y, z, 3, isAdmin);
+    broadcast({ type: 'tnt_explode', x, y, z });
+    if (changes.length > 0) broadcast({ type: 'blocks_batch', changes, fell });
+    // Remove exploded TNTs from any player's remote link list
+    for (const p of players.values()) {
+      if (p.linkedTnts?.delete(key)) {
+        send(p.ws, { type: 'remote_links_update', links: [...p.linkedTnts] });
+      }
+    }
+    // Chain-ignite nearby TNT blocks with a punchy staggered delay!
+    for (let i = 0; i < chainTnts.length; i++) {
+      const ct = chainTnts[i];
+      setTimeout(() => igniteTNTAt(ct.x, ct.y, ct.z, isAdmin, 700), 160 + i * 110);
+    }
+  }, delayMs);
+  return true;
+}
+
+const FUSE_STEP_DIRS = [
+  [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
+  [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1],
+  [1, -1, 0], [-1, -1, 0], [0, -1, 1], [0, -1, -1]
+];
+
+function igniteFuseAt(x, y, z, isAdmin, depth = 0) {
+  if (depth > 96) return false;
+  const key = `${x},${y},${z}`;
+  if (burningFuses.has(key)) return false;
+  if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fuse') return false;
+  if (!isAdmin && store.findProtectingRegion(x, y, z)) return false;
+
+  burningFuses.add(key);
+  broadcast({ type: 'fuse_burn', x, y, z });
+  setTimeout(() => {
+    burningFuses.delete(key);
+    if (store.getBlock(x, y, z) === 'fuse') {
+      store.setBlock(x, y, z, null);
+      broadcast({ type: 'block_update', x, y, z, block: null });
+    }
+    for (const [dx, dy, dz] of FUSE_STEP_DIRS) {
+      const nx = x + dx, ny = y + dy, nz = z + dz;
+      if (!store.inBounds(nx, ny, nz)) continue;
+      const nb = store.getBlock(nx, ny, nz);
+      if (nb === 'fuse') {
+        igniteFuseAt(nx, ny, nz, isAdmin, depth + 1);
+      } else if (nb === 'tnt') {
+        igniteTNTAt(nx, ny, nz, isAdmin, 2400);
+      }
+    }
+  }, 115);
+  return true;
+}
+
 function scheduleSaplingGrowth(x, y, z) {
   setTimeout(() => {
     const changes = store.growSapling(x, y, z);
@@ -308,7 +375,8 @@ wss.on('connection', (ws) => {
         spawn: { ...startPos },
         yaw: 0, pitch: 0, isAdmin: isAdminLogin, bag, tools,
         jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
-        openChestKey: null, openFurnaceKey: null
+        openChestKey: null, openFurnaceKey: null,
+        linkedTnts: new Set()
       };
       players.set(id, player);
 
@@ -737,14 +805,72 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역에서는 TNT를 점화할 수 없습니다.' });
           return;
         }
-        const igniterIsAdmin = player.isAdmin;
-        broadcast({ type: 'tnt_ignited', x, y, z });
-        setTimeout(() => {
-          if (store.getBlock(x, y, z) !== 'tnt') return;
-          const changes = store.explodeAt(x, y, z, 3, igniterIsAdmin);
-          broadcast({ type: 'tnt_explode', x, y, z });
-          if (changes.length > 0) broadcast({ type: 'blocks_batch', changes });
-        }, 2800);
+        igniteTNTAt(x, y, z, player.isAdmin, 2800);
+        break;
+      }
+
+      case 'fuse_ignite': {
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fuse') return;
+        if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역에서는 도화선에 불을 붙일 수 없습니다.' });
+          return;
+        }
+        if (igniteFuseAt(x, y, z, player.isAdmin, 0)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔥 도화선에 불이 붙었습니다! 불꽃이 TNT를 향해 타들어갑니다...' });
+        }
+        break;
+      }
+
+      case 'tnt_link_remote': {
+        const { x, y, z, slotIndex } = msg;
+        const held = player.bag[Number(slotIndex)];
+        if (!held || held.block !== 'detonator') return;
+        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'tnt') return;
+        if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 TNT에는 리모컨을 설치할 수 없습니다.' });
+          return;
+        }
+        const key = `${x},${y},${z}`;
+        if (player.linkedTnts.has(key)) {
+          player.linkedTnts.delete(key);
+          send(ws, { type: 'remote_links_update', links: [...player.linkedTnts] });
+          send(ws, { type: 'toast', level: 'info', text: `📡 리모컨 수신기를 해제했습니다. (연결된 TNT: ${player.linkedTnts.size}개)` });
+        } else {
+          if (player.linkedTnts.size >= 24) {
+            send(ws, { type: 'toast', level: 'warn', text: '📡 리모컨은 최대 24개의 TNT까지 동시 연결할 수 있습니다.' });
+            return;
+          }
+          player.linkedTnts.add(key);
+          send(ws, { type: 'remote_links_update', links: [...player.linkedTnts] });
+          send(ws, { type: 'toast', level: 'success', text: `📡 TNT에 리모컨 수신기 설치! (연결된 TNT: ${player.linkedTnts.size}개 · 멀리서 우클릭으로 폭파)` });
+        }
+        break;
+      }
+
+      case 'tnt_remote_detonate': {
+        const held = player.bag[Number(msg.slotIndex)];
+        if (!held || held.block !== 'detonator') return;
+        const valid = [];
+        for (const key of player.linkedTnts) {
+          const [tx, ty, tz] = key.split(',').map(Number);
+          if (store.inBounds(tx, ty, tz) && store.getBlock(tx, ty, tz) === 'tnt') {
+            valid.push({ x: tx, y: ty, z: tz });
+          }
+        }
+        player.linkedTnts.clear();
+        send(ws, { type: 'remote_links_update', links: [] });
+        if (valid.length === 0) {
+          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 TNT가 없습니다. 먼저 TNT를 리모컨으로 우클릭해 수신기를 설치하세요!' });
+          return;
+        }
+        let ignited = 0;
+        for (const t of valid) {
+          if (igniteTNTAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
+        }
+        if (ignited > 0) {
+          send(ws, { type: 'toast', level: 'warn', text: `💥 원격 폭파 신호 전송! (TNT ${ignited}개 점화)` });
+        }
         break;
       }
 

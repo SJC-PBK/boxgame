@@ -90,6 +90,7 @@ export class WorldRenderer {
       this.idToNum['ladder'],
       this.idToNum['sign']
     ].filter(Boolean));
+    this.fuseNum = this.idToNum['fuse'] || -1;
 
     this.worldGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
@@ -696,6 +697,31 @@ export class WorldRenderer {
           if (num === 0) continue;
           const blockId = this.numToId[num];
           if (!blockId) continue;
+
+          if (num === this.fuseNum) {
+            // Flat ground-hugging gunpowder fuse cord
+            const buf = getBucket(blockId, 'top');
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            const base = buf.positions.length / 3;
+            const fy = y + 0.045;
+            buf.positions.push(
+              x, fy, z + 1,
+              x + 1, fy, z + 1,
+              x + 1, fy, z,
+              x, fy, z
+            );
+            for (let i = 0; i < 4; i++) {
+              buf.normals.push(0, 1, 0);
+              buf.uvs.push(UVS[i][0], UVS[i][1]);
+              buf.lights.push(lr, lg, lb);
+            }
+            buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+            continue;
+          }
 
           if (this.crossNums.has(num)) {
             const buf = getBucket(blockId, 'side');

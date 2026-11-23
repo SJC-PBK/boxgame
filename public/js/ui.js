@@ -813,7 +813,7 @@ export class GameUI {
     const supplyAllow = [
       'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
       'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
-      'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'portal', 'jumppad', 'furnace', 'chest'
+      'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
     ];
     for (const id of supplyAllow) {
       const def = this.catalog[id];
@@ -826,7 +826,7 @@ export class GameUI {
       span.textContent = def.name;
       btn.append(img, span);
       btn.addEventListener('click', () => {
-        const amt = def.id === 'chest' ? 2 : 32;
+        const amt = def.id === 'detonator' ? 1 : (def.id === 'chest' ? 2 : 32);
         this.cb.send({ type: 'bag_supply', block: def.id, count: amt });
       });
       grid.appendChild(btn);

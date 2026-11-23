@@ -33,10 +33,12 @@ export class WorldExtras {
     this.scene = scene;
     this.signGroup = new THREE.Group();
     this.portalGroup = new THREE.Group();
-    this.scene.add(this.signGroup, this.portalGroup);
+    this.remoteGroup = new THREE.Group();
+    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup);
 
     this.ignitedTnts = []; // { mesh, mat, light, x, y, z, startTime, endTime, sparkAcc }
     this.explosions = [];  // { flashLight, core, outer, ring, debris, smokes, age, maxAge }
+    this.fuseSparks = [];  // { meshes, light, age, maxAge }
     this.emotes = [];      // { sprite, targetFn, life }
     this._sparkGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
     this._smokeGeo = new THREE.BoxGeometry(0.65, 0.65, 0.65);
@@ -72,7 +74,42 @@ export class WorldExtras {
     }
   }
 
-  igniteTNT(x, y, z) {
+  syncRemoteLinks(links) {
+    this._clearGroup(this.remoteGroup);
+    for (const key of links || []) {
+      const [x, y, z] = String(key).split(',').map(Number);
+      if (!Number.isFinite(x)) continue;
+      const sp = makeBillboardSprite(['📡 원격 TNT'], 'rgba(127, 29, 29, 0.88)', '#ef4444', '#fef08a', 1.25, 0.42);
+      sp.position.set(x + 0.5, y + 1.32, z + 0.5);
+      this.remoteGroup.add(sp);
+    }
+  }
+
+  burnFuse(x, y, z) {
+    const cx = x + 0.5, cy = y + 0.12, cz = z + 0.5;
+    const light = new THREE.PointLight(0xf97316, 2.8, 6, 1.6);
+    light.position.set(cx, cy + 0.25, cz);
+    this.scene.add(light);
+
+    const sparks = [];
+    const cols = [0xffffff, 0xfef08a, 0xf97316, 0xef4444];
+    for (let i = 0; i < 8; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: cols[i % cols.length], transparent: true, opacity: 1 });
+      const m = new THREE.Mesh(this._sparkGeo, mat);
+      m.position.set(cx + (Math.random() - 0.5) * 0.25, cy, cz + (Math.random() - 0.5) * 0.25);
+      m.scale.setScalar(0.55 + Math.random() * 0.45);
+      this.scene.add(m);
+      sparks.push({
+        mesh: m, mat,
+        vx: (Math.random() - 0.5) * 2.4,
+        vy: 1.8 + Math.random() * 2.4,
+        vz: (Math.random() - 0.5) * 2.4
+      });
+    }
+    this.fuseSparks.push({ sparks, light, age: 0, maxAge: 0.32 });
+  }
+
+  igniteTNT(x, y, z, durationMs = 2800) {
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.06, 1.06, 1.06), mat);
     mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
@@ -86,7 +123,7 @@ export class WorldExtras {
     this.ignitedTnts.push({
       mesh, mat, light,
       x: x + 0.5, y: y + 0.5, z: z + 0.5,
-      startTime: now, endTime: now + 2950,
+      startTime: now, endTime: now + Math.max(250, Number(durationMs) || 2800),
       sparkAcc: 0
     });
   }
@@ -274,6 +311,26 @@ export class WorldExtras {
         for (const d of ex.debris) { this.scene.remove(d.mesh); d.mat.dispose(); }
         for (const s of ex.smokes) { this.scene.remove(s.mesh); s.mat.dispose(); }
         this.explosions.splice(i, 1);
+      }
+    }
+
+    // Update burning fuse spark bursts
+    for (let i = this.fuseSparks.length - 1; i >= 0; i--) {
+      const f = this.fuseSparks[i];
+      f.age += dt;
+      const p = Math.min(1, f.age / f.maxAge);
+      f.light.intensity = 2.8 * (1 - p);
+      for (const s of f.sparks) {
+        s.vy -= 9 * dt;
+        s.mesh.position.x += s.vx * dt;
+        s.mesh.position.y += s.vy * dt;
+        s.mesh.position.z += s.vz * dt;
+        s.mat.opacity = 1 - p;
+      }
+      if (f.age >= f.maxAge) {
+        this.scene.remove(f.light);
+        for (const s of f.sparks) { this.scene.remove(s.mesh); s.mat.dispose(); }
+        this.fuseSparks.splice(i, 1);
       }
     }
 

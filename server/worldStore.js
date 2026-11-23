@@ -421,6 +421,18 @@ export class WorldStore {
 
   explodeAt(cx, cy, cz, radius, isAdmin) {
     const changes = [];
+    const changedKeys = new Set();
+    const recordNull = (x, y, z) => {
+      const k = `${x},${y},${z}`;
+      if (changedKeys.has(k)) return;
+      changedKeys.add(k);
+      this.setBlock(x, y, z, null);
+      changes.push({ x, y, z, block: null });
+    };
+
+    const destroyedWoodCols = new Map(); // "x,z" -> maxY
+    const chainTnts = [];
+
     for (let dx = -radius; dx <= radius; dx++) {
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dz = -radius; dz <= radius; dz++) {
@@ -432,12 +444,62 @@ export class WorldStore {
           if (!isAdmin && this.findProtectingRegion(x, y, z)) continue;
           if (b === 'chest' && !this.isChestEmpty(x, y, z)) continue;
           if (b === 'furnace' && !this.isFurnaceEmpty(x, y, z)) continue;
-          this.setBlock(x, y, z, null);
-          changes.push({ x, y, z, block: null });
+
+          // Chain-ignite other nearby TNT blocks instead of silently erasing them!
+          if (b === 'tnt' && !(x === cx && y === cy && z === cz)) {
+            chainTnts.push({ x, y, z });
+            continue;
+          }
+
+          if (b === 'wood') {
+            const colKey = `${x},${z}`;
+            const prev = destroyedWoodCols.get(colKey);
+            if (prev === undefined || y > prev) destroyedWoodCols.set(colKey, y);
+          } else if ((b === 'grass' || b === 'dirt' || b === 'wool_white') && this.getBlock(x, y + 1, z) === 'wood') {
+            // Blast destroyed ground right under a tree trunk -> fell the tree above it!
+            const colKey = `${x},${z}`;
+            const prev = destroyedWoodCols.get(colKey);
+            if (prev === undefined || y > prev) destroyedWoodCols.set(colKey, y);
+          }
+
+          recordNull(x, y, z);
         }
       }
     }
-    return changes;
+
+    // Collapse any trees whose trunks or bases were blown up by the blast!
+    let fell = false;
+    for (const [colKey, baseY] of destroyedWoodCols.entries()) {
+      const [tx, tz] = colKey.split(',').map(Number);
+      let topY = baseY;
+      let ty = baseY + 1;
+      let trunkRemoved = 0;
+      while (ty <= WORLD_BOUNDS.maxY && this.getBlock(tx, ty, tz) === 'wood' && trunkRemoved < 12) {
+        if (!isAdmin && this.findProtectingRegion(tx, ty, tz)) break;
+        recordNull(tx, ty, tz);
+        topY = ty;
+        ty++;
+        trunkRemoved++;
+      }
+      // Clear canopy leaves around the fallen trunk top
+      let leavesRemoved = 0;
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          for (let dy = -2; dy <= 3; dy++) {
+            const lx = tx + dx, ly = topY + dy, lz = tz + dz;
+            if (!this.inBounds(lx, ly, lz)) continue;
+            if (this.getBlock(lx, ly, lz) === 'leaves') {
+              if (!isAdmin && this.findProtectingRegion(lx, ly, lz)) continue;
+              recordNull(lx, ly, lz);
+              leavesRemoved++;
+            }
+          }
+        }
+      }
+      if (trunkRemoved > 0 || leavesRemoved >= 3) fell = true;
+    }
+
+    return { changes, fell, chainTnts };
   }
 
   addRegion({ name, pos1, pos2, createdBy }) {

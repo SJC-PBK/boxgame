@@ -351,6 +351,28 @@ function drawBlockFace(blockId, face) {
         }
         break;
       }
+      case 'fuse': {
+        // Coiled gunpowder fuse cord (transparent background, bright braided rope + spark tip)
+        ctx.clearRect(0, 0, 16, 16);
+        ctx.fillStyle = '#3f2e21';
+        ctx.fillRect(0, 6, 16, 4);
+        ctx.fillRect(6, 0, 4, 16);
+        ctx.fillStyle = '#92400e';
+        ctx.fillRect(0, 7, 16, 2);
+        ctx.fillRect(7, 0, 2, 16);
+        // Gunpowder weave dots
+        ctx.fillStyle = '#1e293b';
+        for (let i = 1; i < 16; i += 3) {
+          ctx.fillRect(i, 7, 1, 2);
+          ctx.fillRect(7, i, 2, 1);
+        }
+        // Center red-orange spark knot
+        ctx.fillStyle = '#f97316';
+        ctx.fillRect(6, 6, 4, 4);
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(7, 7, 2, 2);
+        break;
+      }
       case 'portal': {
         fillNoise(ctx, ['rgba(147,51,234,0.78)', 'rgba(192,132,252,0.82)', 'rgba(88,28,135,0.82)', 'rgba(56,189,248,0.75)'], 990);
         ctx.fillStyle = 'rgba(255,255,255,0.65)';
@@ -544,6 +566,25 @@ function drawItemIcon(def) {
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(11, 7, 2, 3);
         break;
+      case 'detonator':
+        // Tactical remote detonator: metallic antenna + red LED + dark body + big red button!
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(10, 1, 2, 5);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(10, 0, 2, 2);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(3, 5, 10, 10);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(4, 6, 8, 8);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(5, 7, 6, 2);
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(6, 7, 2, 1);
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(5, 10, 6, 3);
+        ctx.fillStyle = '#f87171';
+        ctx.fillRect(6, 10, 4, 1);
+        break;
       case 'cup':
         ctx.fillStyle = '#e2e8f0'; ctx.fillRect(4, 4, 8, 10);
         ctx.fillStyle = '#cbd5e1'; ctx.fillRect(3, 3, 10, 2);
@@ -677,7 +718,7 @@ export class TextureLibrary {
         this.icons[def.id] = sideC.toDataURL();
 
         const isTransparent = !!def.transparent;
-        const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign';
+        const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign' || def.id === 'fuse';
         const opts = {
           transparent: isTransparent,
           opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : 1.0),

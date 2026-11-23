@@ -62,7 +62,8 @@ export const BLOCKS = {
   job_espresso: { numId: 40, id: 'job_espresso', name: '☕ 커피머신',    transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'stone', stackable: 1, category: '직업체험' },
   job_fridge:   { numId: 41, id: 'job_fridge',   name: '🧊 재료 냉장고', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'stone', stackable: 1, category: '직업체험' },
   job_mixer:    { numId: 42, id: 'job_mixer',    name: '🥤 음료 조합대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
-  job_pickup:   { numId: 43, id: 'job_pickup',   name: '🛎️ 픽업 서빙대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' }
+  job_pickup:   { numId: 43, id: 'job_pickup',   name: '🛎️ 픽업 서빙대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
+  fuse:         { numId: 44, id: 'fuse',         name: '도화선 (심지)', transparent: true,  solid: false, hardness: 0.1,      preferredTool: null, minTier: 0,  drop: 'fuse', sound: 'dirt',  stackable: 64, category: '특수' }
 };
 
 export const NUM_TO_BLOCK = {};
@@ -85,6 +86,7 @@ export const ITEMS = {
   bread:       { id: 'bread',       name: '빵',           kind: 'food', stackable: 32, category: '음식', heal: 6,  hunger: 8 },
   raw_meat:    { id: 'raw_meat',    name: '생고기',       kind: 'food', stackable: 32, category: '음식', heal: 2,  hunger: 3 },
   cooked_meat: { id: 'cooked_meat', name: '구운 고기',    kind: 'food', stackable: 32, category: '음식', heal: 10, hunger: 12 },
+  detonator:   { id: 'detonator',   name: 'TNT 폭파 리모컨', kind: 'item', stackable: 1, category: '특수' },
 
   // Pickaxes
   wood_pickaxe:    { id: 'wood_pickaxe',    name: '나무 곡괭이',   kind: 'tool', toolType: 'pickaxe', tier: 1, speed: 2.4, color: '#a16207', stackable: 1, category: '도구' },
@@ -182,7 +184,9 @@ export const RECIPES = [
   { id: 'r-door',     category: '건축', out: { item: 'door_closed', count: 2 }, in: [{ item: 'planks', count: 6 }] },
   { id: 'r-ladder',   category: '건축', out: { item: 'ladder', count: 4 },      in: [{ item: 'stick', count: 6 }] },
   { id: 'r-sign',     category: '건축', out: { item: 'sign', count: 2 },        in: [{ item: 'planks', count: 4 }, { item: 'stick', count: 1 }] },
-  { id: 'r-tnt',      category: '특수', out: { item: 'tnt', count: 1 },         in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },
+  { id: 'r-tnt',       category: '특수', out: { item: 'tnt', count: 1 },         in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },
+  { id: 'r-fuse',      category: '특수', out: { item: 'fuse', count: 8 },        in: [{ item: 'coal', count: 1 }, { item: 'stick', count: 1 }] },
+  { id: 'r-detonator', category: '특수', out: { item: 'detonator', count: 1 },   in: [{ item: 'iron_ingot', count: 2 }, { item: 'coal', count: 1 }] },
   { id: 'r-portal',   category: '특수', out: { item: 'portal', count: 2 },      in: [{ item: 'diamond_gem', count: 1 }, { item: 'glass', count: 4 }] },
   { id: 'r-jumppad',  category: '특수', out: { item: 'jumppad', count: 2 },     in: [{ item: 'iron_ingot', count: 2 }, { item: 'wool_yellow', count: 2 }] },
   { id: 'r-lamp',     category: '건축', out: { item: 'lamp', count: 4 },     in: [{ item: 'coal', count: 1 }, { item: 'stick', count: 1 }] },
