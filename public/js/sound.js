@@ -3,7 +3,12 @@ export class SoundEngine {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.volume = 1.0;
     this.listenerPos = { x: 0, y: 17, z: 0 };
+  }
+
+  setVolume(v) {
+    this.volume = Math.max(0, Math.min(1, Number(v)));
   }
 
   _ensureCtx() {
@@ -73,7 +78,7 @@ export class SoundEngine {
     filter.Q.value = q;
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(gainAmt, ctx.currentTime);
+    gain.gain.setValueAtTime(Math.max(0.001, gainAmt * this.volume), ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
     src.connect(filter);
@@ -91,7 +96,7 @@ export class SoundEngine {
     osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), ctx.currentTime + duration);
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(gainAmt, ctx.currentTime);
+    gain.gain.setValueAtTime(Math.max(0.001, gainAmt * this.volume), ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
 
     osc.connect(gain);

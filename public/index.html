@@ -52,13 +52,14 @@
       </div>
       <div class="top-right">
         <button id="btn-sound" class="hud-btn" title="3D 사운드 켜기/끄기">🔊</button>
-        <button id="btn-brush" class="hud-btn" title="건축 붓 3×3 빠른 건축 모드 (R)">🪄 붓 OFF [R]</button>
+        <button id="btn-brush" class="hud-btn" title="건축 붓 모드 전환: 1×1 · 3×3 · 5×5 · 가로줄 · 세로기둥 · 벽면 (R)">🪄 1×1 일반 [R]</button>
         <button id="btn-map" class="hud-btn" title="실시간 미니맵 & 빠른 워프 (M)">🗺️ 지도 [M]</button>
         <button id="btn-emote" class="hud-btn" title="이모트 표현 (G)">😊 [G]</button>
         <button id="btn-bag" class="hud-btn" title="개인 가방 & 보급함 (E)">🎒 가방 [E]</button>
         <button id="btn-craft" class="hud-btn" title="도구·제련 제작대 (C)">🔨 제작 [C]</button>
         <button id="btn-skin" class="hud-btn" title="스킨 꾸미기 & 64×64 에디터 (K)">🎨 스킨 [K]</button>
         <button id="btn-blueprint" class="hud-btn" title="설계도 투영 (B)">📐 설계도 [B]</button>
+        <button id="btn-settings" class="hud-btn" title="시야·감도·화질 설정 (O)">⚙️ 설정 [O]</button>
         <button id="btn-admin" class="hud-btn" title="관리자 패널 (P)">🛡️ 관리 [P]</button>
         <button id="btn-logout" class="hud-btn danger" title="로그아웃 (가방 자동 삭제)">🚪 로그아웃</button>
       </div>
@@ -377,6 +378,38 @@
             <input id="reg-name-input" type="text" maxlength="30" placeholder="보호 구역 이름 (예: 중앙 광장)" />
             <button id="btn-reg-add" class="btn-sm accent">보호 추가</button>
           </div>
+
+          <hr class="divider" />
+          <div class="section-title">🏗️ 사진 / 지도로 3D 건물 자동 생성</div>
+          <div class="img-builder-box">
+            <div class="input-row" style="margin-bottom:8px;">
+              <label class="btn-sm accent" style="cursor:pointer;">
+                📂 사진·지도 이미지 선택
+                <input id="adm-img-file" type="file" accept="image/*" class="hidden" />
+              </label>
+              <select id="adm-img-mode" class="select-sm">
+                <option value="map3d">🗺️ 지도/평면도 → 3D 건물 자동 생성</option>
+                <option value="photo">🖼️ 사진 → 3D 픽셀 벽화/조형물</option>
+                <option value="relief">🏔️ 지도/사진 → 3D 지형 부조</option>
+              </select>
+            </div>
+            <div class="img-builder-preview-row">
+              <canvas id="adm-img-preview" width="128" height="128" class="img-preview-canvas"></canvas>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                <label class="range-row">가로 크기: <span id="adm-img-w-val">20</span>블록
+                  <input id="adm-img-w" type="range" min="8" max="34" value="20" />
+                </label>
+                <label class="range-row">건물 높이: <span id="adm-img-h-val">6</span>층
+                  <input id="adm-img-h" type="range" min="3" max="14" value="6" />
+                </label>
+                <div id="adm-img-count" class="small-note">이미지를 선택하면 변환 미리보기가 표시됩니다.</div>
+                <div class="btn-row">
+                  <button id="btn-adm-img-build" class="btn-sm accent" disabled>✨ 내 앞에 자동 건축하기</button>
+                  <button id="btn-adm-img-undo" class="btn-sm danger">↩ 자동 건축 되돌리기</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <hr class="divider" />
@@ -427,6 +460,52 @@
           <button class="btn-sm accent" data-em="💃|신난다!">💃 신난다!</button>
           <button class="btn-sm accent" data-em="⛏️|채굴 중">⛏️ 채굴 중</button>
           <button class="btn-sm accent" data-em="😂|하하하">😂 하하하</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Game Settings (FOV, Render Distance, Sensitivity, Graphics, Audio) -->
+  <div id="modal-settings" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>⚙️ 게임 설정 (시야 · 감도 · 화질 · 편의)</h2>
+        <button class="modal-close" data-close="modal-settings">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+        <label class="range-row">
+          <span>👁️ 시야각 (FOV): <strong id="set-fov-val">75°</strong></span>
+          <input id="set-fov" type="range" min="60" max="110" step="1" value="75" />
+        </label>
+        <label class="range-row">
+          <span>🌫️ 시야 거리 (안개/렌더): <strong id="set-dist-val">125</strong></span>
+          <input id="set-dist" type="range" min="45" max="175" step="5" value="125" />
+        </label>
+        <label class="range-row">
+          <span>🖱️ 마우스 감도: <strong id="set-sens-val">1.0×</strong></span>
+          <input id="set-sens" type="range" min="0.3" max="2.5" step="0.1" value="1.0" />
+        </label>
+        <label class="range-row">
+          <span>🔊 사운드 볼륨: <strong id="set-vol-val">100%</strong></span>
+          <input id="set-vol" type="range" min="0" max="100" step="5" value="100" />
+        </label>
+        <label class="range-row">
+          <span>🖥️ 그래픽 화질 (픽셀 배율)</span>
+          <select id="set-quality" class="select-sm">
+            <option value="1">저화질 (1.0× · 부드러움)</option>
+            <option value="1.5">중화질 (1.5× · 균형)</option>
+            <option value="2" selected>고화질 (2.0× · 선명함)</option>
+          </select>
+        </label>
+        <div class="btn-row" style="gap:14px;">
+          <label class="toggle-label"><input id="set-invert-y" type="checkbox" /> 마우스 Y축 반전</label>
+          <label class="toggle-label"><input id="set-particles" type="checkbox" checked /> 3D 파괴 파편 표시</label>
+          <label class="toggle-label"><input id="set-show-coords" type="checkbox" checked /> 좌표 HUD 표시</label>
+        </div>
+        <div class="small-note">💡 팁: <b>R</b> 키로 1×1 · 3×3 바닥 · 5×5 바닥 · 가로줄(5) · 세로기둥(5) · 벽면(5×3) 건축 모드를 전환하고, <b>Ctrl+Z</b>로 직전 건축을 되돌릴 수 있습니다.</div>
+        <div class="btn-row" style="justify-content:flex-end;">
+          <button id="btn-set-reset" class="btn-sm">기본값 복원</button>
+          <button class="btn-sm accent modal-close" data-close="modal-settings">저장 후 닫기</button>
         </div>
       </div>
     </div>

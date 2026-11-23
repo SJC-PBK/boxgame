@@ -1,4 +1,5 @@
 import { PixelSkinEditor } from './skinEditor.js';
+import { ImageAutoBuilder } from './imageBuilder.js';
 
 const SMELT_INPUTS = new Set(['raw_iron', 'raw_gold', 'sand', 'cobble', 'raw_meat']);
 const FUEL_ITEMS = new Set(['coal', 'wood', 'planks', 'stick']);
@@ -64,6 +65,7 @@ export class GameUI {
     document.getElementById('btn-craft').addEventListener('click', () => this.toggleModal('modal-craft'));
     document.getElementById('btn-skin').addEventListener('click', () => this.toggleModal('modal-skin'));
     document.getElementById('btn-blueprint').addEventListener('click', () => this.toggleModal('modal-blueprint'));
+    document.getElementById('btn-settings').addEventListener('click', () => this.toggleModal('modal-settings'));
     document.getElementById('btn-admin').addEventListener('click', () => this.toggleModal('modal-admin'));
     document.getElementById('btn-logout').addEventListener('click', () => {
       if (confirm('로그아웃하시겠습니까?\n개인 가방의 아이템은 자동 삭제되며, 상자에 넣은 아이템은 보존됩니다.')) {
@@ -103,6 +105,97 @@ export class GameUI {
       this.cb.send({ type: 'admin_announce', text: txt });
       inp.value = '';
     });
+
+    // Admin Photo / Map Auto-Builder
+    this._imgBuilder = new ImageAutoBuilder(document.getElementById('adm-img-preview'));
+    this._pendingAutoBlocks = [];
+    const refreshImgPreview = () => {
+      const mode = document.getElementById('adm-img-mode').value;
+      const w = Number(document.getElementById('adm-img-w').value);
+      const h = Number(document.getElementById('adm-img-h').value);
+      document.getElementById('adm-img-w-val').textContent = w;
+      document.getElementById('adm-img-h-val').textContent = h;
+      this._pendingAutoBlocks = this._imgBuilder.generate({ mode, width: w, height: h });
+      document.getElementById('adm-img-count').textContent = this._pendingAutoBlocks.length > 0
+        ? `변환 완료! 예상 블록 수: ${this._pendingAutoBlocks.length}개`
+        : '이미지를 선택하면 변환 미리보기가 표시됩니다.';
+      document.getElementById('btn-adm-img-build').disabled = this._pendingAutoBlocks.length === 0;
+    };
+
+    document.getElementById('adm-img-file').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      this._imgBuilder.loadFile(file, refreshImgPreview);
+    });
+    document.getElementById('adm-img-mode').addEventListener('change', refreshImgPreview);
+    document.getElementById('adm-img-w').addEventListener('input', refreshImgPreview);
+    document.getElementById('adm-img-h').addEventListener('input', refreshImgPreview);
+    document.getElementById('btn-adm-img-build').addEventListener('click', () => {
+      if (this._pendingAutoBlocks.length === 0) return;
+      const origin = this.cb.getFrontPos();
+      const worldBlocks = this._pendingAutoBlocks.map(b => ({
+        x: origin.x + b.dx,
+        y: origin.y + b.dy,
+        z: origin.z + b.dz,
+        block: b.block
+      }));
+      this.cb.send({ type: 'admin_batch_build', blocks: worldBlocks });
+      this.closeModal();
+    });
+    document.getElementById('btn-adm-img-undo').addEventListener('click', () => {
+      this.cb.send({ type: 'admin_batch_undo' });
+    });
+
+    // Game Settings modal (persisted in localStorage)
+    const bindSetting = () => {
+      const s = {
+        fov: Number(document.getElementById('set-fov').value),
+        viewDist: Number(document.getElementById('set-dist').value),
+        sensitivity: Number(document.getElementById('set-sens').value),
+        volume: Number(document.getElementById('set-vol').value) / 100,
+        quality: Number(document.getElementById('set-quality').value),
+        invertY: document.getElementById('set-invert-y').checked,
+        particles: document.getElementById('set-particles').checked,
+        showCoords: document.getElementById('set-show-coords').checked
+      };
+      document.getElementById('set-fov-val').textContent = `${s.fov}°`;
+      document.getElementById('set-dist-val').textContent = String(s.viewDist);
+      document.getElementById('set-sens-val').textContent = `${s.sensitivity.toFixed(1)}×`;
+      document.getElementById('set-vol-val').textContent = `${Math.round(s.volume * 100)}%`;
+      try { localStorage.setItem('boxworld_settings', JSON.stringify(s)); } catch {}
+      this.cb.onApplySettings?.(s);
+    };
+    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-invert-y', 'set-particles', 'set-show-coords']) {
+      document.getElementById(id).addEventListener('input', bindSetting);
+      document.getElementById(id).addEventListener('change', bindSetting);
+    }
+    document.getElementById('btn-set-reset').addEventListener('click', () => {
+      document.getElementById('set-fov').value = 75;
+      document.getElementById('set-dist').value = 125;
+      document.getElementById('set-sens').value = 1.0;
+      document.getElementById('set-vol').value = 100;
+      document.getElementById('set-quality').value = 2;
+      document.getElementById('set-invert-y').checked = false;
+      document.getElementById('set-particles').checked = true;
+      document.getElementById('set-show-coords').checked = true;
+      bindSetting();
+    });
+
+    // Load saved settings immediately on boot
+    try {
+      const saved = JSON.parse(localStorage.getItem('boxworld_settings') || 'null');
+      if (saved) {
+        if (saved.fov) document.getElementById('set-fov').value = saved.fov;
+        if (saved.viewDist) document.getElementById('set-dist').value = saved.viewDist;
+        if (saved.sensitivity) document.getElementById('set-sens').value = saved.sensitivity;
+        if (typeof saved.volume === 'number') document.getElementById('set-vol').value = Math.round(saved.volume * 100);
+        if (saved.quality) document.getElementById('set-quality').value = saved.quality;
+        document.getElementById('set-invert-y').checked = !!saved.invertY;
+        document.getElementById('set-particles').checked = saved.particles !== false;
+        document.getElementById('set-show-coords').checked = saved.showCoords !== false;
+        bindSetting();
+      }
+    } catch {}
 
     // Skin tabs (Quick / 64x64 Pixel Editor / Gallery)
     document.querySelectorAll('#skin-tabs .tab-btn').forEach((btn) => {

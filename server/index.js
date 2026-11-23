@@ -412,10 +412,10 @@ wss.on('connection', (ws) => {
         break;
       }
 
-      // Builder Brush: place a 3x3 patch of blocks at once!
+      // Multi-mode Builder Brush: place up to 5x5 / wall / row / column at once!
       case 'block_place_brush': {
         const { positions, slotIndex } = msg;
-        if (!Array.isArray(positions) || positions.length === 0 || positions.length > 9) return;
+        if (!Array.isArray(positions) || positions.length === 0 || positions.length > 25) return;
         const idx = Number(slotIndex);
         if (!Number.isInteger(idx) || idx < 0 || idx >= BAG_SIZE) return;
         const slot = player.bag[idx];
@@ -437,9 +437,92 @@ wss.on('connection', (ws) => {
         }
         if (slot.count <= 0) player.bag[idx] = null;
         if (changes.length > 0) {
+          player.lastBrushHistory = player.lastBrushHistory || [];
+          player.lastBrushHistory.push({ blockId, coords: changes.map(c => ({ x: c.x, y: c.y, z: c.z })) });
+          if (player.lastBrushHistory.length > 10) player.lastBrushHistory.shift();
           send(ws, { type: 'bag_update', bag: player.bag });
           broadcast({ type: 'blocks_batch', changes, by: player.nickname });
         }
+        break;
+      }
+
+      case 'block_undo_brush': {
+        if (!player.lastBrushHistory || player.lastBrushHistory.length === 0) {
+          send(ws, { type: 'toast', level: 'info', text: '되돌릴 건축 기록이 없습니다.' });
+          return;
+        }
+        const last = player.lastBrushHistory.pop();
+        const changes = [];
+        let refunded = 0;
+        for (const c of last.coords) {
+          if (!store.inBounds(c.x, c.y, c.z)) continue;
+          if (!player.isAdmin && store.findProtectingRegion(c.x, c.y, c.z)) continue;
+          if (store.getBlock(c.x, c.y, c.z) === last.blockId) {
+            store.setBlock(c.x, c.y, c.z, null);
+            changes.push({ x: c.x, y: c.y, z: c.z, block: null });
+            refunded++;
+          }
+        }
+        if (refunded > 0) {
+          addItemToSlots(player.bag, last.blockId, refunded);
+          send(ws, { type: 'bag_update', bag: player.bag });
+          broadcast({ type: 'blocks_batch', changes, by: player.nickname });
+          send(ws, { type: 'toast', level: 'info', text: `↩ 직전 건축 ${refunded}블록을 되돌렸습니다.` });
+        }
+        break;
+      }
+
+      // Admin Auto-Build from Photo / Map image (up to 4,000 blocks)
+      case 'admin_batch_build': {
+        if (!player.isAdmin) {
+          send(ws, { type: 'toast', level: 'error', text: '관리자만 자동 건축 기능을 사용할 수 있습니다.' });
+          return;
+        }
+        const list = msg.blocks;
+        if (!Array.isArray(list) || list.length === 0 || list.length > 4000) {
+          send(ws, { type: 'toast', level: 'warn', text: '자동 건축 블록 수는 1~4,000개 사이여야 합니다.' });
+          return;
+        }
+        const changes = [];
+        const prevSnapshot = [];
+        for (const item of list) {
+          const x = Math.round(item.x), y = Math.round(item.y), z = Math.round(item.z);
+          const blockId = String(item.block || '');
+          if (!store.inBounds(x, y, z) || y <= WORLD_BOUNDS.minY) continue;
+          if (!BLOCKS[blockId] || ['chest', 'furnace', 'bedrock'].includes(blockId)) continue;
+          const prev = store.getBlock(x, y, z);
+          if (prev === 'chest' || prev === 'furnace' || prev === 'bedrock') continue;
+          prevSnapshot.push({ x, y, z, block: prev });
+          store.setBlock(x, y, z, blockId, player.nickname);
+          changes.push({ x, y, z, block: blockId });
+        }
+        if (changes.length > 0) {
+          player.lastAdminBuild = prevSnapshot;
+          broadcast({ type: 'blocks_batch', changes, by: player.nickname });
+          broadcast({
+            type: 'chat', system: true,
+            text: `🏗️ 관리자 ${player.nickname}님이 사진/지도 자동 건축(${changes.length}블록)을 완료했습니다!`
+          });
+          send(ws, { type: 'toast', level: 'success', text: `🏗️ 자동 건축 완료! (${changes.length}블록 생성됨)` });
+        }
+        break;
+      }
+
+      case 'admin_batch_undo': {
+        if (!player.isAdmin || !player.lastAdminBuild || player.lastAdminBuild.length === 0) {
+          send(ws, { type: 'toast', level: 'info', text: '되돌릴 자동 건축 기록이 없습니다.' });
+          return;
+        }
+        const snap = player.lastAdminBuild;
+        player.lastAdminBuild = null;
+        const changes = [];
+        for (const item of snap) {
+          if (!store.inBounds(item.x, item.y, item.z)) continue;
+          store.setBlock(item.x, item.y, item.z, item.block);
+          changes.push({ x: item.x, y: item.y, z: item.z, block: item.block });
+        }
+        broadcast({ type: 'blocks_batch', changes, by: player.nickname });
+        send(ws, { type: 'toast', level: 'info', text: `↩ 자동 건축(${changes.length}블록)을 원래대로 되돌렸습니다.` });
         break;
       }
 

@@ -68,8 +68,38 @@ export class WorldRenderer {
 
     // 3D voxel block break particles
     this.particles = [];
+    this.particlesEnabled = true;
     this.particleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
     this._lastCrackStage = -1;
+
+    // Live 3D Brush Preview pool (up to 25 cubes for 5x5 / row / col / wall)
+    this.brushGroup = new THREE.Group();
+    this.brushBoxes = [];
+    const brushEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.005, 1.005, 1.005));
+    const brushMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.9 });
+    for (let i = 0; i < 25; i++) {
+      const box = new THREE.LineSegments(brushEdges, brushMat);
+      box.visible = false;
+      this.brushGroup.add(box);
+      this.brushBoxes.push(box);
+    }
+    this.scene.add(this.brushGroup);
+  }
+
+  updateBrushPreview(positions) {
+    if (!positions || positions.length === 0) {
+      for (const b of this.brushBoxes) b.visible = false;
+      return;
+    }
+    for (let i = 0; i < this.brushBoxes.length; i++) {
+      if (i < positions.length) {
+        const p = positions[i];
+        this.brushBoxes[i].position.set(p.x + 0.5, p.y + 0.5, p.z + 0.5);
+        this.brushBoxes[i].visible = true;
+      } else {
+        this.brushBoxes[i].visible = false;
+      }
+    }
   }
 
   inBounds(x, y, z) {
@@ -353,6 +383,7 @@ export class WorldRenderer {
   }
 
   spawnBreakParticles(x, y, z, blockId, count = 12) {
+    if (!this.particlesEnabled) return;
     const mat = this.textures.getFaceMaterial(blockId, 'side');
     if (!mat) return;
     const MAX_PARTICLES = 140;

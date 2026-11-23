@@ -61,7 +61,17 @@ let remotePlayers = new RemotePlayers(scene);
 let fpHand = null;
 let selfRig = null;
 let thirdPerson = false;
-let brushMode = false;
+const BRUSH_MODES = [
+  { id: 'single', label: '🪄 1×1 일반 [R]',    desc: '1블록 일반 설치' },
+  { id: 'floor3', label: '🪄 3×3 바닥 [R]',    desc: '3×3 평면 바닥 동시 설치' },
+  { id: 'floor5', label: '🪄 5×5 바닥 [R]',    desc: '5×5 넓은 바닥 동시 설치' },
+  { id: 'row5',   label: '🪄 가로줄 5칸 [R]',  desc: '바라보는 방향 기준 가로 5칸 동시 설치' },
+  { id: 'col5',   label: '🪄 세로기둥 5칸 [R]', desc: '위로 5칸 기둥 동시 설치' },
+  { id: 'wall53', label: '🪄 벽면 5×3 [R]',    desc: '가로 5 × 높이 3 벽면 동시 설치' }
+];
+let brushModeIdx = 0;
+let mouseSensitivity = 1.0;
+let invertY = false;
 let currentSigns = {};
 let currentPortals = {};
 let lastJumpPadTime = 0;
@@ -140,13 +150,52 @@ function syncHeldItem(itemId) {
 }
 
 function toggleBrushMode() {
-  brushMode = !brushMode;
+  brushModeIdx = (brushModeIdx + 1) % BRUSH_MODES.length;
+  const m = BRUSH_MODES[brushModeIdx];
   const btn = document.getElementById('btn-brush');
   if (btn) {
-    btn.textContent = brushMode ? '🪄 붓 3×3 ON [R]' : '🪄 붓 OFF [R]';
-    btn.style.borderColor = brushMode ? '#38bdf8' : '';
+    btn.textContent = m.label;
+    btn.style.borderColor = brushModeIdx > 0 ? '#38bdf8' : '';
   }
-  ui.toast(brushMode ? '🪄 건축 붓 3×3 모드 켜짐! (우클릭으로 3×3 평면 설치)' : '🪄 건축 붓 모드 꺼짐 (1블록 설치)', 'info');
+  ui.toast(`${m.label} — ${m.desc} (Ctrl+Z 되돌리기)`, 'info');
+}
+
+function computeBrushPositions(px, py, pz) {
+  const mode = BRUSH_MODES[brushModeIdx].id;
+  if (mode === 'single') return null;
+  const out = [];
+  // Determine horizontal axis perpendicular to player look direction (for rows & walls)
+  const facingX = Math.abs(Math.sin(yaw)) > Math.abs(Math.cos(yaw));
+  if (mode === 'floor3') {
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) out.push({ x: px + dx, y: py, z: pz + dz });
+  } else if (mode === 'floor5') {
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) out.push({ x: px + dx, y: py, z: pz + dz });
+  } else if (mode === 'row5') {
+    for (let i = -2; i <= 2; i++) out.push(facingX ? { x: px, y: py, z: pz + i } : { x: px + i, y: py, z: pz });
+  } else if (mode === 'col5') {
+    for (let dy = 0; dy < 5; dy++) out.push({ x: px, y: py + dy, z: pz });
+  } else if (mode === 'wall53') {
+    for (let dy = 0; dy < 3; dy++) {
+      for (let i = -2; i <= 2; i++) {
+        out.push(facingX ? { x: px, y: py + dy, z: pz + i } : { x: px + i, y: py + dy, z: pz });
+      }
+    }
+  }
+  return out;
+}
+
+function applyGameSettings(s) {
+  camera.fov = s.fov || 75;
+  camera.far = Math.max(120, (s.viewDist || 125) + 65);
+  camera.updateProjectionMatrix();
+  scene.fog.near = Math.max(18, (s.viewDist || 125) * 0.38);
+  scene.fog.far = s.viewDist || 125;
+  mouseSensitivity = s.sensitivity || 1.0;
+  invertY = !!s.invertY;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, s.quality || 2));
+  sound.setVolume(typeof s.volume === 'number' ? s.volume : 1.0);
+  if (worldRenderer) worldRenderer.particlesEnabled = s.particles !== false;
+  elHudCoords.classList.toggle('hidden', s.showCoords === false);
 }
 
 function warpPlayer(x, y, z, label = '') {
@@ -167,6 +216,7 @@ const ui = new GameUI({
     return sound.muted;
   },
   onToggleBrush: () => toggleBrushMode(),
+  onApplySettings: (s) => applyGameSettings(s),
   onWarp: (x, y, z, label) => warpPlayer(x, y, z, label),
   getMinimapData: () => ({
     worldRenderer,
@@ -589,19 +639,14 @@ function handleRightClickOrInteract(interactOnly = false) {
     return;
   }
 
-  // 6. Place block (1 block or 3x3 Builder Brush!)
+  // 6. Place block (1x1 or Multi-Mode Builder Brush: floor3/floor5/row5/col5/wall53!)
   if (!currentHit || !heldDef || heldDef.kind !== 'block') return;
   const px = currentHit.placeX, py = currentHit.placeY, pz = currentHit.placeZ;
 
-  if (brushMode && !['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'sapling'].includes(heldDef.id)) {
-    const positions = [];
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        positions.push({ x: px + dx, y: py, z: pz + dz });
-      }
-    }
+  const brushPositions = computeBrushPositions(px, py, pz);
+  if (brushPositions && !['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'sapling'].includes(heldDef.id)) {
     fpHand?.triggerSwing();
-    send({ type: 'block_place_brush', positions, slotIndex: ui.activeSlot });
+    send({ type: 'block_place_brush', positions: brushPositions, slotIndex: ui.activeSlot });
     return;
   }
 
@@ -629,8 +674,9 @@ document.addEventListener('pointerlockchange', () => {
 
 document.addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
-  yaw -= e.movementX * 0.0022;
-  pitch -= e.movementY * 0.0022;
+  const sens = 0.0022 * mouseSensitivity;
+  yaw -= e.movementX * sens;
+  pitch -= e.movementY * sens * (invertY ? -1 : 1);
   pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
 });
 
@@ -678,10 +724,16 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyC') { e.preventDefault(); ui.toggleModal('modal-craft'); return; }
   if (e.code === 'KeyK') { e.preventDefault(); ui.toggleModal('modal-skin'); return; }
   if (e.code === 'KeyB') { e.preventDefault(); ui.toggleModal('modal-blueprint'); return; }
+  if (e.code === 'KeyO') { e.preventDefault(); ui.toggleModal('modal-settings'); return; }
   if (e.code === 'KeyP') { e.preventDefault(); ui.toggleModal('modal-admin'); return; }
   if (e.code === 'KeyM') { e.preventDefault(); ui.toggleModal('modal-map'); return; }
   if (e.code === 'KeyG') { e.preventDefault(); ui.toggleModal('modal-emote'); return; }
   if (e.code === 'KeyR') { e.preventDefault(); toggleBrushMode(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+    e.preventDefault();
+    send({ type: 'block_undo_brush' });
+    return;
+  }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(true); return; }
 
   if (e.code === 'KeyV' || e.code === 'F5') {
@@ -893,6 +945,12 @@ function animate(now) {
       updateMining(dt);
       const ratio = miningTargetKey && Number.isFinite(miningDuration) ? Math.min(1, miningElapsed / miningDuration) : 0;
       worldRenderer.updateHighlight(currentHit, ratio);
+      const heldDef = catalog[ui.getActiveItemId()];
+      if (currentHit && brushModeIdx > 0 && heldDef?.kind === 'block') {
+        worldRenderer.updateBrushPreview(computeBrushPositions(currentHit.placeX, currentHit.placeY, currentHit.placeZ));
+      } else {
+        worldRenderer.updateBrushPreview(null);
+      }
       worldRenderer.updateParticles(dt);
     }
 
