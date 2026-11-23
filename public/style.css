@@ -131,8 +131,9 @@ html, body {
 }
 
 .toast-container {
-  position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 60;
+  position: fixed; top: 58px; right: 14px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; z-index: 60;
+  max-width: min(320px, 78vw);
 }
 .toast {
   padding: 8px 16px; border-radius: 10px; background: rgba(15, 23, 42, 0.94);
@@ -419,22 +420,30 @@ input[type="text"], input[type="password"] {
 
 @media (max-width: 920px) {
   .mobile-menu-btn { display: inline-flex; align-items: center; gap: 4px; }
+  #hud-mode { display: none; }
   .top-right {
     display: none;
-    position: absolute; top: 38px; right: 0;
-    flex-direction: column; align-items: stretch; min-width: 155px;
+    position: absolute; top: 38px; left: 0; right: auto;
+    flex-direction: column; align-items: stretch; min-width: 175px;
+    max-width: calc(100vw - 28px); max-height: 60vh; overflow-y: auto;
     padding: 8px; border-radius: 12px;
     background: var(--bg-card); border: 1px solid var(--border);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); z-index: 40;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65); z-index: 45;
   }
   .top-right.mobile-open { display: flex; }
-  .top-right .hud-btn { text-align: left; }
+  .top-right .hud-btn { text-align: left; padding: 8px 10px; font-size: 13px; }
   .play-hint { max-width: 92vw; white-space: normal; text-align: center; font-size: 11px; bottom: 86px; }
   .hotbar { gap: 3px; padding: 4px; max-width: 96vw; }
   .hotbar .slot { width: clamp(32px, 9.4vw, 44px); height: clamp(32px, 9.4vw, 44px); }
   .hotbar .slot img { width: 70%; height: 70%; }
-  .chat-panel { width: min(260px, 60vw); bottom: 224px; left: 10px; }
-  .player-list { top: 52px; right: 10px; min-width: 105px; }
+  .player-list { top: 48px; right: 10px; min-width: 100px; }
+  .chat-panel {
+    top: 84px; right: 10px; left: auto; bottom: auto;
+    width: min(235px, 60vw);
+  }
+  .chat-messages { max-height: 110px; font-size: 11.5px; padding: 6px 8px; }
+  .chat-hint { text-align: right; font-size: 10.5px; }
+  .toast-container { top: 84px; right: 10px; }
   .info-pill { font-size: 11px; padding: 4px 7px; }
 }
 
