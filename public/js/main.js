@@ -88,6 +88,11 @@ const BRUSH_MODES = [
 let brushModeIdx = 0;
 let mouseSensitivity = 1.0;
 let invertY = false;
+let remoteLook = false;
+let isRightDragging = false;
+let dragMovedDist = 0;
+let lastDragX = 0;
+let lastDragY = 0;
 let currentSigns = {};
 let currentPortals = {};
 let lastJumpPadTime = 0;
@@ -280,7 +285,15 @@ function applyGameSettings(s) {
   }
   elHudCoords.classList.toggle('hidden', s.showCoords === false);
   touchControls.setEnabled(!!s.touchUI);
-  document.getElementById('play-hint').classList.toggle('hidden', pointerLocked || !!s.touchUI);
+  remoteLook = !!s.remoteLook;
+  if (remoteLook && document.pointerLockElement) document.exitPointerLock();
+  const hint = document.getElementById('play-hint');
+  if (hint) {
+    hint.textContent = remoteLook
+      ? '🖥️ 원격 모드: 우클릭 드래그·방향키(←→↑↓)로 시점 회전 · 좌클릭 채굴 · 짧은 우클릭 설치/열기'
+      : '화면을 클릭하여 1인칭 조작 시작 · ESC로 커서 해제 · V: 1/3인칭 전환';
+    hint.classList.toggle('hidden', pointerLocked || !!s.touchUI);
+  }
 }
 
 function warpPlayer(x, y, z, label = '') {
@@ -996,26 +1009,40 @@ function handleRightClickOrInteract(interactOnly = false) {
 }
 
 canvas.addEventListener('click', () => {
-  if (!joined || ui.openModalId || ui.chatOpen || touchControls.enabled) return;
+  if (!joined || ui.openModalId || ui.chatOpen || touchControls.enabled || remoteLook) return;
   if (!pointerLocked) canvas.requestPointerLock?.();
 });
 
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === canvas;
   document.getElementById('play-hint').classList.toggle('hidden', pointerLocked || touchControls.enabled);
-  if (!pointerLocked) { isLeftDown = false; resetMining(); }
+  if (!pointerLocked && !remoteLook) { isLeftDown = false; resetMining(); }
 });
 
 document.addEventListener('mousemove', (e) => {
-  if (!pointerLocked) return;
   const sens = 0.0022 * mouseSensitivity;
+  if (remoteLook && isRightDragging) {
+    const dx = e.clientX - lastDragX;
+    const dy = e.clientY - lastDragY;
+    lastDragX = e.clientX;
+    lastDragY = e.clientY;
+    dragMovedDist += Math.hypot(dx, dy);
+    yaw -= dx * sens * 1.45;
+    pitch -= dy * sens * 1.45 * (invertY ? -1 : 1);
+    pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+    return;
+  }
+  if (!pointerLocked) return;
+  // Filter out RDP/VNC absolute-cursor warp spikes (>180px in a single event)
+  if (Math.abs(e.movementX) > 180 || Math.abs(e.movementY) > 180) return;
   yaw -= e.movementX * sens;
   pitch -= e.movementY * sens * (invertY ? -1 : 1);
   pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
 });
 
 canvas.addEventListener('mousedown', (e) => {
-  if (!joined || !pointerLocked) return;
+  if (!joined || ui.openModalId || ui.chatOpen) return;
+  if (!pointerLocked && !remoteLook) return;
   if (e.button === 0) {
     // Check if clicking an animal first
     const { eyePos, lookDir } = getEyeAndLook();
@@ -1030,12 +1057,31 @@ canvas.addEventListener('mousedown', (e) => {
     fpHand?.triggerSwing();
   } else if (e.button === 2) {
     e.preventDefault();
-    handleRightClickOrInteract(false);
+    if (remoteLook) {
+      isRightDragging = true;
+      dragMovedDist = 0;
+      lastDragX = e.clientX;
+      lastDragY = e.clientY;
+    } else {
+      handleRightClickOrInteract(false);
+    }
+  } else if (e.button === 1 && remoteLook) {
+    e.preventDefault();
+    isRightDragging = true;
+    dragMovedDist = 999; // Middle-drag only rotates camera
+    lastDragX = e.clientX;
+    lastDragY = e.clientY;
   }
 });
 
 window.addEventListener('mouseup', (e) => {
   if (e.button === 0) { isLeftDown = false; resetMining(); }
+  if ((e.button === 2 || e.button === 1) && isRightDragging) {
+    isRightDragging = false;
+    if (e.button === 2 && dragMovedDist < 7 && joined && !ui.openModalId && !ui.chatOpen) {
+      handleRightClickOrInteract(false);
+    }
+  }
 });
 
 window.addEventListener('wheel', (e) => {
@@ -1123,6 +1169,13 @@ function updatePhysics(dt) {
   if (keys.has('KeyS')) _move.sub(_forward);
   if (keys.has('KeyD')) _move.add(_right);
   if (keys.has('KeyA')) _move.sub(_right);
+
+  // Arrow-key camera rotation (super handy over Remote Desktop / laptop trackpads!)
+  const turnSpeed = 2.1 * mouseSensitivity;
+  if (keys.has('ArrowLeft')) yaw += turnSpeed * dt;
+  if (keys.has('ArrowRight')) yaw -= turnSpeed * dt;
+  if (keys.has('ArrowUp')) pitch = Math.min(Math.PI / 2 - 0.01, pitch + turnSpeed * 0.75 * dt);
+  if (keys.has('ArrowDown')) pitch = Math.max(-Math.PI / 2 + 0.01, pitch - turnSpeed * 0.75 * dt);
   if (touchControls.enabled && (touchControls.moveX !== 0 || touchControls.moveZ !== 0)) {
     _move.addScaledVector(_forward, touchControls.moveZ);
     _move.addScaledVector(_right, touchControls.moveX);
@@ -1216,7 +1269,7 @@ function updatePhysics(dt) {
 }
 
 function updateMining(dt) {
-  const activelyMining = (isLeftDown && pointerLocked) || (isTouchMining && touchControls.enabled);
+  const activelyMining = (isLeftDown && (pointerLocked || remoteLook)) || (isTouchMining && touchControls.enabled);
   if (!activelyMining || !currentHit) {
     if (miningTargetKey) resetMining();
     return;

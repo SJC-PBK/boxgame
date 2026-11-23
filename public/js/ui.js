@@ -263,7 +263,8 @@ export class GameUI {
         invertY: document.getElementById('set-invert-y').checked,
         particles: document.getElementById('set-particles').checked,
         showCoords: document.getElementById('set-show-coords').checked,
-        touchUI: document.getElementById('set-touch-ui').checked
+        touchUI: document.getElementById('set-touch-ui').checked,
+        remoteLook: document.getElementById('set-remote-look')?.checked || false
       };
       document.getElementById('set-fov-val').textContent = `${s.fov}°`;
       document.getElementById('set-dist-val').textContent = String(s.viewDist);
@@ -272,9 +273,9 @@ export class GameUI {
       try { localStorage.setItem('boxworld_settings', JSON.stringify(s)); } catch {}
       this.cb.onApplySettings?.(s);
     };
-    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-invert-y', 'set-particles', 'set-show-coords', 'set-touch-ui']) {
-      document.getElementById(id).addEventListener('input', bindSetting);
-      document.getElementById(id).addEventListener('change', bindSetting);
+    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-invert-y', 'set-particles', 'set-show-coords', 'set-touch-ui', 'set-remote-look']) {
+      document.getElementById(id)?.addEventListener('input', bindSetting);
+      document.getElementById(id)?.addEventListener('change', bindSetting);
     }
     document.getElementById('btn-set-reset').addEventListener('click', () => {
       document.getElementById('set-fov').value = 75;
@@ -286,6 +287,7 @@ export class GameUI {
       document.getElementById('set-particles').checked = true;
       document.getElementById('set-show-coords').checked = true;
       document.getElementById('set-touch-ui').checked = defaultTouch;
+      if (document.getElementById('set-remote-look')) document.getElementById('set-remote-look').checked = false;
       bindSetting();
     });
 
@@ -302,6 +304,7 @@ export class GameUI {
         document.getElementById('set-particles').checked = saved.particles !== false;
         document.getElementById('set-show-coords').checked = saved.showCoords !== false;
         document.getElementById('set-touch-ui').checked = typeof saved.touchUI === 'boolean' ? saved.touchUI : defaultTouch;
+        if (document.getElementById('set-remote-look')) document.getElementById('set-remote-look').checked = !!saved.remoteLook;
       }
       bindSetting();
     } catch {}
