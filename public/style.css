@@ -260,7 +260,19 @@ html, body {
   padding: 10px 12px; border-radius: 10px; background: rgba(30, 41, 59, 0.78);
   border: 1px solid var(--border);
 }
+.craft-card.batch-card { flex-direction: column; align-items: stretch; gap: 8px; }
 .craft-card.can-craft { border-color: rgba(34, 197, 94, 0.65); background: rgba(20, 48, 38, 0.55); }
+.craft-mult {
+  display: inline-block; padding: 1px 5px; border-radius: 5px; font-size: 11px;
+  background: rgba(250, 204, 21, 0.2); color: #fde68a; margin-left: 3px;
+}
+.craft-batch-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.craft-qty-btn { padding: 5px 9px; font-size: 13px; }
+.craft-qty-val {
+  min-width: 28px; text-align: center; font-size: 13px; font-weight: 800;
+  padding: 4px 6px; border-radius: 6px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border);
+}
+.craft-make-btn { flex: 1; min-width: 90px; }
 .craft-info { display: flex; align-items: center; gap: 10px; }
 .craft-info img { width: 32px; height: 32px; image-rendering: pixelated; }
 .craft-name { font-size: 13px; font-weight: 700; }

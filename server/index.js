@@ -927,20 +927,27 @@ wss.on('connection', (ws) => {
       case 'craft': {
         const recipe = RECIPES.find(r => r.id === msg.recipeId);
         if (!recipe) return;
+        const outDef = CATALOG[recipe.out.item];
+        const reqTimes = Math.max(1, Math.min(64, Math.floor(Number(msg.times || 1))));
+        let maxTimes = 64;
         for (const req of recipe.in) {
-          if (countItemInSlots(player.bag, req.item) < req.count) {
-            send(ws, { type: 'toast', level: 'warn', text: '재료가 부족합니다.' });
-            return;
-          }
+          const possible = Math.floor(countItemInSlots(player.bag, req.item) / req.count);
+          if (possible < maxTimes) maxTimes = possible;
         }
-        for (const req of recipe.in) consumeItemFromSlots(player.bag, req.item, req.count);
-        const leftover = addItemToSlots(player.bag, recipe.out.item, recipe.out.count);
+        if (maxTimes <= 0) {
+          send(ws, { type: 'toast', level: 'warn', text: '재료가 부족합니다.' });
+          return;
+        }
+        const times = outDef?.stackable === 1 ? 1 : Math.min(reqTimes, maxTimes);
+        for (const req of recipe.in) consumeItemFromSlots(player.bag, req.item, req.count * times);
+        const totalOut = recipe.out.count * times;
+        const leftover = addItemToSlots(player.bag, recipe.out.item, totalOut);
         send(ws, { type: 'bag_update', bag: player.bag });
-        const outName = CATALOG[recipe.out.item]?.name || recipe.out.item;
+        const outName = outDef?.name || recipe.out.item;
         send(ws, {
           type: 'toast',
           level: leftover > 0 ? 'warn' : 'success',
-          text: leftover > 0 ? '가방 공간이 부족해 일부만 획득했습니다.' : `🔨 ${outName} ×${recipe.out.count} 제작 완료!`
+          text: leftover > 0 ? '가방 공간이 부족해 일부만 획득했습니다.' : `🔨 ${outName} ×${totalOut} 제작 완료!`
         });
         break;
       }

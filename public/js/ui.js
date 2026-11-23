@@ -795,34 +795,77 @@ export class GameUI {
     for (const r of filtered) {
       const outDef = this.catalog[r.out.item];
       if (!outDef) continue;
-      let canCraft = true;
+      let maxTimes = 64;
       const reqTexts = r.in.map((req) => {
         const have = this._countInBag(req.item);
-        if (have < req.count) canCraft = false;
+        maxTimes = Math.min(maxTimes, Math.floor(have / req.count));
         const name = this.catalog[req.item]?.name || req.item;
-        return `${name} ${have}/${req.count}`;
+        return `${name} ${req.count} / ${have}`;
       });
+      const canCraft = maxTimes >= 1;
+      const isBatchable = outDef.stackable !== 1 && maxTimes > 1;
 
       const card = document.createElement('div');
-      card.className = `craft-card${canCraft ? ' can-craft' : ''}`;
+      card.className = `craft-card${canCraft ? ' can-craft' : ''}${isBatchable ? ' batch-card' : ''}`;
 
       const info = document.createElement('div');
       info.className = 'craft-info';
       const img = document.createElement('img');
       img.src = this.textures.getIcon(r.out.item);
       const txt = document.createElement('div');
-      txt.innerHTML = `<div class="craft-name">${this._esc(outDef.name)} ×${r.out.count}</div><div class="craft-reqs">${reqTexts.join(' · ')}</div>`;
+      txt.innerHTML = `<div class="craft-name">${this._esc(outDef.name)} <span class="craft-mult">×${r.out.count}</span></div><div class="craft-reqs">${reqTexts.join(' · ')}</div>`;
       info.append(img, txt);
 
-      const btn = document.createElement('button');
-      btn.className = `btn-sm${canCraft ? ' accent' : ''}`;
-      btn.textContent = '제작';
-      btn.disabled = !canCraft;
-      btn.addEventListener('click', () => {
-        this.cb.send({ type: 'craft', recipeId: r.id });
-      });
+      if (isBatchable) {
+        let qty = 1;
+        const ctrl = document.createElement('div');
+        ctrl.className = 'craft-batch-row';
 
-      card.append(info, btn);
+        const btnMinus = document.createElement('button');
+        btnMinus.className = 'btn-sm craft-qty-btn';
+        btnMinus.textContent = '−';
+
+        const qtySpan = document.createElement('span');
+        qtySpan.className = 'craft-qty-val';
+        qtySpan.textContent = String(qty);
+
+        const btnPlus = document.createElement('button');
+        btnPlus.className = 'btn-sm craft-qty-btn';
+        btnPlus.textContent = '+';
+
+        const btnMax = document.createElement('button');
+        btnMax.className = 'btn-sm';
+        btnMax.textContent = `최대 ${maxTimes}`;
+
+        const btnMake = document.createElement('button');
+        btnMake.className = 'btn-sm accent craft-make-btn';
+        btnMake.textContent = `${qty * r.out.count}개 만들기`;
+
+        const syncQty = () => {
+          qty = Math.max(1, Math.min(maxTimes, qty));
+          qtySpan.textContent = String(qty);
+          btnMake.textContent = `${qty * r.out.count}개 만들기`;
+        };
+        btnMinus.addEventListener('click', () => { qty--; syncQty(); });
+        btnPlus.addEventListener('click', () => { qty++; syncQty(); });
+        btnMax.addEventListener('click', () => { qty = maxTimes; syncQty(); });
+        btnMake.addEventListener('click', () => {
+          this.cb.send({ type: 'craft', recipeId: r.id, times: qty });
+        });
+
+        ctrl.append(btnMinus, qtySpan, btnPlus, btnMax, btnMake);
+        card.append(info, ctrl);
+      } else {
+        const btn = document.createElement('button');
+        btn.className = `btn-sm${canCraft ? ' accent' : ''}`;
+        btn.textContent = canCraft ? `${r.out.count}개 만들기` : '제작';
+        btn.disabled = !canCraft;
+        btn.addEventListener('click', () => {
+          this.cb.send({ type: 'craft', recipeId: r.id, times: 1 });
+        });
+        card.append(info, btn);
+      }
+
       list.appendChild(card);
     }
   }
