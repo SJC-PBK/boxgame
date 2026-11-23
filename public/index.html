@@ -202,8 +202,8 @@
           <div class="section-title" style="margin-top:12px;">핫바 9칸 (1~9번 키)</div>
           <div id="bag-hotbar-grid" class="slot-grid hotbar-row"></div>
         </div>
-        <div class="supply-section">
-          <div class="section-title">🧱 건축 보급함 (건축용 블록 빠르게 받기)</div>
+        <div id="bag-supply-section" class="supply-section hidden">
+          <div id="supply-section-title" class="section-title">🧱 건축 보급함 (건축용 블록 빠르게 받기)</div>
           <div id="supply-grid" class="supply-grid"></div>
         </div>
       </div>
@@ -437,6 +437,13 @@
         </div>
 
         <div id="admin-panel-box" class="hidden">
+          <div class="section-title">⚙️ 서버 기능 토글 (즉시 반영)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px 12px;border-radius:10px;background:rgba(15,23,42,0.55);border:1px solid var(--border);">
+            <label class="toggle-label"><input id="adm-toggle-supply" type="checkbox" /> 🎁 모든 아이템 보급함 사용 (채팅 <code>/item</code>)</label>
+            <label class="toggle-label"><input id="adm-toggle-unlimited" type="checkbox" /> ♾️ 전체 유저 블록 무제한 사용</label>
+            <label class="toggle-label"><input id="adm-toggle-sabo" type="checkbox" /> ⚔️ 관리자 사보검 활성화 (모든 블록 1방 파괴 · 채팅 <code>/사보검</code>)</label>
+          </div>
+
           <div class="section-title">🌤️ 시간 & 날씨 제어</div>
           <div class="btn-row" style="margin-bottom:10px;">
             <button id="adm-time-day" class="btn-sm">☀️ 낮</button>

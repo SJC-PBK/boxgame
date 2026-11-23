@@ -290,6 +290,72 @@ function igniteWaterBombAt(x, y, z, isAdmin, delayMs = 2200) {
   return true;
 }
 
+function igniteFlattenBombAt(x, y, z, isAdmin, delayMs = 2200) {
+  const key = `${x},${y},${z}`;
+  if (ignitedTnts.has(key)) return false;
+  if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'flatten_bomb') return false;
+  if (!isAdmin && store.findProtectingRegion(x, y, z)) return false;
+
+  ignitedTnts.add(key);
+  broadcast({ type: 'flatten_bomb_ignited', x, y, z, durationMs: delayMs });
+  setTimeout(() => {
+    ignitedTnts.delete(key);
+    if (store.getBlock(x, y, z) !== 'flatten_bomb') return;
+    const { changes, fell, chainBombs } = store.flattenAt(x, y, z, isAdmin);
+    broadcast({ type: 'flatten_bomb_explode', x, y, z });
+    if (changes.length > 0) broadcast({ type: 'blocks_batch', changes, fell });
+    for (const p of players.values()) {
+      if (p.linkedTnts?.delete(key)) {
+        send(p.ws, { type: 'remote_links_update', links: [...p.linkedTnts] });
+      }
+    }
+    for (let i = 0; i < chainBombs.length; i++) {
+      const cb = chainBombs[i];
+      if (cb.kind === 'flatten_bomb') setTimeout(() => igniteFlattenBombAt(cb.x, cb.y, cb.z, isAdmin, 650), 160 + i * 110);
+      else if (cb.kind === 'tnt') setTimeout(() => igniteTNTAt(cb.x, cb.y, cb.z, isAdmin, 650), 160 + i * 110);
+    }
+  }, delayMs);
+  return true;
+}
+
+function syncSaboSwordForPlayer(p) {
+  if (!p || p.world !== 'sandbox' || !p.tools) return;
+  if (p.isAdmin && store.config.saboSwordEnabled) {
+    p.tools.sword = 'sabo_sword';
+  } else {
+    delete p.tools.sword;
+  }
+  send(p.ws, { type: 'tools_update', tools: p.tools });
+}
+
+function syncSaboSwordForAllAdmins() {
+  for (const p of players.values()) {
+    if (p.world === 'sandbox' && p.tools) syncSaboSwordForPlayer(p);
+  }
+}
+
+// Hunger & HP survival loop: every 4 in-game hours (60s real time) without eating -> hunger drops; when 0 -> HP drops!
+const HUNGER_TICK_MS = 60_000;
+setInterval(() => {
+  const now = Date.now();
+  for (const p of players.values()) {
+    if (p.world !== 'sandbox') continue;
+    if (now - (p.lastAteAt || now) < HUNGER_TICK_MS) continue;
+    p.lastAteAt = now;
+    if (p.hunger > 0) {
+      p.hunger = Math.max(0, p.hunger - 2);
+      if (p.hunger <= 6 && p.hunger > 0) {
+        send(p.ws, { type: 'toast', level: 'warn', text: '🍎 배가 고파지고 있습니다! 사과나 빵, 고기를 먹어주세요.' });
+      }
+    }
+    if (p.hunger <= 0) {
+      p.hp = Math.max(2, p.hp - 2);
+      send(p.ws, { type: 'toast', level: 'error', text: `💔 굶주림으로 체력이 감소했습니다! (HP ${p.hp}/20 · 이동속도 저하)` });
+    }
+    send(p.ws, { type: 'vitals_update', hp: p.hp, hunger: p.hunger });
+  }
+}, 15_000);
+
 const FUSE_STEP_DIRS = [
   [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
   [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1],
@@ -323,6 +389,8 @@ function igniteFuseAt(x, y, z, isAdmin, depth = 0) {
         igniteFillBombAt(nx, ny, nz, isAdmin, 2000);
       } else if (nb === 'water_bomb') {
         igniteWaterBombAt(nx, ny, nz, isAdmin, 2000);
+      } else if (nb === 'flatten_bomb') {
+        igniteFlattenBombAt(nx, ny, nz, isAdmin, 2000);
       }
     }
   }, 115);
@@ -424,6 +492,9 @@ wss.on('connection', (ws) => {
         bag[1] = { block: 'stealth_beacon', count: 16 };
       }
       const tools = worldMode === 'job' ? null : createStarterTools();
+      if (tools && isAdminLogin && store.config.saboSwordEnabled) {
+        tools.sword = 'sabo_sword';
+      }
       let startPos;
       if (worldMode === 'job') {
         startPos = { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z };
@@ -446,6 +517,7 @@ wss.on('connection', (ws) => {
         x: startPos.x, y: startPos.y, z: startPos.z,
         spawn: { ...startPos },
         yaw: 0, pitch: 0, isAdmin: isAdminLogin, bag, tools,
+        hp: 20, hunger: 20, lastAteAt: Date.now(),
         jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
         openChestKey: null, openFurnaceKey: null,
         linkedTnts: new Set()
@@ -476,6 +548,7 @@ wss.on('connection', (ws) => {
         signs: worldMode === 'job' ? jobWorld.signs : store.signs,
         portals: worldMode === 'job' ? {} : store.portals,
         beacons: worldMode === 'job' ? {} : store.beacons,
+        serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
         regions: worldMode === 'job' ? [] : store.regions,
         blueprints: worldMode === 'job' ? [] : store.blueprints,
@@ -705,8 +778,10 @@ wss.on('connection', (ws) => {
           }
         }
 
-        slot.count -= 1;
-        if (slot.count <= 0) player.bag[idx] = null;
+        if (!store.config.unlimitedBlocks) {
+          slot.count -= 1;
+          if (slot.count <= 0) player.bag[idx] = null;
+        }
         store.setBlock(x, y, z, blockId, player.nickname);
         send(ws, { type: 'bag_update', bag: player.bag });
         broadcast({ type: 'block_update', x, y, z, block: blockId, by: player.nickname });
@@ -743,21 +818,21 @@ wss.on('connection', (ws) => {
         const slot = player.bag[idx];
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
         const blockId = slot.block;
-        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'sapling'].includes(blockId)) return;
+        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'flatten_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'sapling'].includes(blockId)) return;
 
         const changes = [];
         for (const p of positions) {
-          if (slot.count <= 0) break;
+          if (!store.config.unlimitedBlocks && slot.count <= 0) break;
           const x = Math.round(p.x), y = Math.round(p.y), z = Math.round(p.z);
           if (!store.inBounds(x, y, z)) continue;
           if (!player.isAdmin && store.findProtectingRegion(x, y, z)) continue;
           const ex = store.getBlock(x, y, z);
           if (ex && ex !== 'water') continue;
-          slot.count -= 1;
+          if (!store.config.unlimitedBlocks) slot.count -= 1;
           store.setBlock(x, y, z, blockId, player.nickname);
           changes.push({ x, y, z, block: blockId });
         }
-        if (slot.count <= 0) player.bag[idx] = null;
+        if (!store.config.unlimitedBlocks && slot.count <= 0) player.bag[idx] = null;
         if (changes.length > 0) {
           player.lastBrushHistory = player.lastBrushHistory || [];
           player.lastBrushHistory.push({ blockId, coords: changes.map(c => ({ x: c.x, y: c.y, z: c.z })) });
@@ -922,6 +997,17 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'flatten_bomb_ignite': {
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'flatten_bomb') return;
+        if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역에서는 평탄화 폭탄을 작동할 수 없습니다.' });
+          return;
+        }
+        igniteFlattenBombAt(x, y, z, player.isAdmin, 2200);
+        break;
+      }
+
       case 'fuse_ignite': {
         const { x, y, z } = msg;
         if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fuse') return;
@@ -941,7 +1027,7 @@ wss.on('connection', (ws) => {
         if (!held || held.block !== 'detonator') return;
         if (!store.inBounds(x, y, z)) return;
         const targetBlock = store.getBlock(x, y, z);
-        if (targetBlock !== 'tnt' && targetBlock !== 'fill_bomb' && targetBlock !== 'water_bomb') return;
+        if (targetBlock !== 'tnt' && targetBlock !== 'fill_bomb' && targetBlock !== 'water_bomb' && targetBlock !== 'flatten_bomb') return;
         if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 폭탄에는 리모컨을 설치할 수 없습니다.' });
           return;
@@ -971,12 +1057,12 @@ wss.on('connection', (ws) => {
           const [tx, ty, tz] = key.split(',').map(Number);
           if (!store.inBounds(tx, ty, tz)) continue;
           const b = store.getBlock(tx, ty, tz);
-          if (b === 'tnt' || b === 'fill_bomb' || b === 'water_bomb') valid.push({ x: tx, y: ty, z: tz, kind: b });
+          if (b === 'tnt' || b === 'fill_bomb' || b === 'water_bomb' || b === 'flatten_bomb') valid.push({ x: tx, y: ty, z: tz, kind: b });
         }
         player.linkedTnts.clear();
         send(ws, { type: 'remote_links_update', links: [] });
         if (valid.length === 0) {
-          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 폭탄이 없습니다. 먼저 TNT·흙·물 폭탄을 리모컨으로 우클릭하세요!' });
+          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 폭탄이 없습니다. 먼저 TNT·평탄화·흙·물 폭탄을 리모컨으로 우클릭하세요!' });
           return;
         }
         let ignited = 0;
@@ -984,6 +1070,7 @@ wss.on('connection', (ws) => {
           if (t.kind === 'tnt' && igniteTNTAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
           else if (t.kind === 'fill_bomb' && igniteFillBombAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
           else if (t.kind === 'water_bomb' && igniteWaterBombAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
+          else if (t.kind === 'flatten_bomb' && igniteFlattenBombAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
         }
         if (ignited > 0) {
           send(ws, { type: 'toast', level: 'warn', text: `💥 원격 작동 신호 전송! (폭탄 ${ignited}개 점화)` });
@@ -1095,7 +1182,10 @@ wss.on('connection', (ws) => {
           ? player.tools[toolType]
           : ((Number.isInteger(idx) && idx >= 0 && idx < BAG_SIZE) ? player.bag[idx]?.block : null);
         const heldDef = heldId ? ITEMS[heldId] : null;
-        const toolTier = (heldDef && heldDef.toolType === bDef.preferredTool) ? (heldDef.tier || 0) : 0;
+        const isSaboSword = heldId === 'sabo_sword' && player.isAdmin && store.config.saboSwordEnabled;
+        const toolTier = isSaboSword
+          ? 99
+          : ((heldDef && heldDef.toolType === bDef.preferredTool) ? (heldDef.tier || 0) : 0);
 
         if (bDef.minTier > 0 && toolTier < bDef.minTier) {
           send(ws, {
@@ -1181,8 +1271,11 @@ wss.on('connection', (ws) => {
         if (!def || def.kind !== 'food') return;
         slot.count -= 1;
         if (slot.count <= 0) player.bag[idx] = null;
+        player.hp = Math.min(20, (player.hp ?? 20) + (def.heal || 4));
+        player.hunger = Math.min(20, (player.hunger ?? 20) + (def.hunger || 6));
+        player.lastAteAt = Date.now();
         send(ws, { type: 'bag_update', bag: player.bag });
-        send(ws, { type: 'food_eaten', heal: def.heal || 4, hunger: def.hunger || 6, name: def.name });
+        send(ws, { type: 'food_eaten', heal: def.heal || 4, hunger: def.hunger || 6, hp: player.hp, curHunger: player.hunger, name: def.name });
         break;
       }
 
@@ -1246,8 +1339,13 @@ wss.on('connection', (ws) => {
         const itemId = String(msg.block || '');
         const def = CATALOG[itemId];
         if (!def) return;
-        if ((itemId === 'protect_beacon' || itemId === 'stealth_beacon') && !player.isAdmin) {
+        const isBeacon = itemId === 'protect_beacon' || itemId === 'stealth_beacon';
+        if (isBeacon && !player.isAdmin) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 받을 수 있습니다.' });
+          return;
+        }
+        if (!isBeacon && !store.config.supplyEnabled) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 현재 아이템 보급함이 비활성화되어 있습니다. (관리자 설정)' });
           return;
         }
         const amount = def.stackable === 1 ? 1 : Math.max(1, Math.min(64, Number(msg.count || 32)));
@@ -1453,6 +1551,7 @@ wss.on('connection', (ws) => {
             if (!player.bag[1]) player.bag[1] = { block: 'stealth_beacon', count: 16 };
             else addItemToSlots(player.bag, 'stealth_beacon', 16);
             send(ws, { type: 'bag_update', bag: player.bag });
+            syncSaboSwordForPlayer(player);
           }
           send(ws, { type: 'admin_status', isAdmin: true });
           send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 1번(보호 비콘)·2번(투명 보호 비콘) 슬롯에 지급되었습니다.' });
@@ -1460,6 +1559,22 @@ wss.on('connection', (ws) => {
         } else {
           send(ws, { type: 'toast', level: 'error', text: '관리자 비밀번호가 올바르지 않습니다.' });
         }
+        break;
+      }
+
+      case 'admin_set_config': {
+        if (!player.isAdmin) return;
+        const prevSabo = store.config.saboSwordEnabled;
+        const updated = store.setConfig({
+          supplyEnabled: typeof msg.supplyEnabled === 'boolean' ? msg.supplyEnabled : undefined,
+          unlimitedBlocks: typeof msg.unlimitedBlocks === 'boolean' ? msg.unlimitedBlocks : undefined,
+          saboSwordEnabled: typeof msg.saboSwordEnabled === 'boolean' ? msg.saboSwordEnabled : undefined
+        });
+        broadcast({ type: 'config_update', config: updated });
+        if (updated.saboSwordEnabled !== prevSabo) {
+          syncSaboSwordForAllAdmins();
+        }
+        send(ws, { type: 'toast', level: 'success', text: '⚙️ 서버 관리자 설정이 적용되었습니다.' });
         break;
       }
 
@@ -1550,6 +1665,33 @@ wss.on('connection', (ws) => {
             send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드가 활성화되었습니다.' });
             broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
           } else send(ws, { type: 'toast', level: 'error', text: '관리자 비밀번호가 올바르지 않습니다.' });
+          return;
+        }
+        if (text === '/item') {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /item 명령어는 관리자만 사용할 수 있습니다.' });
+            return;
+          }
+          const updated = store.setConfig({ supplyEnabled: !store.config.supplyEnabled });
+          broadcast({ type: 'config_update', config: updated });
+          broadcast({
+            type: 'chat', system: true,
+            text: `🎁 관리자(${player.nickname})님이 가방 아이템 보급함을 ${updated.supplyEnabled ? '켰습니다 (ON)' : '껐습니다 (OFF)'}.`
+          });
+          return;
+        }
+        if (text === '/사보검') {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /사보검 명령어는 관리자만 사용할 수 있습니다.' });
+            return;
+          }
+          const updated = store.setConfig({ saboSwordEnabled: !store.config.saboSwordEnabled });
+          broadcast({ type: 'config_update', config: updated });
+          syncSaboSwordForAllAdmins();
+          send(ws, {
+            type: 'toast', level: updated.saboSwordEnabled ? 'success' : 'info',
+            text: updated.saboSwordEnabled ? '⚔️ 사보검 활성화! Q키로 사보검을 꺼내 모든 블록을 1방에 부술 수 있습니다.' : '⚔️ 사보검이 비활성화되었습니다.'
+          });
           return;
         }
         if (text === '/time day' || text === '/낮') {

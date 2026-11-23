@@ -22,6 +22,21 @@ export function encodeRLE(grid) {
   return out;
 }
 
+const DEFAULT_BEACONS = {
+  '-6,37,6':   { x: -6, y: 37, z: 6,   owner: 'System', stealth: true },
+  '-6,37,-6':  { x: -6, y: 37, z: -6,  owner: 'System', stealth: true },
+  '6,37,-6':   { x: 6,  y: 37, z: -6,  owner: 'System', stealth: true },
+  '11,37,-5':  { x: 11, y: 37, z: -5,  owner: 'System', stealth: true },
+  '19,37,-5':  { x: 19, y: 37, z: -5,  owner: 'System', stealth: true },
+  '19,37,4':   { x: 19, y: 37, z: 4,   owner: 'System', stealth: true },
+  '11,37,4':   { x: 11, y: 37, z: 4,   owner: 'System', stealth: true },
+  '6,37,6':    { x: 6,  y: 37, z: 6,   owner: 'System', stealth: true },
+  '-9,37,-7':  { x: -9, y: 37, z: -7,  owner: 'System', stealth: true },
+  '-9,37,-11': { x: -9, y: 37, z: -11, owner: 'System', stealth: true },
+  '-13,37,-11':{ x: -13,y: 37, z: -11, owner: 'System', stealth: true },
+  '-13,37,-7': { x: -13,y: 37, z: -7,  owner: 'System', stealth: true }
+};
+
 export class WorldStore {
   constructor(dataDir) {
     this.dataDir = path.resolve(dataDir);
@@ -36,7 +51,8 @@ export class WorldStore {
       beacons: path.join(this.dataDir, 'beacons.json'),
       regions: path.join(this.dataDir, 'regions.json'),
       blueprints: path.join(this.dataDir, 'blueprints.json'),
-      skins: path.join(this.dataDir, 'skins.json')
+      skins: path.join(this.dataDir, 'skins.json'),
+      config: path.join(this.dataDir, 'config.json')
     };
 
     // Delta overrides on top of deterministic 1024x96x1024 terrainGen:
@@ -50,6 +66,11 @@ export class WorldStore {
     this.regions = [];
     this.blueprints = [];
     this.skins = [];
+    this.config = {
+      supplyEnabled: false,
+      unlimitedBlocks: false,
+      saboSwordEnabled: false
+    };
 
     this._saveTimers = {};
     this._loadAll();
@@ -86,6 +107,7 @@ export class WorldStore {
       else if (kind === 'regions') this._writeJsonAtomic(this.files.regions, this.regions);
       else if (kind === 'blueprints') this._writeJsonAtomic(this.files.blueprints, this.blueprints);
       else if (kind === 'skins') this._writeJsonAtomic(this.files.skins, this.skins);
+      else if (kind === 'config') this._writeJsonAtomic(this.files.config, this.config);
     } catch (err) {
       console.error(`[WorldStore] Save error (${kind}):`, err);
     }
@@ -148,11 +170,28 @@ export class WorldStore {
         [`-4,${sy},-4`]: { x: -4, y: sy, z: -4, channel: '지하광산' },
         '-21,8,-9':      { x: -21, y: 8, z: -9, channel: '지하광산' }
       };
+      this.beacons = {};
+      for (const [bk, bv] of Object.entries(DEFAULT_BEACONS)) {
+        this.beacons[bk] = { ...bv };
+        this.deltas.set(bk, bv.stealth ? 'stealth_beacon' : 'protect_beacon');
+      }
       this.saveNow('world');
       this.saveNow('chests');
       this.saveNow('furnaces');
       this.saveNow('signs');
       this.saveNow('portals');
+      this.saveNow('beacons');
+    }
+
+    const savedConfig = this._readJson(this.files.config);
+    if (savedConfig && typeof savedConfig === 'object') {
+      this.config = {
+        supplyEnabled: !!savedConfig.supplyEnabled,
+        unlimitedBlocks: !!savedConfig.unlimitedBlocks,
+        saboSwordEnabled: !!savedConfig.saboSwordEnabled
+      };
+    } else {
+      this.saveNow('config');
     }
 
     this.regions = Array.isArray(savedRegions) ? savedRegions : [];
@@ -628,6 +667,85 @@ export class WorldStore {
     const fillBlock = this.detectFillMaterial(cx, cy, cz);
     const res = this.fillEmptyAt(cx, cy, cz, radius, isAdmin, fillBlock, 'fill_bomb');
     return { ...res, filledBlock: fillBlock };
+  }
+
+  setConfig(patch) {
+    if (typeof patch.supplyEnabled === 'boolean') this.config.supplyEnabled = patch.supplyEnabled;
+    if (typeof patch.unlimitedBlocks === 'boolean') this.config.unlimitedBlocks = patch.unlimitedBlocks;
+    if (typeof patch.saboSwordEnabled === 'boolean') this.config.saboSwordEnabled = patch.saboSwordEnabled;
+    this.saveNow('config');
+    return { ...this.config };
+  }
+
+  flattenAt(cx, cy, cz, isAdmin) {
+    const changes = [];
+    const changedKeys = new Set();
+    const recordNull = (x, y, z) => {
+      const k = `${x},${y},${z}`;
+      if (changedKeys.has(k)) return;
+      changedKeys.add(k);
+      this.setBlock(x, y, z, null);
+      changes.push({ x, y, z, block: null });
+    };
+    const destroyedWoodCols = new Map();
+    const chainBombs = [];
+
+    // Exact 5x5x5 cube starting at bomb floor level (dy = 0..4, dx = -2..2, dz = -2..2)
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dy = 0; dy <= 4; dy++) {
+          const x = cx + dx, y = cy + dy, z = cz + dz;
+          if (!this.inBounds(x, y, z) || y <= WORLD_BOUNDS.minY) continue;
+          const b = this.getBlock(x, y, z);
+          if (!b || b === 'bedrock' || b === 'water') continue;
+          if (!isAdmin && this.findProtectingRegion(x, y, z)) continue;
+          if (b === 'chest' && !this.isChestEmpty(x, y, z)) continue;
+          if (b === 'furnace' && !this.isFurnaceEmpty(x, y, z)) continue;
+          if ((b === 'protect_beacon' || b === 'stealth_beacon') && !isAdmin) continue;
+          if ((b === 'flatten_bomb' || b === 'tnt') && !(x === cx && y === cy && z === cz)) {
+            chainBombs.push({ x, y, z, kind: b });
+            continue;
+          }
+          if (b === 'wood') {
+            const colKey = `${x},${z}`;
+            const prev = destroyedWoodCols.get(colKey);
+            if (prev === undefined || y > prev) destroyedWoodCols.set(colKey, y);
+          }
+          recordNull(x, y, z);
+        }
+      }
+    }
+
+    let fell = false;
+    for (const [colKey, baseY] of destroyedWoodCols.entries()) {
+      const [tx, tz] = colKey.split(',').map(Number);
+      let topY = baseY;
+      let ty = baseY + 1;
+      let trunkRemoved = 0;
+      while (ty <= WORLD_BOUNDS.maxY && this.getBlock(tx, ty, tz) === 'wood' && trunkRemoved < 12) {
+        if (!isAdmin && this.findProtectingRegion(tx, ty, tz)) break;
+        recordNull(tx, ty, tz);
+        topY = ty;
+        ty++;
+        trunkRemoved++;
+      }
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          for (let dy = -2; dy <= 3; dy++) {
+            const lx = tx + dx, ly = topY + dy, lz = tz + dz;
+            if (!this.inBounds(lx, ly, lz)) continue;
+            if (this.getBlock(lx, ly, lz) === 'leaves') {
+              if (!isAdmin && this.findProtectingRegion(lx, ly, lz)) continue;
+              recordNull(lx, ly, lz);
+              fell = true;
+            }
+          }
+        }
+      }
+      if (trunkRemoved > 0) fell = true;
+    }
+
+    return { changes, fell, chainBombs };
   }
 
   fillWaterAt(cx, cy, cz, radius, isAdmin) {

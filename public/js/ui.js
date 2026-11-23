@@ -4,7 +4,7 @@ import { getSurfaceHeight, getBiomeAt, SEA_LEVEL } from '../shared/terrainGen.js
 
 const SMELT_INPUTS = new Set(['raw_iron', 'raw_gold', 'sand', 'cobble', 'raw_meat']);
 const FUEL_ITEMS = new Set(['coal', 'wood', 'planks', 'stick']);
-const TOOL_ORDER = ['pickaxe', 'axe', 'shovel', 'hoe'];
+const TOOL_ORDER = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword'];
 
 export class GameUI {
   constructor(callbacks) {
@@ -30,6 +30,7 @@ export class GameUI {
     this.jobScore = 0;
     this.jobCompleted = 0;
     this.isAdmin = false;
+    this.serverConfig = { supplyEnabled: false, unlimitedBlocks: false, saboSwordEnabled: false };
     this.selfNick = '';
     this.blueprints = [];
     this.regions = [];
@@ -169,6 +170,17 @@ export class GameUI {
         this.cb.send({ type: 'emote', emoji, label });
         this.closeModal();
       });
+    });
+
+    // Admin server feature toggles
+    document.getElementById('adm-toggle-supply')?.addEventListener('change', (e) => {
+      this.cb.send({ type: 'admin_set_config', supplyEnabled: e.target.checked });
+    });
+    document.getElementById('adm-toggle-unlimited')?.addEventListener('change', (e) => {
+      this.cb.send({ type: 'admin_set_config', unlimitedBlocks: e.target.checked });
+    });
+    document.getElementById('adm-toggle-sabo')?.addEventListener('change', (e) => {
+      this.cb.send({ type: 'admin_set_config', saboSwordEnabled: e.target.checked });
     });
 
     // Admin time / weather / announce controls
@@ -753,7 +765,9 @@ export class GameUI {
     const toolsGrid = document.getElementById('bag-tools-grid');
     if (toolsGrid) {
       toolsGrid.innerHTML = '';
-      for (const t of TOOL_ORDER) {
+      const activeTypes = TOOL_ORDER.filter(t => t !== 'sword' || this.tools?.sword);
+      toolsGrid.style.gridTemplateColumns = `repeat(${activeTypes.length}, 48px)`;
+      for (const t of activeTypes) {
         const found = this.findBestToolSlot(t);
         const el = this._makeSlotEl(found?.slot || null, {
           active: this.usingTool && this.lastToolType === t,
@@ -807,15 +821,49 @@ export class GameUI {
     }
   }
 
+  setServerConfig(cfg) {
+    if (cfg && typeof cfg === 'object') {
+      this.serverConfig = {
+        supplyEnabled: !!cfg.supplyEnabled,
+        unlimitedBlocks: !!cfg.unlimitedBlocks,
+        saboSwordEnabled: !!cfg.saboSwordEnabled
+      };
+    }
+    const elSup = document.getElementById('adm-toggle-supply');
+    const elUnl = document.getElementById('adm-toggle-unlimited');
+    const elSabo = document.getElementById('adm-toggle-sabo');
+    if (elSup) elSup.checked = this.serverConfig.supplyEnabled;
+    if (elUnl) elUnl.checked = this.serverConfig.unlimitedBlocks;
+    if (elSabo) elSabo.checked = this.serverConfig.saboSwordEnabled;
+    if (this.textures) this._renderSupplyCatalog();
+  }
+
   _renderSupplyCatalog() {
+    const sec = document.getElementById('bag-supply-section');
+    const titleEl = document.getElementById('supply-section-title');
     const grid = document.getElementById('supply-grid');
+    if (!grid) return;
     grid.innerHTML = '';
-    const supplyAllow = [
-      ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
-      'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
-      'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
-      'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
-    ];
+
+    const showFull = !!this.serverConfig.supplyEnabled;
+    const showAdminOnly = !showFull && this.isAdmin;
+    if (sec) sec.classList.toggle('hidden', !showFull && !showAdminOnly);
+    if (!showFull && !showAdminOnly) return;
+
+    if (titleEl) {
+      titleEl.textContent = showFull
+        ? '🧱 건축 보급함 (모든 아이템 보급 ON)'
+        : '🛡️ 관리자 전용 비콘 보급함';
+    }
+
+    const supplyAllow = showFull
+      ? [
+          ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
+          'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
+          'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
+          'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
+        ]
+      : ['protect_beacon', 'stealth_beacon'];
     for (const id of supplyAllow) {
       const def = this.catalog[id];
       if (!def) continue;

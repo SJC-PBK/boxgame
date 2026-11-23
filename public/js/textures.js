@@ -449,6 +449,30 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(0, 13, 16, 3);
         break;
       }
+      case 'flatten_bomb': {
+        if (face === 'top' || face === 'bottom') {
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#1e293b';
+          for (let i = 0; i < 16; i += 4) ctx.fillRect(i, 0, 2, 16);
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(5, 5, 6, 6);
+        } else {
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(0, 0, 16, 3);
+          ctx.fillRect(0, 13, 16, 3);
+          ctx.fillStyle = '#fefce8';
+          ctx.fillRect(0, 5, 16, 6);
+          ctx.fillStyle = '#0f172a';
+          // Pixel "5x5"
+          ctx.fillRect(2, 6, 3, 1); ctx.fillRect(2, 6, 1, 2); ctx.fillRect(2, 8, 3, 1); ctx.fillRect(4, 8, 1, 2); ctx.fillRect(2, 9, 3, 1);
+          ctx.fillRect(7, 7, 1, 1); ctx.fillRect(9, 7, 1, 1); ctx.fillRect(8, 8, 1, 1); ctx.fillRect(7, 9, 1, 1); ctx.fillRect(9, 9, 1, 1);
+          ctx.fillRect(11, 6, 3, 1); ctx.fillRect(11, 6, 1, 2); ctx.fillRect(11, 8, 3, 1); ctx.fillRect(13, 8, 1, 2); ctx.fillRect(11, 9, 3, 1);
+        }
+        break;
+      }
       case 'portal': {
         fillNoise(ctx, ['rgba(147,51,234,0.78)', 'rgba(192,132,252,0.82)', 'rgba(88,28,135,0.82)', 'rgba(56,189,248,0.75)'], 990);
         ctx.fillStyle = 'rgba(255,255,255,0.65)';
@@ -601,6 +625,19 @@ function drawItemIcon(def) {
         px(8, 12, 3, 4, tc.dark);
         px(9, 12, 2, 3, tc.hi);    // Sharp pointed tip
         px(10, 4, 9, 1, tc.hi);
+      } else if (def.toolType === 'sword') {
+        // Legendary glowing crimson-gold Sabo Sword (⚔️ 사보검)!
+        px(3, 25, 5, 5, '#eab308');
+        px(4, 26, 3, 3, '#fef08a');
+        px(9, 14, 10, 4, '#ca8a04');
+        px(12, 16, 4, 9, '#ca8a04');
+        px(11, 15, 7, 3, '#fef08a');
+        for (let i = 0; i < 14; i++) {
+          px(15 + i, 15 - i, 4, 4, '#9f1239');
+          px(16 + i, 14 - i, 3, 3, '#f43f5e');
+          px(17 + i, 13 - i, 2, 2, '#fda4af');
+        }
+        px(27, 2, 3, 3, '#ffffff');
       }
       return;
     }

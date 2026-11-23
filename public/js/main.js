@@ -506,6 +506,7 @@ function handleServerMessage(msg) {
       animalRenderer.syncAll(msg.animals);
 
       ui.init(catalog, msg.recipes, textures, selfPlayer);
+      ui.setServerConfig(msg.serverConfig);
       ui.setWorldMode(currentWorldMode, msg.cafeRecipes, msg.cafeFridgeItems, msg.jobOrder, msg.jobScore, msg.jobCompleted);
       ui.updateTools(msg.tools);
       ui.updateBag(msg.bag);
@@ -636,6 +637,37 @@ function handleServerMessage(msg) {
       break;
     }
 
+    case 'flatten_bomb_ignited':
+      worldExtras.igniteTNT(msg.x, msg.y, msg.z, msg.durationMs, 0xf59e0b, 0xfacc15);
+      sound.playHit('stone', { x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
+      if (!msg.durationMs || msg.durationMs >= 1800) {
+        ui.toast('🏗️ 평탄화 폭탄 작동! 곧 5×5×5 영역이 깔끔하게 정리됩니다...', 'warn');
+      }
+      break;
+
+    case 'flatten_bomb_explode': {
+      const ex = msg.x + 0.5, ey = msg.y + 0.5, ez = msg.z + 0.5;
+      sound.playExplosion({ x: ex, y: ey, z: ez });
+      worldExtras.explodeFlattenBomb(msg.x, msg.y, msg.z);
+      if (worldRenderer) {
+        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'stone', 26);
+      }
+      const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
+      if (dist < 22) {
+        cameraShake = Math.max(cameraShake, (1 - dist / 22) * 0.45);
+        ui.toast('🏗️ 5×5×5 평탄화가 완료되었습니다!', 'success');
+      }
+      break;
+    }
+
+    case 'config_update':
+      ui.setServerConfig(msg.config);
+      break;
+
+    case 'vitals_update':
+      ui.updateVitals(msg.hp, msg.hunger);
+      break;
+
     case 'warp_to':
       warpPlayer(msg.x, msg.y, msg.z, msg.label);
       break;
@@ -696,8 +728,11 @@ function handleServerMessage(msg) {
 
     case 'food_eaten':
       sound.playEat();
-      ui.updateVitals(ui.hp + (msg.heal || 4), ui.hunger + (msg.hunger || 6));
-      ui.toast(`🍎 ${msg.name}을(를) 먹어 체력을 회복했습니다!`, 'success');
+      ui.updateVitals(
+        typeof msg.hp === 'number' ? msg.hp : (ui.hp + (msg.heal || 4)),
+        typeof msg.curHunger === 'number' ? msg.curHunger : (ui.hunger + (msg.hunger || 6))
+      );
+      ui.toast(`🍎 ${msg.name}을(를) 먹어 배고픔과 체력을 회복했습니다!`, 'success');
       break;
 
     case 'player_join':
@@ -772,6 +807,7 @@ function computeMiningTime(blockId) {
   const bDef = catalog[blockId];
   if (!bDef || !Number.isFinite(bDef.hardness)) return Infinity;
   const heldId = ui.getActiveItemId();
+  if (heldId === 'sabo_sword') return 0.04;
   const heldDef = heldId ? catalog[heldId] : null;
   const isPreferred = heldDef && heldDef.kind === 'tool' && heldDef.toolType === bDef.preferredTool;
   const speed = isPreferred ? (heldDef.speed || 2.0) : 1.0;
@@ -851,7 +887,7 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'toggle_door', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
-    if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb' || currentHit.block === 'water_bomb') {
+    if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb' || currentHit.block === 'water_bomb' || currentHit.block === 'flatten_bomb') {
       fpHand?.triggerSwing();
       const heldIdNow = ui.getActiveItemId();
       if (heldIdNow === 'detonator') {
@@ -860,6 +896,8 @@ function handleRightClickOrInteract(interactOnly = false) {
         send({ type: 'fill_bomb_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       } else if (currentHit.block === 'water_bomb') {
         send({ type: 'water_bomb_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      } else if (currentHit.block === 'flatten_bomb') {
+        send({ type: 'flatten_bomb_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       } else {
         send({ type: 'tnt_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       }
@@ -1092,7 +1130,9 @@ function updatePhysics(dt) {
   const isMoving = _move.lengthSq() > 0;
   if (isMoving && _move.lengthSq() > 1) _move.normalize();
 
-  const speed = flyMode ? 10.5 : 5.8;
+  // Low HP (from hunger) smoothly slows walking speed (100% at HP 20 -> 45% at HP 0)
+  const hpFactor = 0.45 + 0.55 * (Math.max(0, ui.hp) / 20);
+  const speed = flyMode ? 10.5 : (5.8 * hpFactor);
   const nextX = playerPos.x + _move.x * speed * dt;
   if (!collides(nextX, playerPos.y, playerPos.z)) playerPos.x = nextX;
   const nextZ = playerPos.z + _move.z * speed * dt;

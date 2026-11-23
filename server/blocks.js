@@ -67,7 +67,8 @@ export const BLOCKS = {
   fill_bomb:    { numId: 45, id: 'fill_bomb',    name: '흙 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'fill_bomb', sound: 'dirt', stackable: 16, category: '특수' },
   water_bomb:   { numId: 46, id: 'water_bomb',   name: '물 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'water_bomb', sound: 'glass', stackable: 16, category: '특수' },
   protect_beacon: { numId: 47, id: 'protect_beacon', name: '🛡️ 보호 비콘', transparent: false, solid: true, hardness: 1.0, preferredTool: null, minTier: 0, drop: 'protect_beacon', sound: 'glass', stackable: 16, category: '관리자' },
-  stealth_beacon: { numId: 48, id: 'stealth_beacon', name: '👻 투명 보호 비콘', transparent: true, solid: false, hardness: 1.0, preferredTool: null, minTier: 0, drop: 'stealth_beacon', sound: 'glass', stackable: 16, category: '관리자' }
+  stealth_beacon: { numId: 48, id: 'stealth_beacon', name: '👻 투명 보호 비콘', transparent: true, solid: false, hardness: 1.0, preferredTool: null, minTier: 0, drop: 'stealth_beacon', sound: 'glass', stackable: 16, category: '관리자' },
+  flatten_bomb:   { numId: 49, id: 'flatten_bomb',   name: '평탄화 폭탄 (5×5×5)', transparent: false, solid: true, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'flatten_bomb', sound: 'stone', stackable: 16, category: '특수' }
 };
 
 export const NUM_TO_BLOCK = {};
@@ -114,6 +115,7 @@ export const ITEMS = {
   wood_hoe:  { id: 'wood_hoe',  name: '나무 괭이', kind: 'tool', toolType: 'hoe', tier: 1, speed: 2.0, color: '#a16207', stackable: 1, category: '도구' },
   stone_hoe: { id: 'stone_hoe', name: '돌 괭이',   kind: 'tool', toolType: 'hoe', tier: 2, speed: 3.5, color: '#94a3b8', stackable: 1, category: '도구' },
   iron_hoe:  { id: 'iron_hoe',  name: '철 괭이',   kind: 'tool', toolType: 'hoe', tier: 3, speed: 5.5, color: '#e2e8f0', stackable: 1, category: '도구' },
+  sabo_sword:{ id: 'sabo_sword',name: '⚔️ 사보검',  kind: 'tool', toolType: 'sword', tier: 99, speed: 999, color: '#f43f5e', stackable: 1, category: '관리자' },
 
   // Job Village: Barista Ingredients
   cup:           { id: 'cup',           name: '빈 컵',        kind: 'item', stackable: 16, category: '카페재료' },
@@ -188,8 +190,9 @@ export const RECIPES = [
   { id: 'r-door',     category: '건축', out: { item: 'door_closed', count: 2 }, in: [{ item: 'planks', count: 6 }] },
   { id: 'r-ladder',   category: '건축', out: { item: 'ladder', count: 4 },      in: [{ item: 'stick', count: 6 }] },
   { id: 'r-sign',     category: '건축', out: { item: 'sign', count: 2 },        in: [{ item: 'planks', count: 4 }, { item: 'stick', count: 1 }] },
-  { id: 'r-tnt',       category: '특수', out: { item: 'tnt', count: 1 },         in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },
-  { id: 'r-fill-bomb',  category: '특수', out: { item: 'fill_bomb', count: 1 },   in: [{ item: 'dirt', count: 8 }, { item: 'coal', count: 2 }] },
+  { id: 'r-tnt',          category: '특수', out: { item: 'tnt', count: 1 },          in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },
+  { id: 'r-flatten-bomb', category: '특수', out: { item: 'flatten_bomb', count: 1 }, in: [{ item: 'tnt', count: 1 }, { item: 'iron_ingot', count: 2 }] },
+  { id: 'r-fill-bomb',    category: '특수', out: { item: 'fill_bomb', count: 1 },    in: [{ item: 'dirt', count: 8 }, { item: 'coal', count: 2 }] },
   { id: 'r-water-bomb', category: '특수', out: { item: 'water_bomb', count: 1 },  in: [{ item: 'glass', count: 4 }, { item: 'sand', count: 4 }, { item: 'coal', count: 2 }] },
   { id: 'r-fuse',      category: '특수', out: { item: 'fuse', count: 8 },        in: [{ item: 'coal', count: 1 }, { item: 'stick', count: 1 }] },
   { id: 'r-detonator', category: '특수', out: { item: 'detonator', count: 1 },   in: [{ item: 'iron_ingot', count: 2 }, { item: 'coal', count: 1 }] },
