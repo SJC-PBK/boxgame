@@ -54,6 +54,7 @@ html, body {
 #login-form input[type="checkbox"] {
   width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
 }
+.masked-input { -webkit-text-security: disc; }
 .btn-primary {
   width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 10px;
   background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff;

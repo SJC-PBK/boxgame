@@ -19,7 +19,7 @@
       <h1>Boxworld</h1>
       <p class="subtitle">채굴·제작·농사·포털·스킨·건축을 함께 즐기는 웹 3D 블록 월드 (최대 5명)</p>
 
-      <form id="login-form">
+      <form id="login-form" autocomplete="off">
         <div class="world-mode-grid">
           <button type="button" class="mode-card active" data-world="sandbox">
             <div class="mode-icon">🏗️</div>
@@ -34,13 +34,13 @@
         </div>
 
         <label for="nickname-input">닉네임</label>
-        <input id="nickname-input" type="text" maxlength="16" placeholder="사용할 닉네임을 입력하세요" autocomplete="off" required />
+        <input id="nickname-input" name="bw_nick_field" type="text" maxlength="16" placeholder="사용할 닉네임을 입력하세요" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" required />
 
         <div style="margin-top:10px;">
           <label class="toggle-label" style="margin-bottom:6px;">
             <input id="admin-login-toggle" type="checkbox" /> 🛡️ 관리자 권한으로 로그인
           </label>
-          <input id="login-admin-pw" type="password" class="hidden" placeholder="관리자 비밀번호 입력" autocomplete="off" />
+          <input id="login-admin-pw" name="bw_adm_code" type="text" class="hidden masked-input" placeholder="관리자 비밀번호 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled />
         </div>
 
         <button type="submit" class="btn-primary">월드 입장하기</button>

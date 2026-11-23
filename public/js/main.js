@@ -346,8 +346,10 @@ document.querySelectorAll('.mode-card').forEach((card) => {
 });
 
 adminLoginToggle.addEventListener('change', () => {
-  loginAdminPw.classList.toggle('hidden', !adminLoginToggle.checked);
-  if (adminLoginToggle.checked) loginAdminPw.focus();
+  const on = adminLoginToggle.checked;
+  loginAdminPw.classList.toggle('hidden', !on);
+  loginAdminPw.disabled = !on;
+  if (on) loginAdminPw.focus();
   else loginAdminPw.value = '';
 });
 
