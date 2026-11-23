@@ -685,14 +685,28 @@ export class TextureLibrary {
           side: (isCross || def.id === 'door_closed' || def.id === 'door_open' || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
           emissive: def.id === 'lamp' ? new THREE.Color('#fef08a')
             : def.id === 'portal' ? new THREE.Color('#a855f7')
+            : def.id === 'furnace' ? new THREE.Color('#f97316')
             : def.id === 'jumppad' ? new THREE.Color('#22d3ee')
             : new THREE.Color('#000000'),
-          emissiveIntensity: def.id === 'lamp' ? 0.45 : (def.id === 'portal' ? 0.55 : (def.id === 'jumppad' ? 0.3 : 0))
+          emissiveIntensity: def.id === 'lamp' ? 0.78 : (def.id === 'portal' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))
         };
 
-        const topMat = new THREE.MeshLambertMaterial({ map: toTexture(topC), ...opts });
-        const sideMat = new THREE.MeshLambertMaterial({ map: toTexture(sideC), ...opts });
-        const botMat = new THREE.MeshLambertMaterial({ map: toTexture(botC), ...opts });
+        const applyBlockLightShader = (mat) => {
+          mat.onBeforeCompile = (shader) => {
+            shader.vertexShader = shader.vertexShader
+              .replace('#include <common>', '#include <common>\nattribute vec3 aBlockLight;\nvarying vec3 vBlockLight;')
+              .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBlockLight = aBlockLight;');
+            shader.fragmentShader = shader.fragmentShader
+              .replace('#include <common>', '#include <common>\nvarying vec3 vBlockLight;')
+              .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directDiffuse += diffuseColor.rgb * vBlockLight;');
+          };
+          mat.customProgramCacheKey = () => 'boxworld_block_light_v1';
+          return mat;
+        };
+
+        const topMat = applyBlockLightShader(new THREE.MeshLambertMaterial({ map: toTexture(topC), ...opts }));
+        const sideMat = applyBlockLightShader(new THREE.MeshLambertMaterial({ map: toTexture(sideC), ...opts }));
+        const botMat = applyBlockLightShader(new THREE.MeshLambertMaterial({ map: toTexture(botC), ...opts }));
 
         this.materials[def.id] = {
           top: topMat,

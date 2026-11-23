@@ -38,6 +38,8 @@ scene.add(hemiLight);
 const dirLight = new THREE.DirectionalLight(0xfffbe6, 0.78);
 dirLight.position.set(45, 80, 35);
 scene.add(dirLight);
+const playerLight = new THREE.PointLight(0xffe6b3, 0, 10, 1.6);
+scene.add(playerLight);
 
 const sky = new SkySystem(scene, hemiLight, dirLight);
 const sound = new SoundEngine();
@@ -1095,6 +1097,19 @@ function animate(now) {
     worldExtras.update(dt);
     sky.update(dt, playerPos, currentWorldMode === 'job' ? 4 : 36);
     sound.updateListener(playerPos, yaw);
+
+    // Smoothly brighten first-person hand & nearby entities based on voxel block-light at player position
+    if (worldRenderer) {
+      const bl = worldRenderer.getBlockLightAt(
+        Math.floor(playerPos.x),
+        Math.floor(playerPos.y + 1.1),
+        Math.floor(playerPos.z)
+      );
+      const nightFactor = 1 - (sky.dayLight ?? 1) * 0.7;
+      const targetInt = (bl / 14) * 1.15 * nightFactor;
+      playerLight.position.set(playerPos.x, playerPos.y + 1.4, playerPos.z);
+      playerLight.intensity += (targetInt - playerLight.intensity) * Math.min(1, dt * 10);
+    }
 
     const { eyePos, lookDir } = getEyeAndLook();
     if (thirdPerson) {

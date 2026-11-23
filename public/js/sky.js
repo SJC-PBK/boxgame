@@ -73,10 +73,11 @@ export class SkySystem {
 
     this.colDay = new THREE.Color('#87ceeb');
     this.colSunset = new THREE.Color('#fb923c');
-    this.colNight = new THREE.Color('#090f24');
-    this.colUnderground = new THREE.Color('#0c1324');
+    this.colNight = new THREE.Color('#040814');
+    this.colUnderground = new THREE.Color('#04070f');
     this.colRain = new THREE.Color('#475569');
     this.curSky = new THREE.Color();
+    this.dayLight = 1;
 
     // Dynamic 3D Weather particles (Rain & Snow)
     this.weather = 'clear';
@@ -193,15 +194,16 @@ export class SkySystem {
     this.starMat.opacity = nightAmt;
     this.stars.rotation.y = this.time * 0.5;
 
-    // Lighting intensities
-    const dayLight = Math.max(0, Math.min(1, (sunHeight + 0.2) / 0.6));
-    this.hemiLight.intensity = 0.26 + dayLight * 0.65;
-    this.dirLight.intensity = 0.16 + dayLight * 0.72;
+    // Lighting intensities (genuinely dark at night & deep underground; light-emitting blocks brighten nearby!)
+    const dayLight = Math.max(0, Math.min(1, (sunHeight + 0.12) / 0.52)) * (1 - ug * 0.85);
+    this.dayLight = dayLight;
+    this.hemiLight.intensity = 0.055 + dayLight * 0.85;
+    this.dirLight.intensity = 0.03 + dayLight * 0.85;
     this.dirLight.position.set(
       playerPos.x + (sunHeight >= 0 ? sunX : -sunX) * 0.5,
       playerPos.y + Math.abs(sunY) * 0.5 + 15,
       playerPos.z + 20
     );
-    this.dirLight.color.setHex(sunHeight >= -0.05 ? 0xfff8dc : 0x93c5fd);
+    this.dirLight.color.setHex(sunHeight >= -0.05 ? 0xfff8dc : 0x64748b);
   }
 }

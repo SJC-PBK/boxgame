@@ -2,6 +2,18 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { getBaseBlock } from '../shared/terrainGen.js';
 
 const CHUNK_SIZE = 16;
+const MAX_LIGHT_LEVEL = 14;
+const LIGHT_PROPS = {
+  lamp:    { level: 14, r: 1.18, g: 1.00, b: 0.72 },
+  portal:  { level: 11, r: 0.85, g: 0.45, b: 1.18 },
+  furnace: { level: 9,  r: 1.15, g: 0.62, b: 0.28 },
+  jumppad: { level: 7,  r: 0.32, g: 0.96, b: 1.08 }
+};
+const LIGHT_FALLOFF = new Float32Array(MAX_LIGHT_LEVEL + 1);
+for (let i = 1; i <= MAX_LIGHT_LEVEL; i++) {
+  LIGHT_FALLOFF[i] = Math.pow(i / MAX_LIGHT_LEVEL, 1.25);
+}
+const DIRS_6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 const FACES = [
   { dir: [1, 0, 0],  faceKind: 'side',   corners: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]] },
@@ -37,6 +49,8 @@ export class WorldRenderer {
     this.idToNum = {};
     this.transparentNum = new Uint8Array(256);
     this.solidNum = new Uint8Array(256);
+    this.lightLevelNum = new Uint8Array(256);
+    this.lightColorNum = new Array(256);
 
     for (const def of Object.values(catalog)) {
       if (def.kind === 'block' && def.numId) {
@@ -44,8 +58,29 @@ export class WorldRenderer {
         this.idToNum[def.id] = def.numId;
         this.transparentNum[def.numId] = def.transparent ? 1 : 0;
         this.solidNum[def.numId] = def.solid ? 1 : 0;
+        const lp = LIGHT_PROPS[def.id];
+        if (lp) {
+          this.lightLevelNum[def.numId] = lp.level;
+          this.lightColorNum[def.numId] = lp;
+        }
       }
     }
+
+    // Voxel block-light storage & reusable zero-GC BFS buffers
+    this.chunkLights = new Map();       // "cx,cz" -> Array<{ x, y, z, level, r, g, b }>
+    this.chunkLightScalar = new Map();  // "cx,cz" -> Uint8Array(16 * sizeY * 16)
+    this._padW = CHUNK_SIZE + 2;
+    this._padVol = this._padW * this.sizeY * this._padW;
+    this._padR = new Float32Array(this._padVol);
+    this._padG = new Float32Array(this._padVol);
+    this._padB = new Float32Array(this._padVol);
+    this._padMaxL = new Uint8Array(this._padVol);
+    this._bfsSide = MAX_LIGHT_LEVEL * 2 + 1;
+    this._bfsVol = this._bfsSide * this._bfsSide * this._bfsSide;
+    this._bfsVal = new Uint8Array(this._bfsVol);
+    this._bfsStamp = new Uint32Array(this._bfsVol);
+    this._bfsCurStamp = 0;
+    this._bfsQ = new Int32Array(this._bfsVol * 3);
 
     this.crossNums = new Set([
       this.idToNum['sapling'],
@@ -123,11 +158,11 @@ export class WorldRenderer {
     if (data) return data;
 
     data = new Uint8Array(CHUNK_SIZE * this.sizeY * CHUNK_SIZE);
+    const lights = [];
     const baseX = cx * CHUNK_SIZE;
     const baseZ = cz * CHUNK_SIZE;
 
     for (let lz = 0; lz < CHUNK_SIZE; lz++) {
-      const wx = 0;
       const wz = baseZ + lz;
       if (wz < this.bounds.minZ || wz > this.bounds.maxZ) continue;
       for (let lx = 0; lx < CHUNK_SIZE; lx++) {
@@ -136,14 +171,220 @@ export class WorldRenderer {
         for (let y = this.bounds.minY; y <= this.bounds.maxY; y++) {
           const k = `${x},${y},${wz}`;
           const id = this.deltas.has(k) ? this.deltas.get(k) : getBaseBlock(x, y, wz);
-          if (id) data[this._chunkLocalIdx(lx, y, lz)] = this.idToNum[id] || 0;
+          if (id) {
+            const num = this.idToNum[id] || 0;
+            data[this._chunkLocalIdx(lx, y, lz)] = num;
+            const lp = this.lightColorNum[num];
+            if (lp) lights.push({ x, y, z: wz, level: lp.level, r: lp.r, g: lp.g, b: lp.b });
+          }
         }
       }
-      void wx;
     }
 
     this.chunkData.set(ck, data);
+    this.chunkLights.set(ck, lights);
     return data;
+  }
+
+  _scanChunkLights(cx, cz) {
+    const ck = `${cx},${cz}`;
+    const lights = [];
+    const startX = Math.max(this.bounds.minX, cx * CHUNK_SIZE);
+    const endX = Math.min(this.bounds.maxX, cx * CHUNK_SIZE + CHUNK_SIZE - 1);
+    const startZ = Math.max(this.bounds.minZ, cz * CHUNK_SIZE);
+    const endZ = Math.min(this.bounds.maxZ, cz * CHUNK_SIZE + CHUNK_SIZE - 1);
+    if (startX > endX || startZ > endZ) {
+      this.chunkLights.set(ck, lights);
+      return lights;
+    }
+    const cData = this.streaming ? this.chunkData.get(ck) : null;
+    const baseX = cx * CHUNK_SIZE;
+    const baseZ = cz * CHUNK_SIZE;
+    for (let y = this.bounds.minY; y <= this.bounds.maxY; y++) {
+      for (let z = startZ; z <= endZ; z++) {
+        for (let x = startX; x <= endX; x++) {
+          const num = cData
+            ? cData[this._chunkLocalIdx(x - baseX, y, z - baseZ)]
+            : (this.grid ? this.grid[this.flatIndex(x, y, z)] : 0);
+          const lp = this.lightColorNum[num];
+          if (lp) lights.push({ x, y, z, level: lp.level, r: lp.r, g: lp.g, b: lp.b });
+        }
+      }
+    }
+    this.chunkLights.set(ck, lights);
+    return lights;
+  }
+
+  _padIdx(px, y, pz) {
+    return px + this._padW * (pz + this._padW * (y - this.bounds.minY));
+  }
+
+  // True Minecraft-style 6-neighbor BFS block-light propagation (blocked by opaque blocks!)
+  _computeChunkLight(cx, cz) {
+    const ck = `${cx},${cz}`;
+    const baseX = cx * CHUNK_SIZE;
+    const baseZ = cz * CHUNK_SIZE;
+    const minPX = baseX - 1;
+    const maxPX = baseX + CHUNK_SIZE;
+    const minPZ = baseZ - 1;
+    const maxPZ = baseZ + CHUNK_SIZE;
+
+    const nearbyLights = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const list = this.chunkLights.get(`${cx + dx},${cz + dz}`);
+        if (!list || list.length === 0) continue;
+        for (let i = 0; i < list.length; i++) {
+          const s = list[i];
+          if (
+            s.x + s.level >= minPX && s.x - s.level <= maxPX &&
+            s.z + s.level >= minPZ && s.z - s.level <= maxPZ
+          ) {
+            nearbyLights.push(s);
+          }
+        }
+      }
+    }
+
+    if (nearbyLights.length === 0) {
+      this.chunkLightScalar.delete(ck);
+      return false;
+    }
+
+    const padR = this._padR;
+    const padG = this._padG;
+    const padB = this._padB;
+    const padMaxL = this._padMaxL;
+    padR.fill(0);
+    padG.fill(0);
+    padB.fill(0);
+    padMaxL.fill(0);
+
+    const bfsSide = this._bfsSide;
+    const bfsVal = this._bfsVal;
+    const bfsStamp = this._bfsStamp;
+    const bfsQ = this._bfsQ;
+    const minY = this.bounds.minY;
+    const maxY = this.bounds.maxY;
+    const minX = this.bounds.minX;
+    const maxX = this.bounds.maxX;
+    const minZ = this.bounds.minZ;
+    const maxZ = this.bounds.maxZ;
+    const transNum = this.transparentNum;
+
+    for (let li = 0; li < nearbyLights.length; li++) {
+      const src = nearbyLights[li];
+      const rad = src.level;
+      this._bfsCurStamp++;
+      if (this._bfsCurStamp === 0xffffffff) {
+        bfsStamp.fill(0);
+        this._bfsCurStamp = 1;
+      }
+      const stamp = this._bfsCurStamp;
+      const offX = src.x - rad;
+      const offY = src.y - rad;
+      const offZ = src.z - rad;
+
+      const cIdx = rad + bfsSide * (rad + bfsSide * rad);
+      bfsStamp[cIdx] = stamp;
+      bfsVal[cIdx] = rad;
+
+      let head = 0;
+      let tail = 0;
+      bfsQ[tail++] = src.x;
+      bfsQ[tail++] = src.y;
+      bfsQ[tail++] = src.z;
+
+      while (head < tail) {
+        const x = bfsQ[head++];
+        const y = bfsQ[head++];
+        const z = bfsQ[head++];
+        const lx = x - offX;
+        const ly = y - offY;
+        const lz = z - offZ;
+        const curL = bfsVal[lx + bfsSide * (lz + bfsSide * ly)];
+
+        // Deposit light into padded chunk grid if inside bounds
+        if (x >= minPX && x <= maxPX && z >= minPZ && z <= maxPZ && y >= minY && y <= maxY) {
+          const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+          const f = LIGHT_FALLOFF[curL];
+          const rr = src.r * f;
+          const gg = src.g * f;
+          const bb = src.b * f;
+          if (rr > padR[pIdx]) padR[pIdx] = rr;
+          if (gg > padG[pIdx]) padG[pIdx] = gg;
+          if (bb > padB[pIdx]) padB[pIdx] = bb;
+          if (curL > padMaxL[pIdx]) padMaxL[pIdx] = curL;
+        }
+
+        if (curL <= 1) continue;
+        const nextL = curL - 1;
+
+        for (let d = 0; d < 6; d++) {
+          const dir = DIRS_6[d];
+          const nx = x + dir[0];
+          const ny = y + dir[1];
+          const nz = z + dir[2];
+          if (nx < minX || nx > maxX || ny < minY || ny > maxY || nz < minZ || nz > maxZ) continue;
+          const nlx = nx - offX;
+          const nly = ny - offY;
+          const nlz = nz - offZ;
+          if (nlx < 0 || nlx >= bfsSide || nly < 0 || nly >= bfsSide || nlz < 0 || nlz >= bfsSide) continue;
+
+          const nIdx = nlx + bfsSide * (nlz + bfsSide * nly);
+          if (bfsStamp[nIdx] === stamp && bfsVal[nIdx] >= nextL) continue;
+
+          // Opaque blocks strictly block light! Only air (0) or transparent blocks transmit light.
+          const nNum = this.getNum(nx, ny, nz);
+          if (nNum !== 0 && transNum[nNum] !== 1) continue;
+
+          bfsStamp[nIdx] = stamp;
+          bfsVal[nIdx] = nextL;
+          bfsQ[tail++] = nx;
+          bfsQ[tail++] = ny;
+          bfsQ[tail++] = nz;
+        }
+      }
+    }
+
+    // Store compact interior scalar light for O(1) player/entity queries
+    const scalar = new Uint8Array(CHUNK_SIZE * this.sizeY * CHUNK_SIZE);
+    for (let y = minY; y <= maxY; y++) {
+      for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+        for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+          scalar[this._chunkLocalIdx(lx, y, lz)] = padMaxL[this._padIdx(lx + 1, y, lz + 1)];
+        }
+      }
+    }
+    this.chunkLightScalar.set(ck, scalar);
+    return true;
+  }
+
+  getBlockLightAt(x, y, z) {
+    if (!this.inBounds(x, y, z)) return 0;
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const scalar = this.chunkLightScalar.get(`${cx},${cz}`);
+    if (!scalar) return 0;
+    return scalar[this._chunkLocalIdx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE)];
+  }
+
+  _hasLightNear(x, y, z, radius = MAX_LIGHT_LEVEL + 1) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const list = this.chunkLights.get(`${cx + dx},${cz + dz}`);
+        if (!list) continue;
+        for (let i = 0; i < list.length; i++) {
+          const s = list[i];
+          if (Math.abs(s.x - x) <= radius && Math.abs(s.y - y) <= radius && Math.abs(s.z - z) <= radius) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   getNum(x, y, z) {
@@ -181,6 +422,8 @@ export class WorldRenderer {
     }
     this.chunkGroups.clear();
     this.chunkData.clear();
+    this.chunkLights.clear();
+    this.chunkLightScalar.clear();
   }
 
   // Fixed RLE mode (used by Job Experience Village 64x24x64)
@@ -203,6 +446,9 @@ export class WorldRenderer {
     const minCz = Math.floor(this.bounds.minZ / CHUNK_SIZE);
     const maxCz = Math.floor(this.bounds.maxZ / CHUNK_SIZE);
     for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cz = minCz; cz <= maxCz; cz++) this._scanChunkLights(cx, cz);
+    }
+    for (let cx = minCx; cx <= maxCx; cx++) {
       for (let cz = minCz; cz <= maxCz; cz++) this.rebuildChunk(cx, cz);
     }
   }
@@ -216,12 +462,16 @@ export class WorldRenderer {
     for (const [k, v] of Object.entries(deltasObj || {})) {
       this.deltas.set(k, v);
     }
-    // Synchronously build immediate 3x3 chunks around spawn so the ground is ready on frame 1!
+    // Synchronously build immediate 3x3 chunks around spawn so the ground & plaza lights are ready on frame 1!
     const pcx = Math.floor((initialPos?.x || 0) / CHUNK_SIZE);
     const pcz = Math.floor((initialPos?.z || 0) / CHUNK_SIZE);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
         this._ensureChunkData(pcx + dx, pcz + dz);
+      }
+    }
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
         this.rebuildChunk(pcx + dx, pcz + dz);
       }
     }
@@ -248,6 +498,8 @@ export class WorldRenderer {
         if (g) { this._disposeGroup(g); this.worldGroup.remove(g); }
         this.chunkGroups.delete(ck);
         this.chunkData.delete(ck);
+        this.chunkLights.delete(ck);
+        this.chunkLightScalar.delete(ck);
       }
     }
 
@@ -269,32 +521,73 @@ export class WorldRenderer {
     missing.sort((a, b) => a.distSq - b.distSq);
 
     const budget = 3; // Build 3 chunks per frame for silky 60fps streaming
+    const relightNeighbors = new Set();
     for (let i = 0; i < Math.min(budget, missing.length); i++) {
       const { cx, cz } = missing[i];
       this._ensureChunkData(cx, cz);
       this.rebuildChunk(cx, cz);
+      const list = this.chunkLights.get(`${cx},${cz}`);
+      if (list && list.length > 0) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            if (dx === 0 && dz === 0) continue;
+            const nck = `${cx + dx},${cz + dz}`;
+            if (this.chunkGroups.has(nck)) relightNeighbors.add(nck);
+          }
+        }
+      }
+    }
+    for (const nck of relightNeighbors) {
+      const [nx, nz] = nck.split(',').map(Number);
+      this.rebuildChunk(nx, nz);
     }
   }
 
   _writeBlockInternal(x, y, z, blockId) {
     const num = blockId ? (this.idToNum[blockId] || 0) : 0;
-    if (!this.streaming) {
-      if (this.grid) this.grid[this.flatIndex(x, y, z)] = num;
-      return;
-    }
-    const k = `${x},${y},${z}`;
-    this.deltas.set(k, blockId || null);
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
-    const data = this.chunkData.get(`${cx},${cz}`);
-    if (data) {
-      data[this._chunkLocalIdx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE)] = num;
+    const ck = `${cx},${cz}`;
+    let oldNum = 0;
+
+    if (!this.streaming) {
+      if (this.grid) {
+        const fi = this.flatIndex(x, y, z);
+        oldNum = this.grid[fi];
+        this.grid[fi] = num;
+      }
+    } else {
+      const k = `${x},${y},${z}`;
+      this.deltas.set(k, blockId || null);
+      const data = this.chunkData.get(ck);
+      if (data) {
+        const idx = this._chunkLocalIdx(x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE);
+        oldNum = data[idx];
+        data[idx] = num;
+      }
     }
+
+    // Keep chunkLights up to date when a light-emitting block is added or removed
+    const oldIsLight = this.lightLevelNum[oldNum] > 0;
+    const newLp = this.lightColorNum[num];
+    if (oldIsLight || newLp) {
+      let list = this.chunkLights.get(ck);
+      if (list) {
+        if (oldIsLight) {
+          list = list.filter(s => !(s.x === x && s.y === y && s.z === z));
+        }
+        if (newLp) {
+          list.push({ x, y, z, level: newLp.level, r: newLp.r, g: newLp.g, b: newLp.b });
+        }
+        this.chunkLights.set(ck, list);
+      }
+    }
+    return oldIsLight || !!newLp;
   }
 
   setBlock(x, y, z, blockId) {
     if (!this.inBounds(x, y, z)) return;
-    this._writeBlockInternal(x, y, z, blockId);
+    const lightChanged = this._writeBlockInternal(x, y, z, blockId);
 
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
@@ -305,6 +598,15 @@ export class WorldRenderer {
     if (localX === CHUNK_SIZE - 1) toRebuild.add(`${cx + 1},${cz}`);
     if (localZ === 0) toRebuild.add(`${cx},${cz - 1}`);
     if (localZ === CHUNK_SIZE - 1) toRebuild.add(`${cx},${cz + 1}`);
+
+    // If a light source changed OR an occluder near a light source changed, rebuild surrounding chunks!
+    if (lightChanged || this._hasLightNear(x, y, z)) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          toRebuild.add(`${cx + dx},${cz + dz}`);
+        }
+      }
+    }
 
     for (const ck of toRebuild) {
       if (!this.streaming || this.chunkGroups.has(ck)) {
@@ -318,7 +620,7 @@ export class WorldRenderer {
     const dirty = new Set();
     for (const c of changes) {
       if (!this.inBounds(c.x, c.y, c.z)) continue;
-      this._writeBlockInternal(c.x, c.y, c.z, c.block);
+      const lightChanged = this._writeBlockInternal(c.x, c.y, c.z, c.block);
       const cx = Math.floor(c.x / CHUNK_SIZE);
       const cz = Math.floor(c.z / CHUNK_SIZE);
       dirty.add(`${cx},${cz}`);
@@ -328,6 +630,11 @@ export class WorldRenderer {
       if (lx === CHUNK_SIZE - 1) dirty.add(`${cx + 1},${cz}`);
       if (lz === 0) dirty.add(`${cx},${cz - 1}`);
       if (lz === CHUNK_SIZE - 1) dirty.add(`${cx},${cz + 1}`);
+      if (lightChanged || this._hasLightNear(c.x, c.y, c.z)) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) dirty.add(`${cx + dx},${cz + dz}`);
+        }
+      }
     }
     for (const ck of dirty) {
       if (!this.streaming || this.chunkGroups.has(ck)) {
@@ -357,21 +664,30 @@ export class WorldRenderer {
     if (startX > endX || startZ > endZ) return;
 
     const cData = this.streaming ? this._ensureChunkData(cx, cz) : null;
+    if (!this.chunkLights.has(ck)) this._scanChunkLights(cx, cz);
+    const hasLight = this._computeChunkLight(cx, cz);
+    const padR = this._padR;
+    const padG = this._padG;
+    const padB = this._padB;
     const baseX = cx * CHUNK_SIZE;
     const baseZ = cz * CHUNK_SIZE;
+    const minPX = baseX - 1;
+    const minPZ = baseZ - 1;
+    const minY = this.bounds.minY;
+    const maxY = this.bounds.maxY;
 
     const buckets = new Map();
     const getBucket = (blockId, faceKind) => {
       const key = `${blockId}:${faceKind}`;
       let buf = buckets.get(key);
       if (!buf) {
-        buf = { blockId, faceKind, positions: [], normals: [], uvs: [], indices: [] };
+        buf = { blockId, faceKind, positions: [], normals: [], uvs: [], lights: [], indices: [] };
         buckets.set(key, buf);
       }
       return buf;
     };
 
-    for (let y = this.bounds.minY; y <= this.bounds.maxY; y++) {
+    for (let y = minY; y <= maxY; y++) {
       for (let z = startZ; z <= endZ; z++) {
         for (let x = startX; x <= endX; x++) {
           const num = cData
@@ -383,6 +699,11 @@ export class WorldRenderer {
 
           if (this.crossNums.has(num)) {
             const buf = getBucket(blockId, 'side');
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
             const quads = [
               [[0.15, 0, 0.15], [0.85, 0, 0.85], [0.85, 0.92, 0.85], [0.15, 0.92, 0.15]],
               [[0.85, 0, 0.15], [0.15, 0, 0.85], [0.15, 0.92, 0.85], [0.85, 0.92, 0.15]]
@@ -393,6 +714,7 @@ export class WorldRenderer {
                 buf.positions.push(x + q[i][0], y + q[i][1], z + q[i][2]);
                 buf.normals.push(0, 1, 0);
                 buf.uvs.push(UVS[i][0], UVS[i][1]);
+                buf.lights.push(lr, lg, lb);
               }
               buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
             }
@@ -407,7 +729,7 @@ export class WorldRenderer {
             const nz = z + face.dir[2];
 
             let nNum;
-            if (cData && nx >= baseX && nx < baseX + CHUNK_SIZE && nz >= baseZ && nz < baseZ + CHUNK_SIZE && ny >= this.bounds.minY && ny <= this.bounds.maxY) {
+            if (cData && nx >= baseX && nx < baseX + CHUNK_SIZE && nz >= baseZ && nz < baseZ + CHUNK_SIZE && ny >= minY && ny <= maxY) {
               nNum = cData[this._chunkLocalIdx(nx - baseX, ny, nz - baseZ)];
             } else {
               nNum = this.getNum(nx, ny, nz);
@@ -419,6 +741,13 @@ export class WorldRenderer {
               if (selfTrans && nNum === num) continue;
             }
 
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const cy = ny < minY ? minY : (ny > maxY ? maxY : ny);
+              const pIdx = this._padIdx(nx - minPX, cy, nz - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+
             const buf = getBucket(blockId, face.faceKind);
             const base = buf.positions.length / 3;
             for (let i = 0; i < 4; i++) {
@@ -426,6 +755,7 @@ export class WorldRenderer {
               buf.positions.push(x + c[0], y + c[1], z + c[2]);
               buf.normals.push(face.dir[0], face.dir[1], face.dir[2]);
               buf.uvs.push(UVS[i][0], UVS[i][1]);
+              buf.lights.push(lr, lg, lb);
             }
             buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
           }
@@ -439,6 +769,7 @@ export class WorldRenderer {
       geo.setAttribute('position', new THREE.Float32BufferAttribute(buf.positions, 3));
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(buf.normals, 3));
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(buf.uvs, 2));
+      geo.setAttribute('aBlockLight', new THREE.Float32BufferAttribute(buf.lights, 3));
       geo.setIndex(buf.indices);
       const mat = this.textures.getFaceMaterial(buf.blockId, buf.faceKind);
       const mesh = new THREE.Mesh(geo, mat);
