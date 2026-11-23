@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boxworld — 웹 3D 멀티플레이 블록 월드</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Login Overlay -->
+  <div id="login-overlay" class="overlay">
+    <div class="login-card">
+      <div class="logo-badge">BOXWORLD v4</div>
+      <h1>Boxworld</h1>
+      <p class="subtitle">채굴·제작·농사·포털·스킨·건축을 함께 즐기는 웹 3D 블록 월드 (최대 5명)</p>
+
+      <form id="login-form">
+        <label for="nickname-input">닉네임</label>
+        <input id="nickname-input" type="text" maxlength="16" placeholder="사용할 닉네임을 입력하세요" autocomplete="off" required />
+
+        <div style="margin-top:10px;">
+          <label class="toggle-label" style="margin-bottom:6px;">
+            <input id="admin-login-toggle" type="checkbox" /> 🛡️ 관리자 권한으로 로그인
+          </label>
+          <input id="login-admin-pw" type="password" class="hidden" placeholder="관리자 비밀번호 입력" autocomplete="off" />
+        </div>
+
+        <button type="submit" class="btn-primary">월드 입장하기</button>
+        <div id="login-error" class="error-text"></div>
+      </form>
+
+      <div class="login-rules">
+        <div class="rule-item">⛏️ <strong>채굴 & 도구 업그레이드</strong>: 나무→돌→철→다이아 도구로 업그레이드하고 지하 광물을 캐보세요!</div>
+        <div class="rule-item">🌳 <strong>나무 벌목 & 묘목</strong>: 나무 밑둥을 도끼로 베면 나무가 통째로 쓰러지며 원목·묘목·사과가 나옵니다.</div>
+        <div class="rule-item">🎒 <strong>가방 vs 보관 상자</strong>: 개인 가방은 로그아웃 시 자동 삭제되지만, <strong>상자에 넣은 아이템은 영구 보존</strong>됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- In-Game HUD -->
+  <div id="hud" class="hidden">
+    <div class="top-bar">
+      <div class="top-left">
+        <span class="brand-pill">BOXWORLD</span>
+        <span id="hud-players" class="info-pill">👥 1/5</span>
+        <span id="hud-time" class="info-pill">☀️ 낮 11:15</span>
+        <span id="hud-coords" class="info-pill">XYZ: 0, 17, 0</span>
+        <span id="hud-mode" class="info-pill">🚶 걷기 (Space×2 비행)</span>
+        <span id="hud-admin-badge" class="admin-pill hidden">🛡️ 관리자</span>
+      </div>
+      <div class="top-right">
+        <button id="btn-sound" class="hud-btn" title="3D 사운드 켜기/끄기">🔊</button>
+        <button id="btn-brush" class="hud-btn" title="건축 붓 3×3 빠른 건축 모드 (R)">🪄 붓 OFF [R]</button>
+        <button id="btn-map" class="hud-btn" title="실시간 미니맵 & 빠른 워프 (M)">🗺️ 지도 [M]</button>
+        <button id="btn-emote" class="hud-btn" title="이모트 표현 (G)">😊 [G]</button>
+        <button id="btn-bag" class="hud-btn" title="개인 가방 & 보급함 (E)">🎒 가방 [E]</button>
+        <button id="btn-craft" class="hud-btn" title="도구·제련 제작대 (C)">🔨 제작 [C]</button>
+        <button id="btn-skin" class="hud-btn" title="스킨 꾸미기 & 64×64 에디터 (K)">🎨 스킨 [K]</button>
+        <button id="btn-blueprint" class="hud-btn" title="설계도 투영 (B)">📐 설계도 [B]</button>
+        <button id="btn-admin" class="hud-btn" title="관리자 패널 (P)">🛡️ 관리 [P]</button>
+        <button id="btn-logout" class="hud-btn danger" title="로그아웃 (가방 자동 삭제)">🚪 로그아웃</button>
+      </div>
+    </div>
+
+    <div id="player-list" class="player-list"></div>
+
+    <!-- Active Blueprint Mini HUD -->
+    <div id="bp-hud" class="bp-hud hidden">
+      <div class="bp-hud-title">📐 <span id="bp-hud-name">-</span></div>
+      <div class="bp-progress-bar"><div id="bp-hud-fill" class="bp-progress-fill"></div></div>
+      <div id="bp-hud-stats" class="bp-hud-stats">0 / 0 (0%)</div>
+    </div>
+
+    <!-- Crosshair (block destruction uses 3D crack & shatter animation, no gauge!) -->
+    <div id="crosshair" class="crosshair">+</div>
+
+    <div id="play-hint" class="play-hint">
+      화면 클릭 시 시점 고정 · <b>좌클릭 꾹</b> 채굴/사냥 · <b>우클릭/F</b> 설치·상자·화로·경작·양털 · <b>V</b> 3인칭 · <b>/낮 /밤</b> 시간변경
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Chat Box -->
+    <div class="chat-panel">
+      <div id="chat-messages" class="chat-messages"></div>
+      <form id="chat-form" class="chat-form hidden">
+        <input id="chat-input" type="text" maxlength="200" placeholder="메시지 입력... (Enter 전송, ESC 닫기)" autocomplete="off" />
+      </form>
+      <div id="chat-hint" class="chat-hint">T 또는 Enter 키로 채팅 · 광산 입구: (-9, 16, -9)</div>
+    </div>
+
+    <!-- Bottom Status + Hotbar -->
+    <div class="hotbar-wrap">
+      <div class="vitals-row">
+        <span id="hud-hp" class="vital-pill hp">❤️ 20 / 20</span>
+        <div id="hotbar-label" class="hotbar-label">나무 곡괭이</div>
+        <span id="hud-hunger" class="vital-pill hunger">🍎 20 / 20</span>
+      </div>
+      <div id="hotbar" class="hotbar"></div>
+    </div>
+  </div>
+
+  <!-- Modal: Personal Bag & Creative Supply -->
+  <div id="modal-bag" class="modal hidden">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>🎒 개인 가방 <span class="badge-warn">로그아웃 시 자동 삭제</span></h2>
+        <button class="modal-close" data-close="modal-bag">✕</button>
+      </div>
+      <div class="modal-body bag-layout">
+        <div class="bag-section">
+          <div class="section-title">내 가방 (클릭해서 슬롯 이동 · 우클릭 버리기)</div>
+          <div id="bag-grid" class="slot-grid"></div>
+          <div class="section-title" style="margin-top:12px;">핫바 (1~9번 키)</div>
+          <div id="bag-hotbar-grid" class="slot-grid hotbar-row"></div>
+        </div>
+        <div class="supply-section">
+          <div class="section-title">🧱 건축 보급함 (건축용 블록 빠르게 받기)</div>
+          <div id="supply-grid" class="supply-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crafting & Tool Upgrade -->
+  <div id="modal-craft" class="modal hidden">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>🔨 제작대 & 제련 <span class="badge-ok">도구 업그레이드</span></h2>
+        <button class="modal-close" data-close="modal-craft">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="craft-tabs" id="craft-tabs">
+          <button class="tab-btn active" data-cat="전체">전체</button>
+          <button class="tab-btn" data-cat="도구">⛏️ 도구 업그레이드</button>
+          <button class="tab-btn" data-cat="제련">🔥 광물 제련</button>
+          <button class="tab-btn" data-cat="재료">🪵 기본 재료</button>
+          <button class="tab-btn" data-cat="건축">🏠 건축/가구</button>
+          <button class="tab-btn" data-cat="특수">⚡ TNT·포털·점프패드</button>
+        </div>
+        <div id="craft-list" class="craft-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Skin Customizer, 64x64 Pixel Editor & Shared Gallery -->
+  <div id="modal-skin" class="modal hidden">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>🎨 스킨 꾸미기 · 64×64 픽셀 에디터 · 스킨 게시판</h2>
+        <button class="modal-close" data-close="modal-skin">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="craft-tabs" id="skin-tabs">
+          <button class="tab-btn active" data-sktab="quick">🎨 간편 색상 꾸미기</button>
+          <button class="tab-btn" data-sktab="pixel">✏️ 64×64 픽셀 직접 그리기</button>
+          <button class="tab-btn" data-sktab="gallery">🌟 공유 스킨 게시판</button>
+        </div>
+
+        <!-- Tab 1: Quick Color Customizer -->
+        <div id="sk-tab-quick">
+          <div class="skin-controls">
+            <label>피부색 <input id="sk-skin" type="color" value="#f5cfa0" /></label>
+            <label>머리색 <input id="sk-hair" type="color" value="#3b2416" /></label>
+            <label>상의색 <input id="sk-shirt" type="color" value="#38bdf8" /></label>
+            <label>하의색 <input id="sk-pants" type="color" value="#334155" /></label>
+            <label>눈 색상 <input id="sk-eye" type="color" value="#0f172a" /></label>
+            <label>모자색 <input id="sk-hat" type="color" value="#facc15" /></label>
+            <label class="toggle-label"><input id="sk-hat-on" type="checkbox" /> 모자 착용</label>
+            <label class="toggle-label"><input id="sk-blush" type="checkbox" checked /> 볼터치</label>
+          </div>
+          <div class="btn-row" style="margin-top:12px;">
+            <button id="btn-skin-apply" class="btn-sm accent">내 캐릭터에 입기</button>
+            <button id="btn-skin-random" class="btn-sm">🎲 무작위</button>
+          </div>
+          <hr class="divider" />
+          <div class="input-row">
+            <input id="sk-publish-name" type="text" maxlength="20" placeholder="스킨 이름 (예: 우주 탐험가)" />
+            <button id="btn-skin-publish" class="btn-sm accent">게시판에 공유하기</button>
+          </div>
+        </div>
+
+        <!-- Tab 2: 64x64 Pixel Skin Editor -->
+        <div id="sk-tab-pixel" class="hidden">
+          <div class="pixel-editor-layout">
+            <canvas id="pixel-skin-canvas" width="384" height="384" class="pixel-canvas"></canvas>
+            <div class="pixel-tools-pane">
+              <div class="section-title">그리기 도구 (마인크래프트 64×64 표준 규격)</div>
+              <div class="btn-row" id="px-tool-btns">
+                <button class="btn-sm accent" data-pxtool="pencil">✏️ 연필</button>
+                <button class="btn-sm" data-pxtool="eraser">🧽 지우개</button>
+                <button class="btn-sm" data-pxtool="fill">🪣 채우기</button>
+                <button class="btn-sm" data-pxtool="picker">💧 색 뽑기</button>
+                <button id="btn-px-undo" class="btn-sm">↩ 되돌리기</button>
+              </div>
+              <div class="section-title" style="margin-top:10px;">팔레트 & 직접 색상</div>
+              <div id="px-palette" class="px-palette"></div>
+              <div class="input-row" style="margin-top:8px;">
+                <label class="small-note" style="margin:0;">직접 색상:</label>
+                <input id="px-custom-color" type="color" value="#38bdf8" />
+                <label class="btn-sm" style="cursor:pointer;">
+                  📂 PNG 불러오기
+                  <input id="px-upload-input" type="file" accept="image/png" class="hidden" />
+                </label>
+                <button id="btn-px-download" class="btn-sm">⬇ PNG 내려받기</button>
+              </div>
+              <hr class="divider" />
+              <div class="btn-row">
+                <button id="btn-px-apply" class="btn-sm accent">✨ 이 픽셀 스킨 입기</button>
+              </div>
+              <div class="input-row" style="margin-top:8px;">
+                <input id="px-publish-name" type="text" maxlength="20" placeholder="픽셀 스킨 이름" />
+                <button id="btn-px-publish" class="btn-sm accent">게시판에 공유</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Community Skin Gallery -->
+        <div id="sk-tab-gallery" class="hidden">
+          <div id="skin-gallery" class="skin-gallery"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Furnace Block (Persistent Smelting) -->
+  <div id="modal-furnace" class="modal hidden">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>🔥 화로 제련 <span class="badge-ok">영구 보존됨</span></h2>
+        <button class="modal-close" data-close="modal-furnace">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="furnace-station">
+          <div class="furnace-col">
+            <div class="section-title">재료 (클릭 시 꺼내기)</div>
+            <div id="furnace-input-slot" class="slot furnace-slot"></div>
+            <div class="section-title" style="margin-top:8px;">연료 (석탄/나무)</div>
+            <div id="furnace-fuel-slot" class="slot furnace-slot"></div>
+          </div>
+          <div class="furnace-mid">
+            <div id="furnace-flame" class="furnace-flame">🔥</div>
+            <div class="furnace-arrow">➔</div>
+            <div id="furnace-status" class="small-note">대기 중</div>
+          </div>
+          <div class="furnace-col">
+            <div class="section-title">완성품 (클릭 시 꺼내기)</div>
+            <div id="furnace-output-slot" class="slot furnace-slot active"></div>
+          </div>
+        </div>
+        <hr class="divider" />
+        <div class="section-title">🎒 내 가방 (제련할 원석·모래·생고기 또는 연료를 클릭해 화로에 넣기)</div>
+        <div id="furnace-bag-grid" class="slot-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Persistent Chest -->
+  <div id="modal-chest" class="modal hidden">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>📦 <span id="chest-title">보관 상자</span> <span class="badge-ok">영구 보존됨</span></h2>
+        <button class="modal-close" data-close="modal-chest">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="chest-meta">
+          <span id="chest-info">위치: (0,0,0) · 설치자: -</span>
+          <div class="chest-rename-row">
+            <input id="chest-rename-input" type="text" maxlength="24" placeholder="상자 이름 변경" />
+            <button id="btn-chest-rename" class="btn-sm">이름 저장</button>
+          </div>
+        </div>
+        <div class="chest-columns">
+          <div>
+            <div class="section-title">📦 상자 보관함 (클릭 → 내 가방으로 꺼내기, Shift+클릭 절반)</div>
+            <div id="chest-grid" class="slot-grid"></div>
+          </div>
+          <div>
+            <div class="section-title">🎒 내 가방 (클릭 → 상자에 넣기, Shift+클릭 절반)</div>
+            <div id="chest-bag-grid" class="slot-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Blueprint Projection -->
+  <div id="modal-blueprint" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>📐 설계도 투영 (따라 만들기)</h2>
+        <button class="modal-close" data-close="modal-blueprint">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="section-title">공유 설계도 목록</div>
+        <div id="bp-list" class="item-list"></div>
+
+        <div id="bp-controls" class="bp-controls hidden">
+          <div class="section-title">투영 위치 / 회전 조절</div>
+          <div class="btn-row">
+            <button id="bp-move-xm" class="btn-sm">X -1</button>
+            <button id="bp-move-xp" class="btn-sm">X +1</button>
+            <button id="bp-move-ym" class="btn-sm">Y -1</button>
+            <button id="bp-move-yp" class="btn-sm">Y +1</button>
+            <button id="bp-move-zm" class="btn-sm">Z -1</button>
+            <button id="bp-move-zp" class="btn-sm">Z +1</button>
+            <button id="bp-rotate" class="btn-sm accent">↻ 90° 회전</button>
+            <button id="bp-clear" class="btn-sm danger">투영 끄기</button>
+          </div>
+          <div id="bp-origin-info" class="small-note"></div>
+        </div>
+
+        <hr class="divider" />
+        <div class="section-title">내 건축물을 새 설계도로 저장</div>
+        <div class="pos-row">
+          <button id="bp-set-pos1" class="btn-sm">현재 위치 → Pos1</button>
+          <span id="bp-pos1-label" class="pos-label">미지정</span>
+          <button id="bp-set-pos2" class="btn-sm">현재 위치 → Pos2</button>
+          <span id="bp-pos2-label" class="pos-label">미지정</span>
+        </div>
+        <div class="input-row">
+          <input id="bp-new-name" type="text" maxlength="30" placeholder="새 설계도 이름 (예: 우리 센터)" />
+          <button id="bp-capture-btn" class="btn-sm accent">설계도 저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Admin Region Protection -->
+  <div id="modal-admin" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>🛡️ 관리자 영역 보호</h2>
+        <button class="modal-close" data-close="modal-admin">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="admin-auth-box" class="admin-auth-box">
+          <p class="small-note">특정 영역의 블록을 보호하려면 관리자 비밀번호를 입력하세요.</p>
+          <div class="input-row">
+            <input id="admin-pw-input" type="password" placeholder="관리자 비밀번호" />
+            <button id="btn-admin-unlock" class="btn-sm accent">관리자 인증</button>
+          </div>
+        </div>
+
+        <div id="admin-panel-box" class="hidden">
+          <div class="section-title">🌤️ 시간 & 날씨 제어</div>
+          <div class="btn-row" style="margin-bottom:10px;">
+            <button id="adm-time-day" class="btn-sm">☀️ 낮</button>
+            <button id="adm-time-sunset" class="btn-sm">🌅 노을</button>
+            <button id="adm-time-night" class="btn-sm">🌙 밤</button>
+            <button id="adm-w-clear" class="btn-sm">☀️ 맑음</button>
+            <button id="adm-w-rain" class="btn-sm">🌧️ 비</button>
+            <button id="adm-w-snow" class="btn-sm">❄️ 눈</button>
+          </div>
+
+          <div class="section-title">📢 전체 공지 보내기</div>
+          <div class="input-row" style="margin-bottom:10px;">
+            <input id="adm-announce-input" type="text" maxlength="120" placeholder="접속자 전원에게 보낼 공지 메시지" style="flex:1;" />
+            <button id="btn-adm-announce" class="btn-sm accent">공지 전송</button>
+          </div>
+
+          <div class="section-title">👥 접속자 관리</div>
+          <div id="adm-player-list" class="item-list" style="margin-bottom:10px;"></div>
+
+          <hr class="divider" />
+          <div class="section-title">🔒 새 보호 구역 지정</div>
+          <div class="pos-row">
+            <button id="reg-set-pos1" class="btn-sm">현재 위치 → Pos1</button>
+            <span id="reg-pos1-label" class="pos-label">미지정</span>
+            <button id="reg-set-pos2" class="btn-sm">현재 위치 → Pos2</button>
+            <span id="reg-pos2-label" class="pos-label">미지정</span>
+          </div>
+          <div class="input-row">
+            <input id="reg-name-input" type="text" maxlength="30" placeholder="보호 구역 이름 (예: 중앙 광장)" />
+            <button id="btn-reg-add" class="btn-sm accent">보호 추가</button>
+          </div>
+        </div>
+
+        <hr class="divider" />
+        <div class="row-between">
+          <div class="section-title" style="margin:0;">현재 보호 구역 목록</div>
+          <label class="toggle-label">
+            <input id="toggle-region-boxes" type="checkbox" checked /> 3D 경계선 표시
+          </label>
+        </div>
+        <div id="region-list" class="item-list" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Live Minimap & Quick Warp -->
+  <div id="modal-map" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>🗺️ 실시간 월드 지도 & 빠른 워프</h2>
+        <button class="modal-close" data-close="modal-map">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+        <canvas id="minimap-canvas" width="256" height="256" style="border-radius:10px;border:2px solid var(--border);image-rendering:pixelated;"></canvas>
+        <div class="small-note">🔵 나 · 🟢 친구들 · 🟣 포털 · 🟨 광장</div>
+        <div class="section-title" style="align-self:flex-start;margin:0;">⚡ 빠른 워프</div>
+        <div class="btn-row" style="width:100%;">
+          <button class="btn-sm accent" data-warp="0.5,17.2,0.5">🏛️ 중앙 광장</button>
+          <button class="btn-sm accent" data-warp="-21.5,4.2,-8.5">⛏️ 지하 광산</button>
+          <button class="btn-sm accent" data-warp="8.5,17.2,-2.5">🌾 농장 & 연못</button>
+        </div>
+        <div id="map-portal-warps" class="btn-row" style="width:100%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Emotes -->
+  <div id="modal-emote" class="modal hidden">
+    <div class="modal-box" style="width:min(400px,92vw);">
+      <div class="modal-header">
+        <h2>😊 이모트 표현 (주변 친구들에게 표시)</h2>
+        <button class="modal-close" data-close="modal-emote">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="btn-row" id="emote-btns" style="justify-content:center;gap:10px;">
+          <button class="btn-sm accent" data-em="👋|안녕!">👋 안녕!</button>
+          <button class="btn-sm accent" data-em="❤️|좋아요">❤️ 좋아요</button>
+          <button class="btn-sm accent" data-em="🎉|축하해!">🎉 축하해!</button>
+          <button class="btn-sm accent" data-em="💃|신난다!">💃 신난다!</button>
+          <button class="btn-sm accent" data-em="⛏️|채굴 중">⛏️ 채굴 중</button>
+          <button class="btn-sm accent" data-em="😂|하하하">😂 하하하</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
