@@ -445,11 +445,15 @@ export class GameUI {
     });
 
     // Admin controls
-    document.getElementById('btn-admin-unlock').addEventListener('click', () => {
+    const submitAdminPw = () => {
       const pw = document.getElementById('admin-pw-input').value;
       if (!pw) return;
       this.cb.send({ type: 'admin_auth', password: pw });
       document.getElementById('admin-pw-input').value = '';
+    };
+    document.getElementById('btn-admin-unlock').addEventListener('click', submitAdminPw);
+    document.getElementById('admin-pw-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submitAdminPw(); }
     });
     document.getElementById('reg-set-pos1').addEventListener('click', () => {
       this.regPos1 = this.cb.getPlayerBlockPos();
@@ -475,9 +479,16 @@ export class GameUI {
     chatForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const text = chatInput.value.trim();
-      if (text) this.cb.send({ type: 'chat', text });
       chatInput.value = '';
       this.closeChat();
+      if (text === '/관리자') {
+        this.openModal('modal-admin');
+        if (!this.isAdmin) {
+          setTimeout(() => document.getElementById('admin-pw-input')?.focus(), 30);
+        }
+        return;
+      }
+      if (text) this.cb.send({ type: 'chat', text });
     });
   }
 
