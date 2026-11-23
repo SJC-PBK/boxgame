@@ -313,6 +313,110 @@ function drawBlockFace(blockId, face) {
         }
         break;
       }
+      case 'door_stone_closed':
+      case 'door_stone_open': {
+        if (blockId === 'door_stone_open') {
+          ctx.fillStyle = 'rgba(100, 116, 139, 0.4)';
+          ctx.fillRect(0, 0, 3, 16); ctx.fillRect(13, 0, 3, 16); ctx.fillRect(0, 0, 16, 2);
+        } else {
+          fillNoise(ctx, ['#64748b', '#788496', '#475569'], 981);
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(0, 0, 16, 2); ctx.fillRect(0, 14, 16, 2);
+          ctx.fillRect(0, 0, 2, 16); ctx.fillRect(14, 0, 2, 16);
+          ctx.fillRect(4, 3, 8, 5);
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(5, 4, 6, 3);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(11, 10, 2, 2);
+        }
+        break;
+      }
+      case 'door_iron_closed':
+      case 'door_iron_open': {
+        if (blockId === 'door_iron_open') {
+          ctx.fillStyle = 'rgba(203, 213, 225, 0.45)';
+          ctx.fillRect(0, 0, 3, 16); ctx.fillRect(13, 0, 3, 16); ctx.fillRect(0, 0, 16, 2);
+        } else {
+          fillNoise(ctx, ['#cbd5e1', '#e2e8f0', '#94a3b8'], 982);
+          ctx.fillStyle = '#64748b';
+          ctx.fillRect(0, 0, 16, 2); ctx.fillRect(0, 14, 16, 2);
+          ctx.fillRect(0, 0, 2, 16); ctx.fillRect(14, 0, 2, 16);
+          ctx.clearRect(4, 3, 8, 5);
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(7, 3, 2, 5);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(11, 10, 2, 2);
+        }
+        break;
+      }
+      case 'door_glass_closed':
+      case 'door_glass_open': {
+        if (blockId === 'door_glass_open') {
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.35)';
+          ctx.fillRect(0, 0, 2, 16); ctx.fillRect(14, 0, 2, 16); ctx.fillRect(0, 0, 16, 2);
+        } else {
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.38)';
+          ctx.fillRect(2, 2, 12, 12);
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(0, 0, 16, 2); ctx.fillRect(0, 14, 16, 2);
+          ctx.fillRect(0, 0, 2, 16); ctx.fillRect(14, 0, 2, 16);
+          ctx.fillStyle = 'rgba(255,255,255,0.65)';
+          ctx.fillRect(4, 4, 3, 1); ctx.fillRect(3, 5, 2, 2);
+          ctx.fillStyle = '#facc15';
+          ctx.fillRect(11, 9, 2, 3);
+        }
+        break;
+      }
+      case 'stairs_wood': {
+        fillNoise(ctx, ['#b88248', '#c69255', '#a6743d'], 505);
+        ctx.fillStyle = '#785026';
+        ctx.fillRect(0, 7, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        break;
+      }
+      case 'stairs_cobble': {
+        fillNoise(ctx, ['#7c838a', '#646b73', '#9198a0', '#545b63'], 506);
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(0, 7, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        break;
+      }
+      case 'stairs_brick': {
+        ctx.fillStyle = '#b94a3e';
+        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#d6d3d1';
+        for (let y = 0; y < 16; y += 4) ctx.fillRect(0, y, 16, 1);
+        for (let y = 0; y < 16; y += 4) {
+          const off = (y % 8 === 0) ? 0 : 4;
+          for (let x = off; x < 16; x += 8) ctx.fillRect(x, y, 1, 4);
+        }
+        break;
+      }
+      case 'stairs_stone': {
+        fillNoise(ctx, ['#8e949c', '#7d838b', '#9aa0a8'], 507);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 7, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        break;
+      }
+      case 'torch': {
+        if (face === 'top') {
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#f97316';
+          ctx.fillRect(0, 0, 16, 3); ctx.fillRect(0, 13, 16, 3);
+        } else {
+          ctx.fillStyle = '#784820';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#5c3616';
+          ctx.fillRect(0, 6, 4, 10);
+          // Glowing flame top
+          ctx.fillStyle = '#f97316';
+          ctx.fillRect(0, 0, 16, 6);
+          ctx.fillStyle = '#facc15';
+          ctx.fillRect(2, 0, 12, 4);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(5, 1, 6, 2);
+        }
+        break;
+      }
       case 'ladder': {
         ctx.fillStyle = '#9a6534';
         ctx.fillRect(2, 0, 2, 16);
@@ -832,20 +936,23 @@ export class TextureLibrary {
 
         const isTransparent = !!def.transparent;
         const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign' || def.id === 'fuse';
+        const isDoor = def.id.startsWith('door_');
+        const isStair = def.id.startsWith('stairs_');
         const opts = {
-          transparent: isTransparent,
+          transparent: isTransparent && !isStair,
           opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : (def.id === 'stealth_beacon' ? 0.58 : 1.0)),
           depthWrite: def.id !== 'water' && def.id !== 'stealth_beacon',
-          alphaTest: (def.id === 'leaves' || isCross || def.id === 'door_closed' || def.id === 'door_open') ? 0.25 : 0,
-          side: (isCross || def.id === 'water' || def.id === 'stealth_beacon' || def.id === 'door_closed' || def.id === 'door_open' || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
+          alphaTest: (def.id === 'leaves' || isCross || isDoor) ? 0.25 : 0,
+          side: (isCross || def.id === 'water' || def.id === 'stealth_beacon' || isDoor || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
           emissive: def.id === 'lamp' ? new THREE.Color('#fef08a')
+            : def.id === 'torch' ? new THREE.Color('#fb923c')
             : def.id === 'portal' ? new THREE.Color('#a855f7')
             : def.id === 'furnace' ? new THREE.Color('#f97316')
             : def.id === 'jumppad' ? new THREE.Color('#22d3ee')
             : def.id === 'protect_beacon' ? new THREE.Color('#38bdf8')
             : def.id === 'stealth_beacon' ? new THREE.Color('#c084fc')
             : new THREE.Color('#000000'),
-          emissiveIntensity: def.id === 'lamp' ? 0.78 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))
+          emissiveIntensity: def.id === 'torch' ? 0.82 : (def.id === 'lamp' ? 0.78 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0))))
         };
 
         const applyBlockLightShader = (mat) => {

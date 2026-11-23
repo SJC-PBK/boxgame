@@ -875,7 +875,9 @@ export class GameUI {
           ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
           'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
           'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
-          'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
+          'bed', 'door_closed', 'door_stone_closed', 'door_iron_closed', 'door_glass_closed',
+          'stairs_wood', 'stairs_cobble', 'stairs_brick', 'stairs_stone', 'torch',
+          'ladder', 'sign', 'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
         ]
       : ['protect_beacon', 'stealth_beacon'];
     for (const id of supplyAllow) {

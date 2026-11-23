@@ -5,6 +5,7 @@ const CHUNK_SIZE = 16;
 const MAX_LIGHT_LEVEL = 10;
 const LIGHT_PROPS = {
   lamp:    { level: 10, r: 1.22, g: 1.02, b: 0.72 },
+  torch:   { level: 10, r: 1.25, g: 0.92, b: 0.54 },
   portal:  { level: 9,  r: 0.85, g: 0.45, b: 1.18 },
   furnace: { level: 8,  r: 1.15, g: 0.62, b: 0.28 },
   jumppad: { level: 6,  r: 0.32, g: 0.96, b: 1.08 }
@@ -93,6 +94,13 @@ export class WorldRenderer {
       this.idToNum['sign']
     ].filter(Boolean));
     this.fuseNum = this.idToNum['fuse'] || -1;
+    this.torchNum = this.idToNum['torch'] || -1;
+    this.stairNums = new Set([
+      this.idToNum['stairs_wood'],
+      this.idToNum['stairs_cobble'],
+      this.idToNum['stairs_brick'],
+      this.idToNum['stairs_stone']
+    ].filter(Boolean));
     this.stealthBeaconNum = this.idToNum['stealth_beacon'] || -1;
     this.showAdminBlocks = false;
 
@@ -725,6 +733,26 @@ export class WorldRenderer {
       return buf;
     };
 
+    const pushSubBox = (blockId, bx, by, bz, x0, y0, z0, x1, y1, z1, lr, lg, lb) => {
+      for (let f = 0; f < 6; f++) {
+        const face = FACES[f];
+        const buf = getBucket(blockId, face.faceKind);
+        const base = buf.positions.length / 3;
+        for (let i = 0; i < 4; i++) {
+          const c = face.corners[i];
+          buf.positions.push(
+            bx + (c[0] ? x1 : x0),
+            by + (c[1] ? y1 : y0),
+            bz + (c[2] ? z1 : z0)
+          );
+          buf.normals.push(face.dir[0], face.dir[1], face.dir[2]);
+          buf.uvs.push(UVS[i][0], UVS[i][1]);
+          buf.lights.push(lr, lg, lb);
+        }
+        buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      }
+    };
+
     for (let y = minY; y <= maxY; y++) {
       for (let z = startZ; z <= endZ; z++) {
         for (let x = startX; x <= endX; x++) {
@@ -735,6 +763,28 @@ export class WorldRenderer {
           if (num === this.stealthBeaconNum && !this.showAdminBlocks) continue;
           const blockId = this.numToId[num];
           if (!blockId) continue;
+
+          if (num === this.torchNum) {
+            let lr = 1.0, lg = 0.85, lb = 0.55;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = Math.max(lr, padR[pIdx]); lg = Math.max(lg, padG[pIdx]); lb = Math.max(lb, padB[pIdx]);
+            }
+            pushSubBox(blockId, x, y, z, 0.42, 0, 0.42, 0.58, 0.72, 0.58, lr, lg, lb);
+            continue;
+          }
+
+          if (this.stairNums.has(num)) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            // Lower half-step + upper back step (classic 2-step voxel stairs!)
+            pushSubBox(blockId, x, y, z, 0, 0, 0, 1, 0.5, 1, lr, lg, lb);
+            pushSubBox(blockId, x, y, z, 0, 0.5, 0, 1, 1, 0.5, lr, lg, lb);
+            continue;
+          }
 
           if (num === this.fuseNum) {
             // Flat ground-hugging gunpowder fuse cord

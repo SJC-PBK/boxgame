@@ -68,7 +68,21 @@ export const BLOCKS = {
   water_bomb:   { numId: 46, id: 'water_bomb',   name: '물 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'water_bomb', sound: 'glass', stackable: 16, category: '특수' },
   protect_beacon: { numId: 47, id: 'protect_beacon', name: '🛡️ 보호 비콘', transparent: false, solid: true, hardness: 1.0, preferredTool: null, minTier: 0, drop: 'protect_beacon', sound: 'glass', stackable: 16, category: '관리자' },
   stealth_beacon: { numId: 48, id: 'stealth_beacon', name: '👻 투명 보호 비콘', transparent: true, solid: false, hardness: 1.0, preferredTool: null, minTier: 0, drop: 'stealth_beacon', sound: 'glass', stackable: 16, category: '관리자' },
-  flatten_bomb:   { numId: 49, id: 'flatten_bomb',   name: '평탄화 폭탄 (5×5×5)', transparent: false, solid: true, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'flatten_bomb', sound: 'stone', stackable: 16, category: '특수' }
+  flatten_bomb:   { numId: 49, id: 'flatten_bomb',   name: '평탄화 폭탄 (5×5×5)', transparent: false, solid: true, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'flatten_bomb', sound: 'stone', stackable: 16, category: '특수' },
+  // Material Doors (openable / closeable)
+  door_stone_closed: { numId: 50, id: 'door_stone_closed', name: '돌 문',         transparent: true, solid: true,  hardness: 2.0, preferredTool: 'pickaxe', minTier: 1, drop: 'door_stone_closed', sound: 'stone', stackable: 16, category: '건축' },
+  door_stone_open:   { numId: 51, id: 'door_stone_open',   name: '열린 돌 문',    transparent: true, solid: false, hardness: 2.0, preferredTool: 'pickaxe', minTier: 1, drop: 'door_stone_closed', sound: 'stone', stackable: 16, category: '건축' },
+  door_iron_closed:  { numId: 52, id: 'door_iron_closed',  name: '철 문',         transparent: true, solid: true,  hardness: 2.8, preferredTool: 'pickaxe', minTier: 1, drop: 'door_iron_closed',  sound: 'stone', stackable: 16, category: '건축' },
+  door_iron_open:    { numId: 53, id: 'door_iron_open',    name: '열린 철 문',    transparent: true, solid: false, hardness: 2.8, preferredTool: 'pickaxe', minTier: 1, drop: 'door_iron_closed',  sound: 'stone', stackable: 16, category: '건축' },
+  door_glass_closed: { numId: 54, id: 'door_glass_closed', name: '유리 문',       transparent: true, solid: true,  hardness: 0.8, preferredTool: null,      minTier: 0, drop: 'door_glass_closed', sound: 'glass', stackable: 16, category: '건축' },
+  door_glass_open:   { numId: 55, id: 'door_glass_open',   name: '열린 유리 문',  transparent: true, solid: false, hardness: 0.8, preferredTool: null,      minTier: 0, drop: 'door_glass_closed', sound: 'glass', stackable: 16, category: '건축' },
+  // Material Stairs (3D 2-step voxel stairs + auto step-up)
+  stairs_wood:    { numId: 56, id: 'stairs_wood',   name: '나무 계단',   transparent: true, solid: true, hardness: 1.2, preferredTool: 'axe',     minTier: 0, drop: 'stairs_wood',   sound: 'wood',  stackable: 64, category: '건축' },
+  stairs_cobble:  { numId: 57, id: 'stairs_cobble', name: '조약돌 계단', transparent: true, solid: true, hardness: 1.8, preferredTool: 'pickaxe', minTier: 1, drop: 'stairs_cobble', sound: 'stone', stackable: 64, category: '건축' },
+  stairs_brick:   { numId: 58, id: 'stairs_brick',  name: '벽돌 계단',   transparent: true, solid: true, hardness: 1.8, preferredTool: 'pickaxe', minTier: 1, drop: 'stairs_brick',  sound: 'stone', stackable: 64, category: '건축' },
+  stairs_stone:   { numId: 59, id: 'stairs_stone',  name: '돌 계단',     transparent: true, solid: true, hardness: 2.0, preferredTool: 'pickaxe', minTier: 1, drop: 'stairs_stone',  sound: 'stone', stackable: 64, category: '건축' },
+  // Torch (light-emitting, craftable from stick + coal)
+  torch:          { numId: 60, id: 'torch',         name: '🔥 횃불',     transparent: true, solid: false, hardness: 0.1, preferredTool: null, minTier: 0, drop: 'torch', sound: 'wood', stackable: 64, category: '건축' }
 };
 
 export const NUM_TO_BLOCK = {};
@@ -187,7 +201,15 @@ export const RECIPES = [
   { id: 'r-chest',    category: '건축', out: { item: 'chest', count: 1 },       in: [{ item: 'planks', count: 8 }] },
   { id: 'r-furnace',  category: '건축', out: { item: 'furnace', count: 1 },     in: [{ item: 'cobble', count: 8 }] },
   { id: 'r-bed',      category: '건축', out: { item: 'bed', count: 1 },         in: [{ item: 'planks', count: 3 }, { item: 'wool_white', count: 3 }] },
-  { id: 'r-door',     category: '건축', out: { item: 'door_closed', count: 2 }, in: [{ item: 'planks', count: 6 }] },
+  { id: 'r-door',       category: '건축', out: { item: 'door_closed', count: 2 },       in: [{ item: 'planks', count: 6 }] },
+  { id: 'r-door-stone', category: '건축', out: { item: 'door_stone_closed', count: 2 }, in: [{ item: 'cobble', count: 6 }] },
+  { id: 'r-door-iron',  category: '건축', out: { item: 'door_iron_closed', count: 2 },  in: [{ item: 'iron_ingot', count: 4 }] },
+  { id: 'r-door-glass', category: '건축', out: { item: 'door_glass_closed', count: 2 }, in: [{ item: 'glass', count: 4 }, { item: 'planks', count: 2 }] },
+  { id: 'r-stairs-wood',   category: '건축', out: { item: 'stairs_wood', count: 4 },    in: [{ item: 'planks', count: 6 }] },
+  { id: 'r-stairs-cobble', category: '건축', out: { item: 'stairs_cobble', count: 4 },  in: [{ item: 'cobble', count: 6 }] },
+  { id: 'r-stairs-brick',  category: '건축', out: { item: 'stairs_brick', count: 4 },   in: [{ item: 'brick', count: 6 }] },
+  { id: 'r-stairs-stone',  category: '건축', out: { item: 'stairs_stone', count: 4 },   in: [{ item: 'stone', count: 6 }] },
+  { id: 'r-torch',         category: '건축', out: { item: 'torch', count: 4 },          in: [{ item: 'stick', count: 1 }, { item: 'coal', count: 1 }] },
   { id: 'r-ladder',   category: '건축', out: { item: 'ladder', count: 4 },      in: [{ item: 'stick', count: 6 }] },
   { id: 'r-sign',     category: '건축', out: { item: 'sign', count: 2 },        in: [{ item: 'planks', count: 4 }, { item: 'stick', count: 1 }] },
   { id: 'r-tnt',          category: '특수', out: { item: 'tnt', count: 1 },          in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },

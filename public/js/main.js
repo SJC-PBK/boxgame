@@ -42,6 +42,7 @@ const playerLight = new THREE.PointLight(0xffe6b3, 0, 10, 1.35);
 scene.add(playerLight);
 const HELD_LIGHT_PROPS = {
   lamp:    { intensity: 3.4, distance: 16, color: new THREE.Color(0xffe49c) },
+  torch:   { intensity: 3.1, distance: 15, color: new THREE.Color(0xffb86c) },
   portal:  { intensity: 2.3, distance: 12, color: new THREE.Color(0xc084fc) },
   furnace: { intensity: 1.9, distance: 10, color: new THREE.Color(0xfb923c) },
   jumppad: { intensity: 1.6, distance: 9,  color: new THREE.Color(0x38bdf8) }
@@ -894,7 +895,7 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'sleep_bed', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
-    if (currentHit.block === 'door_closed' || currentHit.block === 'door_open') {
+    if (currentHit.block.startsWith('door_')) {
       fpHand?.triggerSwing();
       sound.playDoor();
       send({ type: 'toggle_door', x: currentHit.x, y: currentHit.y, z: currentHit.z });
@@ -1186,10 +1187,19 @@ function updatePhysics(dt) {
   // Low HP (from hunger) smoothly slows walking speed (100% at HP 20 -> 45% at HP 0)
   const hpFactor = 0.45 + 0.55 * (Math.max(0, ui.hp) / 20);
   const speed = flyMode ? 10.5 : (5.8 * hpFactor);
+  const tryStepUp = (nx, nz) => {
+    if (!onGround || flyMode) return false;
+    const hitBlock = worldRenderer?.getBlock(Math.floor(nx), Math.floor(playerPos.y), Math.floor(nz));
+    if (hitBlock && hitBlock.startsWith('stairs_') && !collides(nx, playerPos.y + 1.02, nz)) {
+      playerPos.y = Math.floor(playerPos.y) + 1.01;
+      return true;
+    }
+    return false;
+  };
   const nextX = playerPos.x + _move.x * speed * dt;
-  if (!collides(nextX, playerPos.y, playerPos.z)) playerPos.x = nextX;
+  if (!collides(nextX, playerPos.y, playerPos.z) || tryStepUp(nextX, playerPos.z)) playerPos.x = nextX;
   const nextZ = playerPos.z + _move.z * speed * dt;
-  if (!collides(playerPos.x, playerPos.y, nextZ)) playerPos.z = nextZ;
+  if (!collides(playerPos.x, playerPos.y, nextZ) || tryStepUp(playerPos.x, nextZ)) playerPos.z = nextZ;
 
   const jumpActive = keys.has('Space') || touchJumpHeld;
   const descendActive = keys.has('ShiftLeft') || keys.has('ShiftRight') || touchDescendHeld;

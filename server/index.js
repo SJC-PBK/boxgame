@@ -963,8 +963,18 @@ wss.on('connection', (ws) => {
         const { x, y, z } = msg;
         if (!store.inBounds(x, y, z)) return;
         const cur = store.getBlock(x, y, z);
-        if (cur !== 'door_closed' && cur !== 'door_open') return;
-        const next = cur === 'door_closed' ? 'door_open' : 'door_closed';
+        const DOOR_PAIRS = {
+          door_closed: 'door_open',
+          door_open: 'door_closed',
+          door_stone_closed: 'door_stone_open',
+          door_stone_open: 'door_stone_closed',
+          door_iron_closed: 'door_iron_open',
+          door_iron_open: 'door_iron_closed',
+          door_glass_closed: 'door_glass_open',
+          door_glass_open: 'door_glass_closed'
+        };
+        const next = DOOR_PAIRS[cur];
+        if (!next) return;
         store.setBlock(x, y, z, next);
         broadcast({ type: 'block_update', x, y, z, block: next, by: player.nickname });
         break;
