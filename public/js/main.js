@@ -76,12 +76,12 @@ let fpHand = null;
 let selfRig = null;
 let thirdPerson = false;
 const BRUSH_MODES = [
-  { id: 'single', label: '🪄 1×1 일반 [R]',    desc: '1블록 일반 설치' },
-  { id: 'floor3', label: '🪄 3×3 바닥 [R]',    desc: '3×3 평면 바닥 동시 설치' },
-  { id: 'floor5', label: '🪄 5×5 바닥 [R]',    desc: '5×5 넓은 바닥 동시 설치' },
-  { id: 'row5',   label: '🪄 가로줄 5칸 [R]',  desc: '바라보는 방향 기준 가로 5칸 동시 설치' },
-  { id: 'col5',   label: '🪄 세로기둥 5칸 [R]', desc: '위로 5칸 기둥 동시 설치' },
-  { id: 'wall53', label: '🪄 벽면 5×3 [R]',    desc: '가로 5 × 높이 3 벽면 동시 설치' }
+  { id: 'single', label: '🪄 1×1 일반 [PgUp/Dn]',    desc: '1블록 일반 설치' },
+  { id: 'floor3', label: '🪄 3×3 바닥 [PgUp/Dn]',    desc: '3×3 평면 바닥 동시 설치' },
+  { id: 'floor5', label: '🪄 5×5 바닥 [PgUp/Dn]',    desc: '5×5 넓은 바닥 동시 설치' },
+  { id: 'row5',   label: '🪄 가로줄 5칸 [PgUp/Dn]',  desc: '바라보는 방향 기준 가로 5칸 동시 설치' },
+  { id: 'col5',   label: '🪄 세로기둥 5칸 [PgUp/Dn]', desc: '위로 5칸 기둥 동시 설치' },
+  { id: 'wall53', label: '🪄 벽면 5×3 [PgUp/Dn]',    desc: '가로 5 × 높이 3 벽면 동시 설치' }
 ];
 let brushModeIdx = 0;
 let mouseSensitivity = 1.0;
@@ -163,15 +163,19 @@ function syncHeldItem(itemId) {
   if (joined) send({ type: 'held_item', item: itemId });
 }
 
-function toggleBrushMode() {
-  brushModeIdx = (brushModeIdx + 1) % BRUSH_MODES.length;
+function setBrushMode(idx) {
+  brushModeIdx = ((idx % BRUSH_MODES.length) + BRUSH_MODES.length) % BRUSH_MODES.length;
   const m = BRUSH_MODES[brushModeIdx];
   const btn = document.getElementById('btn-brush');
   if (btn) {
     btn.textContent = m.label;
     btn.style.borderColor = brushModeIdx > 0 ? '#38bdf8' : '';
   }
-  ui.toast(`${m.label} — ${m.desc} (Ctrl+Z 되돌리기)`, 'info');
+  ui.toast(`${m.label} — ${m.desc} (End: 1×1 · Ctrl+Z: 되돌리기)`, 'info');
+}
+
+function toggleBrushMode(delta = 1) {
+  setBrushMode(brushModeIdx + delta);
 }
 
 function computeBrushPositions(px, py, pz) {
@@ -946,7 +950,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.code === 'KeyT' || e.code === 'Enter') { e.preventDefault(); ui.openChat(); return; }
   if (e.code === 'KeyE') { e.preventDefault(); ui.toggleModal('modal-bag'); return; }
-  if (e.code === 'KeyC') { e.preventDefault(); ui.toggleModal('modal-craft'); return; }
+  if (e.code === 'KeyR') { e.preventDefault(); ui.toggleModal('modal-craft'); return; }
   if (e.code === 'KeyK') { e.preventDefault(); ui.toggleModal('modal-skin'); return; }
   if (e.code === 'KeyB') { e.preventDefault(); ui.toggleModal('modal-blueprint'); return; }
   if (e.code === 'KeyO') { e.preventDefault(); ui.toggleModal('modal-settings'); return; }
@@ -954,7 +958,9 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { e.preventDefault(); ui.toggleModal('modal-map'); return; }
   if (e.code === 'KeyG') { e.preventDefault(); ui.toggleModal('modal-emote'); return; }
   if (e.code === 'KeyQ') { e.preventDefault(); ui.pressToolSwitchQ(); return; }
-  if (e.code === 'KeyR') { e.preventDefault(); toggleBrushMode(); return; }
+  if (e.code === 'PageUp') { e.preventDefault(); toggleBrushMode(1); return; }
+  if (e.code === 'PageDown') { e.preventDefault(); toggleBrushMode(-1); return; }
+  if (e.code === 'End') { e.preventDefault(); setBrushMode(0); return; }
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
     e.preventDefault();
     send({ type: 'block_undo_brush' });

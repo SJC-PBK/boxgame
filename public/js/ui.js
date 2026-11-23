@@ -610,7 +610,7 @@ export class GameUI {
         }
       }
       if (!found) {
-        this.toast('보유한 도구가 없습니다. (C키로 제작)', 'warn');
+        this.toast('보유한 도구가 없습니다. (R키로 제작)', 'warn');
         return;
       }
       this.usingTool = true;
@@ -746,7 +746,7 @@ export class GameUI {
     const def = cur ? this.catalog[cur.block] : null;
     document.getElementById('hotbar-label').textContent = def
       ? `${this.usingTool ? '[Q 도구] ' : ''}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
-      : '맨손 (Q 도구 · E 가방 · C 제작)';
+      : '맨손 (Q 도구 · E 가방 · R 제작)';
   }
 
   renderBagModal() {
