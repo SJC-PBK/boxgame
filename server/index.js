@@ -263,6 +263,33 @@ function igniteFillBombAt(x, y, z, isAdmin, delayMs = 2200) {
   return true;
 }
 
+function igniteWaterBombAt(x, y, z, isAdmin, delayMs = 2200) {
+  const key = `${x},${y},${z}`;
+  if (ignitedTnts.has(key)) return false;
+  if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'water_bomb') return false;
+  if (!isAdmin && store.findProtectingRegion(x, y, z)) return false;
+
+  ignitedTnts.add(key);
+  broadcast({ type: 'water_bomb_ignited', x, y, z, durationMs: delayMs });
+  setTimeout(() => {
+    ignitedTnts.delete(key);
+    if (store.getBlock(x, y, z) !== 'water_bomb') return;
+    const { changes, chainFills } = store.fillWaterAt(x, y, z, 4, isAdmin);
+    broadcast({ type: 'water_bomb_explode', x, y, z });
+    if (changes.length > 0) broadcast({ type: 'blocks_batch', changes });
+    for (const p of players.values()) {
+      if (p.linkedTnts?.delete(key)) {
+        send(p.ws, { type: 'remote_links_update', links: [...p.linkedTnts] });
+      }
+    }
+    for (let i = 0; i < chainFills.length; i++) {
+      const cf = chainFills[i];
+      setTimeout(() => igniteWaterBombAt(cf.x, cf.y, cf.z, isAdmin, 650), 160 + i * 110);
+    }
+  }, delayMs);
+  return true;
+}
+
 const FUSE_STEP_DIRS = [
   [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
   [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1],
@@ -294,6 +321,8 @@ function igniteFuseAt(x, y, z, isAdmin, depth = 0) {
         igniteTNTAt(nx, ny, nz, isAdmin, 2400);
       } else if (nb === 'fill_bomb') {
         igniteFillBombAt(nx, ny, nz, isAdmin, 2000);
+      } else if (nb === 'water_bomb') {
+        igniteWaterBombAt(nx, ny, nz, isAdmin, 2000);
       }
     }
   }, 115);
@@ -849,6 +878,17 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'water_bomb_ignite': {
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'water_bomb') return;
+        if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역에서는 물 채움 폭탄을 작동할 수 없습니다.' });
+          return;
+        }
+        igniteWaterBombAt(x, y, z, player.isAdmin, 2200);
+        break;
+      }
+
       case 'fuse_ignite': {
         const { x, y, z } = msg;
         if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fuse') return;
@@ -868,7 +908,7 @@ wss.on('connection', (ws) => {
         if (!held || held.block !== 'detonator') return;
         if (!store.inBounds(x, y, z)) return;
         const targetBlock = store.getBlock(x, y, z);
-        if (targetBlock !== 'tnt' && targetBlock !== 'fill_bomb') return;
+        if (targetBlock !== 'tnt' && targetBlock !== 'fill_bomb' && targetBlock !== 'water_bomb') return;
         if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 폭탄에는 리모컨을 설치할 수 없습니다.' });
           return;
@@ -898,18 +938,19 @@ wss.on('connection', (ws) => {
           const [tx, ty, tz] = key.split(',').map(Number);
           if (!store.inBounds(tx, ty, tz)) continue;
           const b = store.getBlock(tx, ty, tz);
-          if (b === 'tnt' || b === 'fill_bomb') valid.push({ x: tx, y: ty, z: tz, kind: b });
+          if (b === 'tnt' || b === 'fill_bomb' || b === 'water_bomb') valid.push({ x: tx, y: ty, z: tz, kind: b });
         }
         player.linkedTnts.clear();
         send(ws, { type: 'remote_links_update', links: [] });
         if (valid.length === 0) {
-          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 폭탄이 없습니다. 먼저 TNT나 흙 채움 폭탄을 리모컨으로 우클릭하세요!' });
+          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 폭탄이 없습니다. 먼저 TNT·흙·물 폭탄을 리모컨으로 우클릭하세요!' });
           return;
         }
         let ignited = 0;
         for (const t of valid) {
           if (t.kind === 'tnt' && igniteTNTAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
           else if (t.kind === 'fill_bomb' && igniteFillBombAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
+          else if (t.kind === 'water_bomb' && igniteWaterBombAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
         }
         if (ignited > 0) {
           send(ws, { type: 'toast', level: 'warn', text: `💥 원격 작동 신호 전송! (폭탄 ${ignited}개 점화)` });

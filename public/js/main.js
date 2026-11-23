@@ -598,6 +598,28 @@ function handleServerMessage(msg) {
       break;
     }
 
+    case 'water_bomb_ignited':
+      worldExtras.igniteTNT(msg.x, msg.y, msg.z, msg.durationMs, 0x0284c7, 0x38bdf8);
+      sound.playHit('glass', { x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
+      if (!msg.durationMs || msg.durationMs >= 1800) {
+        ui.toast('💧 물 채움 폭탄 작동! 곧 주변 빈 공간에 물이 채워집니다...', 'info');
+      }
+      break;
+
+    case 'water_bomb_explode': {
+      const ex = msg.x + 0.5, ey = msg.y + 0.5, ez = msg.z + 0.5;
+      sound.playWarp();
+      worldExtras.explodeWaterBomb(msg.x, msg.y, msg.z);
+      if (worldRenderer) {
+        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'water', 24);
+      }
+      const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
+      if (dist < 18) {
+        cameraShake = Math.max(cameraShake, (1 - dist / 18) * 0.24);
+      }
+      break;
+    }
+
     case 'warp_to':
       warpPlayer(msg.x, msg.y, msg.z, msg.label);
       break;
@@ -810,13 +832,15 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'toggle_door', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
-    if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb') {
+    if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb' || currentHit.block === 'water_bomb') {
       fpHand?.triggerSwing();
       const heldIdNow = ui.getActiveItemId();
       if (heldIdNow === 'detonator') {
         send({ type: 'tnt_link_remote', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
       } else if (currentHit.block === 'fill_bomb') {
         send({ type: 'fill_bomb_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      } else if (currentHit.block === 'water_bomb') {
+        send({ type: 'water_bomb_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       } else {
         send({ type: 'tnt_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       }

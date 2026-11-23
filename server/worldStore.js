@@ -502,13 +502,12 @@ export class WorldStore {
     return { changes, fell, chainTnts };
   }
 
-  fillDirtAt(cx, cy, cz, radius, isAdmin) {
+  fillEmptyAt(cx, cy, cz, radius, isAdmin, fillBlockId, bombId) {
     const changes = [];
     const chainFills = [];
-    // Replace the bomb itself with dirt too
     if (this.inBounds(cx, cy, cz) && (isAdmin || !this.findProtectingRegion(cx, cy, cz))) {
-      this.setBlock(cx, cy, cz, 'dirt');
-      changes.push({ x: cx, y: cy, z: cz, block: 'dirt' });
+      this.setBlock(cx, cy, cz, fillBlockId);
+      changes.push({ x: cx, y: cy, z: cz, block: fillBlockId });
     }
     for (let dx = -radius; dx <= radius; dx++) {
       for (let dy = -radius; dy <= radius; dy++) {
@@ -518,18 +517,26 @@ export class WorldStore {
           if (!this.inBounds(x, y, z) || y <= WORLD_BOUNDS.minY || y >= WORLD_BOUNDS.maxY) continue;
           if (!isAdmin && this.findProtectingRegion(x, y, z)) continue;
           const b = this.getBlock(x, y, z);
-          if (b === 'fill_bomb' && !(x === cx && y === cy && z === cz)) {
+          if (b === bombId && !(x === cx && y === cy && z === cz)) {
             chainFills.push({ x, y, z });
             continue;
           }
           // Only fill completely empty (air) spaces — never overwrite existing blocks/buildings!
           if (b !== null) continue;
-          this.setBlock(x, y, z, 'dirt');
-          changes.push({ x, y, z, block: 'dirt' });
+          this.setBlock(x, y, z, fillBlockId);
+          changes.push({ x, y, z, block: fillBlockId });
         }
       }
     }
     return { changes, chainFills };
+  }
+
+  fillDirtAt(cx, cy, cz, radius, isAdmin) {
+    return this.fillEmptyAt(cx, cy, cz, radius, isAdmin, 'dirt', 'fill_bomb');
+  }
+
+  fillWaterAt(cx, cy, cz, radius, isAdmin) {
+    return this.fillEmptyAt(cx, cy, cz, radius, isAdmin, 'water', 'water_bomb');
   }
 
   addRegion({ name, pos1, pos2, createdBy }) {

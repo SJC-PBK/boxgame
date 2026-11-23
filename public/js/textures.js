@@ -398,6 +398,30 @@ function drawBlockFace(blockId, face) {
         }
         break;
       }
+      case 'water_bomb': {
+        if (face === 'top' || face === 'bottom') {
+          fillNoise(ctx, ['#0284c7', '#0369a1', '#38bdf8'], 987);
+          ctx.fillStyle = '#0c4a6e';
+          ctx.fillRect(5, 5, 6, 6);
+          ctx.fillStyle = '#e0f2fe';
+          ctx.fillRect(7, 7, 2, 2);
+        } else {
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#0369a1';
+          for (let x = 0; x < 16; x += 4) ctx.fillRect(x, 0, 1, 16);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(0, 12, 16, 4);
+          ctx.fillStyle = '#f0f9ff';
+          ctx.fillRect(0, 5, 16, 6);
+          ctx.fillStyle = '#0c4a6e';
+          // Pixel "H2O"
+          ctx.fillRect(2, 6, 1, 4); ctx.fillRect(3, 8, 1, 1); ctx.fillRect(4, 6, 1, 4);
+          ctx.fillRect(6, 6, 3, 1); ctx.fillRect(8, 7, 1, 1); ctx.fillRect(6, 8, 3, 1); ctx.fillRect(6, 9, 1, 1); ctx.fillRect(6, 9, 3, 1);
+          ctx.fillRect(11, 6, 3, 1); ctx.fillRect(11, 6, 1, 4); ctx.fillRect(13, 6, 1, 4); ctx.fillRect(11, 9, 3, 1);
+        }
+        break;
+      }
       case 'portal': {
         fillNoise(ctx, ['rgba(147,51,234,0.78)', 'rgba(192,132,252,0.82)', 'rgba(88,28,135,0.82)', 'rgba(56,189,248,0.75)'], 990);
         ctx.fillStyle = 'rgba(255,255,255,0.65)';

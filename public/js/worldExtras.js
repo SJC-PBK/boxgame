@@ -201,6 +201,79 @@ export class WorldExtras {
     this.explosions.push({ flashLight, core, coreMat, outer, outerMat, ring, ringMat, debris, smokes, age: 0, maxAge: 1.6, isFill: true });
   }
 
+  explodeWaterBomb(x, y, z) {
+    const cx = x + 0.5, cy = y + 0.5, cz = z + 0.5;
+    const flashLight = new THREE.PointLight(0x38bdf8, 12, 24, 1.35);
+    flashLight.position.set(cx, cy + 0.5, cz);
+    this.scene.add(flashLight);
+
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0xf0f9ff, transparent: true, opacity: 0.92, depthWrite: false });
+    const core = new THREE.Mesh(this._sphereGeo, coreMat);
+    core.position.set(cx, cy, cz);
+    core.scale.setScalar(0.5);
+    this.scene.add(core);
+
+    const outerMat = new THREE.MeshBasicMaterial({ color: 0x0284c7, transparent: true, opacity: 0.65, depthWrite: false });
+    const outer = new THREE.Mesh(this._sphereGeo, outerMat);
+    outer.position.set(cx, cy, cz);
+    outer.scale.setScalar(0.8);
+    this.scene.add(outer);
+
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(this._ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(cx, cy + 0.1, cz);
+    ring.scale.setScalar(0.6);
+    this.scene.add(ring);
+
+    const debris = [];
+    const cols = [0xe0f2fe, 0x7dd3fc, 0x38bdf8, 0x0284c7, 0xffffff];
+    for (let i = 0; i < 34; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: cols[i % cols.length], transparent: true, opacity: 0.95 });
+      const m = new THREE.Mesh(this._sparkGeo, mat);
+      m.position.set(cx + (Math.random() - 0.5) * 0.8, cy + (Math.random() - 0.5) * 0.8, cz + (Math.random() - 0.5) * 0.8);
+      m.scale.setScalar(0.75 + Math.random() * 0.9);
+      this.scene.add(m);
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.72;
+      const spd = 4.5 + Math.random() * 7.5;
+      debris.push({
+        mesh: m, mat,
+        vx: Math.cos(theta) * Math.sin(phi) * spd,
+        vy: Math.cos(phi) * spd + 3.2 + Math.random() * 3,
+        vz: Math.sin(theta) * Math.sin(phi) * spd,
+        spinX: (Math.random() - 0.5) * 10,
+        spinY: (Math.random() - 0.5) * 10,
+        life: 0.75 + Math.random() * 0.55,
+        maxLife: 1.3
+      });
+    }
+
+    const smokes = [];
+    const mistCols = [0xbae6fd, 0x7dd3fc, 0x38bdf8, 0xe0f2fe];
+    for (let i = 0; i < 12; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: mistCols[i % mistCols.length], transparent: true, opacity: 0.6, depthWrite: false });
+      const m = new THREE.Mesh(this._smokeGeo, mat);
+      const ang = Math.random() * Math.PI * 2;
+      const r = Math.random() * 2.0;
+      m.position.set(cx + Math.cos(ang) * r, cy + Math.random() * 1.2, cz + Math.sin(ang) * r);
+      const baseScale = 0.65 + Math.random() * 0.75;
+      m.scale.setScalar(baseScale);
+      this.scene.add(m);
+      smokes.push({
+        mesh: m, mat,
+        vx: Math.cos(ang) * (0.6 + Math.random() * 1.4),
+        vy: 1.4 + Math.random() * 2.0,
+        vz: Math.sin(ang) * (0.6 + Math.random() * 1.4),
+        baseScale,
+        life: 1.0 + Math.random() * 0.5,
+        maxLife: 1.5
+      });
+    }
+
+    this.explosions.push({ flashLight, core, coreMat, outer, outerMat, ring, ringMat, debris, smokes, age: 0, maxAge: 1.6, isFill: true });
+  }
+
   explodeTNT(x, y, z) {
     const cx = x + 0.5, cy = y + 0.5, cz = z + 0.5;
 

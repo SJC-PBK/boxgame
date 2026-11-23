@@ -64,7 +64,8 @@ export const BLOCKS = {
   job_mixer:    { numId: 42, id: 'job_mixer',    name: '🥤 음료 조합대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
   job_pickup:   { numId: 43, id: 'job_pickup',   name: '🛎️ 픽업 서빙대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
   fuse:         { numId: 44, id: 'fuse',         name: '도화선 (심지)', transparent: true,  solid: false, hardness: 0.1,      preferredTool: null, minTier: 0,  drop: 'fuse', sound: 'dirt',  stackable: 64, category: '특수' },
-  fill_bomb:    { numId: 45, id: 'fill_bomb',    name: '흙 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'fill_bomb', sound: 'dirt', stackable: 16, category: '특수' }
+  fill_bomb:    { numId: 45, id: 'fill_bomb',    name: '흙 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'fill_bomb', sound: 'dirt', stackable: 16, category: '특수' },
+  water_bomb:   { numId: 46, id: 'water_bomb',   name: '물 채움 폭탄', transparent: false, solid: true,  hardness: 0.25,     preferredTool: null, minTier: 0,  drop: 'water_bomb', sound: 'glass', stackable: 16, category: '특수' }
 };
 
 export const NUM_TO_BLOCK = {};
@@ -186,7 +187,8 @@ export const RECIPES = [
   { id: 'r-ladder',   category: '건축', out: { item: 'ladder', count: 4 },      in: [{ item: 'stick', count: 6 }] },
   { id: 'r-sign',     category: '건축', out: { item: 'sign', count: 2 },        in: [{ item: 'planks', count: 4 }, { item: 'stick', count: 1 }] },
   { id: 'r-tnt',       category: '특수', out: { item: 'tnt', count: 1 },         in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },
-  { id: 'r-fill-bomb', category: '특수', out: { item: 'fill_bomb', count: 1 },   in: [{ item: 'dirt', count: 8 }, { item: 'coal', count: 2 }] },
+  { id: 'r-fill-bomb',  category: '특수', out: { item: 'fill_bomb', count: 1 },   in: [{ item: 'dirt', count: 8 }, { item: 'coal', count: 2 }] },
+  { id: 'r-water-bomb', category: '특수', out: { item: 'water_bomb', count: 1 },  in: [{ item: 'glass', count: 4 }, { item: 'sand', count: 4 }, { item: 'coal', count: 2 }] },
   { id: 'r-fuse',      category: '특수', out: { item: 'fuse', count: 8 },        in: [{ item: 'coal', count: 1 }, { item: 'stick', count: 1 }] },
   { id: 'r-detonator', category: '특수', out: { item: 'detonator', count: 1 },   in: [{ item: 'iron_ingot', count: 2 }, { item: 'coal', count: 1 }] },
   { id: 'r-portal',   category: '특수', out: { item: 'portal', count: 2 },      in: [{ item: 'diamond_gem', count: 1 }, { item: 'glass', count: 4 }] },
