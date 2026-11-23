@@ -814,11 +814,39 @@ wss.on('connection', (ws) => {
           }
         }
 
+        const isDoorBlock = blockId.startsWith('door_');
+        if (isDoorBlock) {
+          if (!store.inBounds(x, y + 1, z)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🚪 문은 1×2 크기로 위쪽 1칸이 필요합니다.' });
+            return;
+          }
+          const topRegion = store.findProtectingRegion(x, y + 1, z);
+          if (topRegion && !player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: `🔒 보호 구역("${topRegion.name}")에서는 설치할 수 없습니다.` });
+            return;
+          }
+          const topExisting = store.getBlock(x, y + 1, z);
+          if (topExisting && topExisting !== 'water') {
+            send(ws, { type: 'toast', level: 'warn', text: '🚪 문(1×2)을 설치하려면 위쪽 1칸이 비어 있어야 합니다.' });
+            return;
+          }
+        }
+
         if (!store.config.unlimitedBlocks) {
           slot.count -= 1;
           if (slot.count <= 0) player.bag[idx] = null;
         }
         store.setBlock(x, y, z, blockId, player.nickname);
+        if (isDoorBlock) {
+          store.setBlock(x, y + 1, z, blockId, player.nickname);
+          send(ws, { type: 'bag_update', bag: player.bag });
+          broadcast({
+            type: 'blocks_batch',
+            changes: [{ x, y, z, block: blockId }, { x, y: y + 1, z, block: blockId }],
+            by: player.nickname
+          });
+          break;
+        }
         send(ws, { type: 'bag_update', bag: player.bag });
         broadcast({ type: 'block_update', x, y, z, block: blockId, by: player.nickname });
 
@@ -854,7 +882,7 @@ wss.on('connection', (ws) => {
         const slot = player.bag[idx];
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
         const blockId = slot.block;
-        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'flatten_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'sapling'].includes(blockId)) return;
+        if (blockId.startsWith('door_') || ['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'flatten_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'sapling'].includes(blockId)) return;
 
         const changes = [];
         for (const p of positions) {
@@ -975,8 +1003,17 @@ wss.on('connection', (ws) => {
         };
         const next = DOOR_PAIRS[cur];
         if (!next) return;
+        const changes = [{ x, y, z, block: next }];
         store.setBlock(x, y, z, next);
-        broadcast({ type: 'block_update', x, y, z, block: next, by: player.nickname });
+        // Sync paired top or bottom half of 1x2 door
+        if (store.inBounds(x, y + 1, z) && store.getBlock(x, y + 1, z) === cur) {
+          store.setBlock(x, y + 1, z, next);
+          changes.push({ x, y: y + 1, z, block: next });
+        } else if (store.inBounds(x, y - 1, z) && store.getBlock(x, y - 1, z) === cur) {
+          store.setBlock(x, y - 1, z, next);
+          changes.push({ x, y: y - 1, z, block: next });
+        }
+        broadcast({ type: 'blocks_batch', changes, by: player.nickname });
         break;
       }
 
@@ -1259,6 +1296,17 @@ wss.on('connection', (ws) => {
         }
 
         store.setBlock(x, y, z, null);
+        // Remove paired top or bottom half when breaking a 1x2 door
+        let doorPairCoord = null;
+        if (existing.startsWith('door_')) {
+          if (store.inBounds(x, y + 1, z) && store.getBlock(x, y + 1, z) === existing) {
+            store.setBlock(x, y + 1, z, null);
+            doorPairCoord = { x, y: y + 1, z };
+          } else if (store.inBounds(x, y - 1, z) && store.getBlock(x, y - 1, z) === existing) {
+            store.setBlock(x, y - 1, z, null);
+            doorPairCoord = { x, y: y - 1, z };
+          }
+        }
 
         // Ripe wheat harvest bonus
         if (existing === 'wheat_3') {
@@ -1278,6 +1326,9 @@ wss.on('connection', (ws) => {
 
         send(ws, { type: 'bag_update', bag: player.bag });
         broadcast({ type: 'block_update', x, y, z, block: null, by: player.nickname, brokenBlock: existing });
+        if (doorPairCoord) {
+          broadcast({ type: 'block_update', x: doorPairCoord.x, y: doorPairCoord.y, z: doorPairCoord.z, block: null, by: player.nickname, brokenBlock: existing });
+        }
         if (existing === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
         if (existing === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
         if (existing === 'protect_beacon' || existing === 'stealth_beacon') {
