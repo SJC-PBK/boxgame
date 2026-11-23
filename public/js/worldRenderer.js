@@ -91,6 +91,8 @@ export class WorldRenderer {
       this.idToNum['sign']
     ].filter(Boolean));
     this.fuseNum = this.idToNum['fuse'] || -1;
+    this.stealthBeaconNum = this.idToNum['stealth_beacon'] || -1;
+    this.showAdminBlocks = false;
 
     this.worldGroup = new THREE.Group();
     this.scene.add(this.worldGroup);
@@ -135,6 +137,16 @@ export class WorldRenderer {
 
   setViewDistance(distBlocks) {
     this.viewRadius = Math.max(3, Math.min(8, Math.round(distBlocks / 24)));
+  }
+
+  setShowAdminBlocks(show) {
+    const next = !!show;
+    if (this.showAdminBlocks === next) return;
+    this.showAdminBlocks = next;
+    for (const ck of [...this.chunkGroups.keys()]) {
+      const [cx, cz] = ck.split(',').map(Number);
+      this.rebuildChunk(cx, cz);
+    }
   }
 
   inBounds(x, y, z) {
@@ -695,6 +707,7 @@ export class WorldRenderer {
             ? cData[this._chunkLocalIdx(x - baseX, y, z - baseZ)]
             : this.grid[this.flatIndex(x, y, z)];
           if (num === 0) continue;
+          if (num === this.stealthBeaconNum && !this.showAdminBlocks) continue;
           const blockId = this.numToId[num];
           if (!blockId) continue;
 
@@ -823,7 +836,7 @@ export class WorldRenderer {
 
     while (dist <= maxDist) {
       const num = this.getNum(x, y, z);
-      if (num !== 0 && num !== waterNum) {
+      if (num !== 0 && num !== waterNum && !(num === this.stealthBeaconNum && !this.showAdminBlocks)) {
         return { x, y, z, block: this.numToId[num], placeX: x + nx, placeY: y + ny, placeZ: z + nz };
       }
       if (tMaxX < tMaxY && tMaxX < tMaxZ) {

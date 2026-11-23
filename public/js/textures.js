@@ -435,6 +435,20 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(0, 13, 16, 3);
         break;
       }
+      case 'stealth_beacon': {
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#a855f7';
+        ctx.fillRect(2, 2, 12, 12);
+        ctx.fillStyle = '#f3e8ff';
+        ctx.fillRect(5, 4, 6, 7);
+        ctx.fillStyle = '#1e1b4b';
+        ctx.fillRect(6, 6, 1, 2);
+        ctx.fillRect(9, 6, 1, 2);
+        ctx.fillStyle = '#c084fc';
+        ctx.fillRect(0, 13, 16, 3);
+        break;
+      }
       case 'portal': {
         fillNoise(ctx, ['rgba(147,51,234,0.78)', 'rgba(192,132,252,0.82)', 'rgba(88,28,135,0.82)', 'rgba(56,189,248,0.75)'], 990);
         ctx.fillStyle = 'rgba(255,255,255,0.65)';
@@ -783,17 +797,18 @@ export class TextureLibrary {
         const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign' || def.id === 'fuse';
         const opts = {
           transparent: isTransparent,
-          opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : 1.0),
-          depthWrite: def.id !== 'water',
+          opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : (def.id === 'stealth_beacon' ? 0.58 : 1.0)),
+          depthWrite: def.id !== 'water' && def.id !== 'stealth_beacon',
           alphaTest: (def.id === 'leaves' || isCross || def.id === 'door_closed' || def.id === 'door_open') ? 0.25 : 0,
-          side: (isCross || def.id === 'water' || def.id === 'door_closed' || def.id === 'door_open' || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
+          side: (isCross || def.id === 'water' || def.id === 'stealth_beacon' || def.id === 'door_closed' || def.id === 'door_open' || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
           emissive: def.id === 'lamp' ? new THREE.Color('#fef08a')
             : def.id === 'portal' ? new THREE.Color('#a855f7')
             : def.id === 'furnace' ? new THREE.Color('#f97316')
             : def.id === 'jumppad' ? new THREE.Color('#22d3ee')
             : def.id === 'protect_beacon' ? new THREE.Color('#38bdf8')
+            : def.id === 'stealth_beacon' ? new THREE.Color('#c084fc')
             : new THREE.Color('#000000'),
-          emissiveIntensity: def.id === 'lamp' ? 0.78 : (def.id === 'portal' ? 0.65 : (def.id === 'protect_beacon' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0))))
+          emissiveIntensity: def.id === 'lamp' ? 0.78 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))
         };
 
         const applyBlockLightShader = (mat) => {

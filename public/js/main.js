@@ -473,6 +473,11 @@ function handleServerMessage(msg) {
         projector = null;
       }
       worldRenderer = new WorldRenderer(scene, textures, catalog, worldBounds);
+      worldRenderer.showAdminBlocks = !!selfPlayer.isAdmin;
+      worldExtras.setBeaconsVisible(!!selfPlayer.isAdmin);
+      regionVis.setVisible(!!selfPlayer.isAdmin);
+      const regToggle = document.getElementById('toggle-region-boxes');
+      if (regToggle) regToggle.checked = !!selfPlayer.isAdmin;
       if (msg.worldRLE) {
         worldRenderer.loadFromRLE(msg.worldRLE);
       } else {
@@ -723,6 +728,9 @@ function handleServerMessage(msg) {
     case 'admin_status':
       if (selfPlayer) selfPlayer.isAdmin = msg.isAdmin;
       ui.setAdminStatus(msg.isAdmin);
+      worldRenderer?.setShowAdminBlocks(!!msg.isAdmin);
+      worldExtras.setBeaconsVisible(!!msg.isAdmin);
+      regionVis.setVisible(!!msg.isAdmin);
       ui.updatePlayersList(selfPlayer, remotePlayers.list(), maxPlayers);
       break;
 

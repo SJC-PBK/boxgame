@@ -420,7 +420,8 @@ wss.on('connection', (ws) => {
 
       const bag = worldMode === 'job' ? Array(BAG_SIZE).fill(null) : createStarterBag();
       if (isAdminLogin && worldMode === 'sandbox') {
-        addItemToSlots(bag, 'protect_beacon', 16);
+        bag[0] = { block: 'protect_beacon', count: 16 };
+        bag[1] = { block: 'stealth_beacon', count: 16 };
       }
       const tools = worldMode === 'job' ? null : createStarterTools();
       let startPos;
@@ -691,7 +692,8 @@ wss.on('connection', (ws) => {
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
 
         const blockId = slot.block;
-        if (blockId === 'protect_beacon' && !player.isAdmin) {
+        const isBeaconBlock = blockId === 'protect_beacon' || blockId === 'stealth_beacon';
+        if (isBeaconBlock && !player.isAdmin) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 설치할 수 있습니다.' });
           return;
         }
@@ -715,7 +717,7 @@ wss.on('connection', (ws) => {
         }
         if (blockId === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
         if (blockId === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
-        if (blockId === 'protect_beacon') {
+        if (isBeaconBlock) {
           broadcast({ type: 'beacons_update', beacons: store.beacons });
           broadcast({ type: 'regions_update', regions: store.regions });
           const bCount = Object.keys(store.beacons).length;
@@ -741,7 +743,7 @@ wss.on('connection', (ws) => {
         const slot = player.bag[idx];
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
         const blockId = slot.block;
-        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'fuse', 'protect_beacon', 'sapling'].includes(blockId)) return;
+        if (['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'sapling'].includes(blockId)) return;
 
         const changes = [];
         for (const p of positions) {
@@ -1065,7 +1067,7 @@ wss.on('connection', (ws) => {
         if (!store.inBounds(x, y, z)) return;
         const existing = store.getBlock(x, y, z);
         if (!existing) return;
-        if (existing === 'protect_beacon' && !player.isAdmin) {
+        if ((existing === 'protect_beacon' || existing === 'stealth_beacon') && !player.isAdmin) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 철거할 수 있습니다.' });
           return;
         }
@@ -1142,7 +1144,7 @@ wss.on('connection', (ws) => {
         broadcast({ type: 'block_update', x, y, z, block: null, by: player.nickname, brokenBlock: existing });
         if (existing === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
         if (existing === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
-        if (existing === 'protect_beacon') {
+        if (existing === 'protect_beacon' || existing === 'stealth_beacon') {
           broadcast({ type: 'beacons_update', beacons: store.beacons });
           broadcast({ type: 'regions_update', regions: store.regions });
           const bCount = Object.keys(store.beacons).length;
@@ -1244,7 +1246,7 @@ wss.on('connection', (ws) => {
         const itemId = String(msg.block || '');
         const def = CATALOG[itemId];
         if (!def) return;
-        if (itemId === 'protect_beacon' && !player.isAdmin) {
+        if ((itemId === 'protect_beacon' || itemId === 'stealth_beacon') && !player.isAdmin) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 받을 수 있습니다.' });
           return;
         }
@@ -1446,11 +1448,14 @@ wss.on('connection', (ws) => {
         if (String(msg.password || '') === adminPassword) {
           player.isAdmin = true;
           if (player.world === 'sandbox') {
-            addItemToSlots(player.bag, 'protect_beacon', 16);
+            if (!player.bag[0]) player.bag[0] = { block: 'protect_beacon', count: 16 };
+            else addItemToSlots(player.bag, 'protect_beacon', 16);
+            if (!player.bag[1]) player.bag[1] = { block: 'stealth_beacon', count: 16 };
+            else addItemToSlots(player.bag, 'stealth_beacon', 16);
             send(ws, { type: 'bag_update', bag: player.bag });
           }
           send(ws, { type: 'admin_status', isAdmin: true });
-          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 가방에 보호 비콘 ×16이 지급되었습니다.' });
+          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 1번(보호 비콘)·2번(투명 보호 비콘) 슬롯에 지급되었습니다.' });
           broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
         } else {
           send(ws, { type: 'toast', level: 'error', text: '관리자 비밀번호가 올바르지 않습니다.' });

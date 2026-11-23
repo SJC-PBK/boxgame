@@ -75,7 +75,13 @@ export class WorldExtras {
     }
   }
 
+  setBeaconsVisible(visible) {
+    this.isAdminView = !!visible;
+    this.syncBeacons(this._lastBeacons || {});
+  }
+
   syncBeacons(beaconsObj) {
+    this._lastBeacons = beaconsObj || {};
     while (this.beaconGroup.children.length > 0) {
       const ch = this.beaconGroup.children[0];
       ch.geometry?.dispose?.();
@@ -83,17 +89,27 @@ export class WorldExtras {
       ch.material?.dispose?.();
       this.beaconGroup.remove(ch);
     }
-    for (const b of Object.values(beaconsObj || {})) {
-      // Lightweight single 4-sided cyan vertical sky beam (low GPU cost)
+    for (const b of Object.values(this._lastBeacons)) {
+      if (b.stealth && !this.isAdminView) continue;
+      // Lightweight single 4-sided vertical sky beam (low GPU cost)
       const beamGeo = new THREE.BoxGeometry(0.22, 32, 0.22);
       const beamMat = new THREE.MeshBasicMaterial({
-        color: 0x38bdf8, transparent: true, opacity: 0.45, depthWrite: false
+        color: b.stealth ? 0xc084fc : 0x38bdf8,
+        transparent: true,
+        opacity: b.stealth ? 0.36 : 0.45,
+        depthWrite: false
       });
       const beam = new THREE.Mesh(beamGeo, beamMat);
       beam.position.set(b.x + 0.5, b.y + 17, b.z + 0.5);
       this.beaconGroup.add(beam);
 
-      const sp = makeBillboardSprite(['🛡️ 보호 비콘'], 'rgba(15, 23, 42, 0.86)', '#38bdf8', '#fde047', 1.45, 0.44);
+      const sp = makeBillboardSprite(
+        [b.stealth ? '👻 투명 비콘' : '🛡️ 보호 비콘'],
+        b.stealth ? 'rgba(59, 7, 100, 0.86)' : 'rgba(15, 23, 42, 0.86)',
+        b.stealth ? '#c084fc' : '#38bdf8',
+        b.stealth ? '#f5d0fe' : '#fde047',
+        1.45, 0.44
+      );
       sp.position.set(b.x + 0.5, b.y + 1.55, b.z + 0.5);
       this.beaconGroup.add(sp);
     }

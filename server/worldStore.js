@@ -250,8 +250,8 @@ export class WorldStore {
         this.portals[k] = { x, y, z, channel: '기본' };
         this._scheduleSave('portals', 100);
       }
-      if (val === 'protect_beacon' && !this.beacons[k]) {
-        this.beacons[k] = { x, y, z, owner: ownerName || '관리자' };
+      if ((val === 'protect_beacon' || val === 'stealth_beacon') && !this.beacons[k]) {
+        this.beacons[k] = { x, y, z, owner: ownerName || '관리자', stealth: val === 'stealth_beacon' };
         this._scheduleSave('beacons', 100);
         this._syncBeaconRegion(true);
       }
@@ -484,7 +484,7 @@ export class WorldStore {
           if (!isAdmin && this.findProtectingRegion(x, y, z)) continue;
           if (b === 'chest' && !this.isChestEmpty(x, y, z)) continue;
           if (b === 'furnace' && !this.isFurnaceEmpty(x, y, z)) continue;
-          if (b === 'protect_beacon' && !isAdmin) continue;
+          if ((b === 'protect_beacon' || b === 'stealth_beacon') && !isAdmin) continue;
 
           // Chain-ignite other nearby TNT blocks instead of silently erasing them!
           if (b === 'tnt' && !(x === cx && y === cy && z === cz)) {

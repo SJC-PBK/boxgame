@@ -811,7 +811,7 @@ export class GameUI {
     const grid = document.getElementById('supply-grid');
     grid.innerHTML = '';
     const supplyAllow = [
-      ...(this.isAdmin ? ['protect_beacon'] : []),
+      ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
       'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
       'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
       'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
