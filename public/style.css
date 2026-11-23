@@ -143,8 +143,26 @@ html, body {
 .toast.error { border-color: var(--danger); color: #fecaca; }
 .toast.success { border-color: var(--green); color: #bbf7d0; }
 
-/* Chat */
-.chat-panel { position: fixed; left: 14px; bottom: 108px; width: min(360px, 42vw); pointer-events: auto; }
+/* Draggable Chat / System Message Panel */
+.chat-panel { position: fixed; left: 14px; bottom: 108px; width: min(360px, 42vw); pointer-events: auto; z-index: 20; }
+.chat-drag-handle {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 8px; margin-bottom: 3px; border-radius: 8px;
+  background: rgba(15, 23, 42, 0.72); border: 1px solid var(--border);
+  font-size: 11px; font-weight: 700; color: #94a3b8;
+  cursor: grab; touch-action: none;
+}
+.chat-drag-handle:active { cursor: grabbing; border-color: var(--accent); color: #e2e8f0; }
+.chat-collapse-btn {
+  border: none; background: transparent; color: #cbd5e1; font-size: 14px; font-weight: 700;
+  cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.sk-editing-banner {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 7px 10px; margin-bottom: 10px; border-radius: 8px;
+  background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.45);
+  font-size: 12.5px; color: #e0f2fe;
+}
 .chat-messages {
   max-height: 170px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
   padding: 8px 10px; border-radius: 10px; background: rgba(15, 23, 42, 0.56); font-size: 12.5px; line-height: 1.4;
@@ -426,8 +444,8 @@ input[type="text"], input[type="password"] {
 .t-act-btn.pressed, .t-act-btn:active { transform: scale(0.93); background: rgba(56, 189, 248, 0.38); }
 
 @media (max-width: 920px) {
-  .top-right-wrap { width: 100%; justify-content: space-between; }
-  .top-right-pinned { width: 100%; justify-content: space-between; }
+  .top-right-wrap { width: auto; }
+  .top-right-pinned { width: auto; }
   .mobile-menu-btn { display: inline-flex; align-items: center; gap: 4px; }
   #hud-mode { display: none; }
   .top-right {
@@ -445,14 +463,14 @@ input[type="text"], input[type="password"] {
   .hotbar { gap: 3px; padding: 4px; max-width: 96vw; }
   .hotbar .slot { width: clamp(32px, 9.4vw, 44px); height: clamp(32px, 9.4vw, 44px); }
   .hotbar .slot img { width: 70%; height: 70%; }
-  .player-list { top: 86px; right: 10px; min-width: 100px; }
+  .player-list { top: 48px; right: 10px; min-width: 100px; }
   .chat-panel {
-    top: 120px; right: 10px; left: auto; bottom: auto;
+    top: 84px; right: 10px; left: auto; bottom: auto;
     width: min(235px, 60vw);
   }
   .chat-messages { max-height: 110px; font-size: 11.5px; padding: 6px 8px; }
   .chat-hint { text-align: right; font-size: 10.5px; }
-  .toast-container { top: 120px; right: 10px; }
+  .toast-container { top: 84px; right: 10px; }
   .info-pill { font-size: 11px; padding: 4px 7px; }
 }
 

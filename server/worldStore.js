@@ -608,4 +608,24 @@ export class WorldStore {
     this.saveNow('skins');
     return true;
   }
+
+  updateSkin(skinId, { name, skin }) {
+    const entry = this.skins.find(x => x.id === skinId);
+    if (!entry) return null;
+    if (name) entry.name = String(name).trim().slice(0, 20) || entry.name;
+    entry.skin = {
+      skinColor: String(skin?.skinColor || '#f5cfa0').slice(0, 16),
+      hairColor: String(skin?.hairColor || '#3b2416').slice(0, 16),
+      shirtColor: String(skin?.shirtColor || '#38bdf8').slice(0, 16),
+      pantsColor: String(skin?.pantsColor || '#334155').slice(0, 16),
+      hatColor: String(skin?.hatColor || '').slice(0, 16),
+      eyeColor: String(skin?.eyeColor || '#0f172a').slice(0, 16),
+      blush: !!skin?.blush,
+      pixelDataUrl: (typeof skin?.pixelDataUrl === 'string' && skin.pixelDataUrl.startsWith('data:image/png;base64,') && skin.pixelDataUrl.length < 32000)
+        ? skin.pixelDataUrl
+        : null
+    };
+    this.saveNow('skins');
+    return entry;
+  }
 }

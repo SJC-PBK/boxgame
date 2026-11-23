@@ -1138,7 +1138,18 @@ wss.on('connection', (ws) => {
       case 'skin_publish': {
         const entry = store.publishSkin({ name: msg.name, author: player.nickname, skin: msg.skin || player.skin });
         broadcast({ type: 'skins_update', skins: store.skins });
-        send(ws, { type: 'toast', level: 'success', text: `✨ "${entry.name}" 스킨을 게시판에 공유했습니다!` });
+        send(ws, { type: 'toast', level: 'success', text: `✨ "${entry.name}" 스킨을 새 이름으로 저장했습니다!` });
+        break;
+      }
+
+      case 'skin_update': {
+        const updated = store.updateSkin(String(msg.id || ''), { name: msg.name, skin: msg.skin || player.skin });
+        if (!updated) {
+          send(ws, { type: 'toast', level: 'warn', text: '수정할 기존 스킨을 찾지 못했습니다.' });
+          return;
+        }
+        broadcast({ type: 'skins_update', skins: store.skins });
+        send(ws, { type: 'toast', level: 'success', text: `💾 "${updated.name}" 스킨에 덮어씌워 저장했습니다!` });
         break;
       }
 

@@ -204,6 +204,49 @@ export class PixelSkinEditor {
     img.src = dataUrl;
   }
 
+  loadFromColorSkin(s = {}) {
+    this._pushUndo();
+    const c = this.octx;
+    c.clearRect(0, 0, 64, 64);
+    const skin = s.skinColor || '#f5cfa0';
+    const hair = s.hairColor || '#3b2416';
+    const shirt = s.shirtColor || '#38bdf8';
+    const pants = s.pantsColor || '#334155';
+    const eye = s.eyeColor || '#0f172a';
+
+    // Head
+    c.fillStyle = skin;
+    c.fillRect(0, 8, 32, 8);
+    c.fillRect(8, 0, 16, 8);
+    // Hair or Hat
+    c.fillStyle = s.hatColor || hair;
+    c.fillRect(8, 0, 8, 8);
+    c.fillRect(24, 8, 8, 8);
+    c.fillRect(0, 8, 8, 3);
+    c.fillRect(16, 8, 8, 3);
+    c.fillRect(8, 8, 8, 2);
+    // Eyes & Blush
+    c.fillStyle = '#ffffff';
+    c.fillRect(9, 11, 2, 2); c.fillRect(13, 11, 2, 2);
+    c.fillStyle = eye;
+    c.fillRect(10, 11, 1, 2); c.fillRect(13, 11, 1, 2);
+    if (s.blush) {
+      c.fillStyle = '#f472b6';
+      c.fillRect(9, 13, 1, 1); c.fillRect(14, 13, 1, 1);
+    }
+    c.fillStyle = '#9a3412';
+    c.fillRect(11, 14, 2, 1);
+    // Body & Arms & Legs
+    c.fillStyle = shirt;
+    c.fillRect(16, 20, 24, 12); c.fillRect(20, 16, 16, 4);
+    c.fillRect(40, 20, 16, 8); c.fillRect(32, 52, 16, 8);
+    c.fillStyle = skin;
+    c.fillRect(40, 28, 16, 4); c.fillRect(32, 60, 16, 4);
+    c.fillStyle = pants;
+    c.fillRect(0, 20, 16, 12); c.fillRect(16, 52, 16, 12);
+    this.render();
+  }
+
   exportDataUrl() {
     return this.off.toDataURL('image/png');
   }

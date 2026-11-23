@@ -16,6 +16,8 @@ export class GameUI {
     this.currentChest = null;
     this.currentFurnace = null;
     this.pixelEditor = null;
+    this.editingSkin = null;      // { id, name } when editing an existing gallery skin
+    this._pendingSkinSave = null; // { skin, suggestedName }
     this.worldMode = 'sandbox';
     this.cafeRecipes = [];
     this.cafeFridgeItems = [];
@@ -100,6 +102,32 @@ export class GameUI {
 
     document.getElementById('chat-hint')?.addEventListener('click', () => this.openChat());
     document.getElementById('btn-job-clear')?.addEventListener('click', () => this.cb.send({ type: 'job_clear_bag' }));
+
+    // Draggable Chat / System Message Panel (Mouse + Touch PointerEvents, persisted)
+    this._initDraggableChat();
+
+    // Skin editing banner & Save-As / Overwrite dialog
+    document.getElementById('btn-sk-edit-clear')?.addEventListener('click', () => this._setEditingSkin(null));
+    const closeSkinSaveModal = () => {
+      document.getElementById('modal-skin-save').classList.add('hidden');
+      this._pendingSkinSave = null;
+    };
+    document.getElementById('btn-sk-save-cancel-x')?.addEventListener('click', closeSkinSaveModal);
+    document.getElementById('btn-sk-save-overwrite')?.addEventListener('click', () => {
+      if (!this._pendingSkinSave || !this.editingSkin) return;
+      const newName = document.getElementById('sk-save-new-name').value.trim() || this.editingSkin.name;
+      this.cb.onApplySkin(this._pendingSkinSave.skin);
+      this.cb.send({ type: 'skin_update', id: this.editingSkin.id, name: newName, skin: this._pendingSkinSave.skin });
+      this._setEditingSkin({ id: this.editingSkin.id, name: newName });
+      closeSkinSaveModal();
+    });
+    document.getElementById('btn-sk-save-as')?.addEventListener('click', () => {
+      if (!this._pendingSkinSave) return;
+      const newName = document.getElementById('sk-save-new-name').value.trim() || `${this.selfNick}의 스킨`;
+      this.cb.onApplySkin(this._pendingSkinSave.skin);
+      this.cb.send({ type: 'skin_publish', name: newName, skin: this._pendingSkinSave.skin });
+      closeSkinSaveModal();
+    });
 
     document.getElementById('btn-sound').addEventListener('click', (e) => {
       const muted = this.cb.onToggleSound();
@@ -305,11 +333,9 @@ export class GameUI {
     });
     document.getElementById('btn-px-publish').addEventListener('click', () => {
       if (!this.pixelEditor) return;
-      const name = document.getElementById('px-publish-name').value.trim() || `${this.selfNick}의 픽셀 스킨`;
+      const name = document.getElementById('px-publish-name').value.trim() || (this.editingSkin?.name || `${this.selfNick}의 픽셀 스킨`);
       const skin = { ...this._readSkinFromInputs(), pixelDataUrl: this.pixelEditor.exportDataUrl() };
-      this.cb.onApplySkin(skin);
-      this.cb.send({ type: 'skin_publish', name, skin });
-      document.getElementById('px-publish-name').value = '';
+      this._requestSkinSave(skin, name, () => { document.getElementById('px-publish-name').value = ''; });
     });
 
     // Furnace take slots
@@ -359,11 +385,9 @@ export class GameUI {
       this.cb.onApplySkin(randSkin);
     });
     document.getElementById('btn-skin-publish').addEventListener('click', () => {
-      const name = document.getElementById('sk-publish-name').value.trim() || `${this.selfNick}의 스킨`;
-      const skin = this._readSkinFromInputs();
-      this.cb.onApplySkin(skin);
-      this.cb.send({ type: 'skin_publish', name, skin });
-      document.getElementById('sk-publish-name').value = '';
+      const name = document.getElementById('sk-publish-name').value.trim() || (this.editingSkin?.name || `${this.selfNick}의 스킨`);
+      const skin = { ...this._readSkinFromInputs(), pixelDataUrl: null };
+      this._requestSkinSave(skin, name, () => { document.getElementById('sk-publish-name').value = ''; });
     });
 
     // Chest rename
@@ -753,11 +777,17 @@ export class GameUI {
         if (s.pixelDataUrl && this.pixelEditor) this.pixelEditor.loadDataUrl(s.pixelDataUrl);
         this.cb.onApplySkin(s);
       });
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn-sm';
+      editBtn.textContent = '✏️ 편집';
+      editBtn.addEventListener('click', () => {
+        this._loadSkinForEdit(entry);
+      });
       const likeBtn = document.createElement('button');
       likeBtn.className = 'btn-sm';
       likeBtn.textContent = '♥';
       likeBtn.addEventListener('click', () => this.cb.send({ type: 'skin_like', id: entry.id }));
-      row.append(wearBtn, likeBtn);
+      row.append(wearBtn, editBtn, likeBtn);
       card.appendChild(row);
       grid.appendChild(card);
     }
@@ -1211,6 +1241,123 @@ export class GameUI {
       card.append(info, btn);
       list.appendChild(card);
     }
+  }
+
+  _initDraggableChat() {
+    const panel = document.getElementById('chat-panel');
+    const handle = document.getElementById('chat-drag-handle');
+    const collapseBtn = document.getElementById('btn-chat-collapse');
+    const body = document.getElementById('chat-body');
+    if (!panel || !handle) return;
+
+    collapseBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = body.classList.toggle('hidden');
+      collapseBtn.textContent = collapsed ? '+' : '−';
+    });
+
+    // Restore saved position if valid
+    try {
+      const saved = JSON.parse(localStorage.getItem('boxworld_chat_pos') || 'null');
+      if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+        const clampedL = Math.max(4, Math.min(window.innerWidth - 140, saved.left));
+        const clampedT = Math.max(4, Math.min(window.innerHeight - 60, saved.top));
+        panel.style.left = `${clampedL}px`;
+        panel.style.top = `${clampedT}px`;
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+      }
+    } catch {}
+
+    let dragging = false;
+    let startX = 0, startY = 0, origL = 0, origT = 0;
+
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.target === collapseBtn) return;
+      e.preventDefault();
+      handle.setPointerCapture?.(e.pointerId);
+      const rect = panel.getBoundingClientRect();
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      origL = rect.left;
+      origT = rect.top;
+      panel.style.left = `${origL}px`;
+      panel.style.top = `${origT}px`;
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const nx = Math.max(4, Math.min(window.innerWidth - panel.offsetWidth - 4, origL + (e.clientX - startX)));
+      const ny = Math.max(4, Math.min(window.innerHeight - 40, origT + (e.clientY - startY)));
+      panel.style.left = `${nx}px`;
+      panel.style.top = `${ny}px`;
+    });
+
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      try {
+        const r = panel.getBoundingClientRect();
+        localStorage.setItem('boxworld_chat_pos', JSON.stringify({ left: Math.round(r.left), top: Math.round(r.top) }));
+      } catch {}
+    };
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+  }
+
+  _setEditingSkin(info) {
+    this.editingSkin = info;
+    const banner = document.getElementById('sk-editing-banner');
+    if (info) {
+      document.getElementById('sk-editing-name').textContent = info.name;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
+  _loadSkinForEdit(entry) {
+    const s = entry.skin || {};
+    this._setEditingSkin({ id: entry.id, name: entry.name });
+    this._loadSkinIntoInputs(s);
+    document.getElementById('sk-publish-name').value = entry.name;
+    document.getElementById('px-publish-name').value = entry.name;
+
+    // Switch to Pixel Editor if pixelDataUrl exists, or load color skin into both!
+    const targetTab = s.pixelDataUrl ? 'pixel' : 'quick';
+    document.querySelectorAll('#skin-tabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.sktab === targetTab));
+    document.getElementById('sk-tab-quick').classList.toggle('hidden', targetTab !== 'quick');
+    document.getElementById('sk-tab-pixel').classList.toggle('hidden', targetTab !== 'pixel');
+    document.getElementById('sk-tab-gallery').classList.toggle('hidden', true);
+
+    if (!this.pixelEditor) {
+      this.pixelEditor = new PixelSkinEditor(
+        document.getElementById('pixel-skin-canvas'),
+        document.getElementById('px-palette')
+      );
+    }
+    if (s.pixelDataUrl) this.pixelEditor.loadDataUrl(s.pixelDataUrl);
+    else this.pixelEditor.loadFromColorSkin(s);
+
+    this.toast(`✏️ "${entry.name}" 스킨을 불러왔습니다. 수정 후 저장하면 덮어씌우기/다른 이름 저장을 선택할 수 있습니다.`, 'info');
+  }
+
+  _requestSkinSave(skin, suggestedName, afterClear) {
+    if (this.editingSkin) {
+      this._pendingSkinSave = { skin, suggestedName };
+      document.getElementById('sk-save-desc').textContent =
+        `불러온 스킨 "${this.editingSkin.name}"에 덮어씌울까요, 아니면 다른 이름으로 새로 저장할까요?`;
+      document.getElementById('sk-save-new-name').value = suggestedName;
+      document.getElementById('modal-skin-save').classList.remove('hidden');
+      return;
+    }
+    this.cb.onApplySkin(skin);
+    this.cb.send({ type: 'skin_publish', name: suggestedName, skin });
+    if (afterClear) afterClear();
   }
 
   _esc(s) {
