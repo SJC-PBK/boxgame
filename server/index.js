@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws';
 import {
   BLOCKS, ITEMS, CATALOG, RECIPES, CAFE_RECIPES, CAFE_FRIDGE_ITEMS,
   SMELT_MAP, FUEL_POWER, TIER_NAMES, WORLD_BOUNDS,
-  BAG_SIZE, CHEST_SIZE, createStarterBag
+  BAG_SIZE, CHEST_SIZE, createStarterBag, createStarterTools
 } from './blocks.js';
 import { WorldStore } from './worldStore.js';
 import { AnimalManager } from './animals.js';
@@ -294,6 +294,7 @@ wss.on('connection', (ws) => {
       };
 
       const bag = worldMode === 'job' ? Array(BAG_SIZE).fill(null) : createStarterBag();
+      const tools = worldMode === 'job' ? null : createStarterTools();
       const startPos = worldMode === 'job'
         ? { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z }
         : { x: 0.5 + (Math.random() - 0.5) * 3, y: 37.1, z: 0.5 + (Math.random() - 0.5) * 3 };
@@ -305,7 +306,7 @@ wss.on('connection', (ws) => {
         heldItem: bag[0]?.block || null,
         x: startPos.x, y: startPos.y, z: startPos.z,
         spawn: { ...startPos },
-        yaw: 0, pitch: 0, isAdmin: isAdminLogin, bag,
+        yaw: 0, pitch: 0, isAdmin: isAdminLogin, bag, tools,
         jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
         openChestKey: null, openFurnaceKey: null
       };
@@ -318,6 +319,7 @@ wss.on('connection', (ws) => {
         worldMode,
         self: serializePlayer(player),
         bag: player.bag,
+        tools: player.tools,
         catalog: CATALOG,
         recipes: RECIPES,
         cafeRecipes: CAFE_RECIPES,
@@ -482,15 +484,15 @@ wss.on('connection', (ws) => {
       }
 
       case 'till_soil': {
-        const { x, y, z, slotIndex } = msg;
+        const { x, y, z, slotIndex, toolType } = msg;
         if (!store.inBounds(x, y, z)) return;
         const region = store.findProtectingRegion(x, y, z);
         if (region && !player.isAdmin) {
           send(ws, { type: 'toast', level: 'warn', text: `🔒 보호 구역("${region.name}")에서는 경작할 수 없습니다.` });
           return;
         }
-        const slot = player.bag[Number(slotIndex)];
-        const heldDef = slot ? ITEMS[slot.block] : null;
+        const toolId = (toolType && player.tools?.[toolType]) ? player.tools[toolType] : player.bag[Number(slotIndex)]?.block;
+        const heldDef = toolId ? ITEMS[toolId] : null;
         if (!heldDef || heldDef.toolType !== 'hoe') return;
         const cur = store.getBlock(x, y, z);
         if (cur !== 'grass' && cur !== 'dirt') return;
@@ -818,7 +820,7 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 부술 수 없습니다.' });
           return;
         }
-        const { x, y, z, slotIndex } = msg;
+        const { x, y, z, slotIndex, toolType } = msg;
         if (!store.inBounds(x, y, z)) return;
         const existing = store.getBlock(x, y, z);
         if (!existing) return;
@@ -842,8 +844,10 @@ wss.on('connection', (ws) => {
         }
 
         const idx = Number(slotIndex);
-        const heldSlot = (Number.isInteger(idx) && idx >= 0 && idx < BAG_SIZE) ? player.bag[idx] : null;
-        const heldDef = heldSlot ? ITEMS[heldSlot.block] : null;
+        const heldId = (toolType && player.tools?.[toolType])
+          ? player.tools[toolType]
+          : ((Number.isInteger(idx) && idx >= 0 && idx < BAG_SIZE) ? player.bag[idx]?.block : null);
+        const heldDef = heldId ? ITEMS[heldId] : null;
         const toolTier = (heldDef && heldDef.toolType === bDef.preferredTool) ? (heldDef.tier || 0) : 0;
 
         if (bDef.minTier > 0 && toolTier < bDef.minTier) {
@@ -941,6 +945,16 @@ wss.on('connection', (ws) => {
         const times = outDef?.stackable === 1 ? 1 : Math.min(reqTimes, maxTimes);
         for (const req of recipe.in) consumeItemFromSlots(player.bag, req.item, req.count * times);
         const totalOut = recipe.out.count * times;
+
+        // If crafting a tool -> equip directly into dedicated 0-slot toolbelt!
+        if (outDef?.kind === 'tool' && player.tools) {
+          player.tools[outDef.toolType] = outDef.id;
+          send(ws, { type: 'bag_update', bag: player.bag });
+          send(ws, { type: 'tools_update', tools: player.tools });
+          send(ws, { type: 'toast', level: 'success', text: `⛏️ 전용 도구가 ${outDef.name}(으)로 업그레이드되었습니다! (Q키)` });
+          break;
+        }
+
         const leftover = addItemToSlots(player.bag, recipe.out.item, totalOut);
         send(ws, { type: 'bag_update', bag: player.bag });
         const outName = outDef?.name || recipe.out.item;
@@ -1322,6 +1336,7 @@ wss.on('connection', (ws) => {
     const id = player.id;
     const w = player.world;
     player.bag = null;
+    player.tools = null;
     players.delete(id);
     broadcast({ type: 'player_leave', id }, null, w);
     broadcast({ type: 'chat', system: true, text: `${nick}님이 퇴장했습니다.` }, null, w);

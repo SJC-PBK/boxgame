@@ -14,7 +14,7 @@ export const WORLD_SIZE_Y = WORLD_BOUNDS.maxY - WORLD_BOUNDS.minY + 1; // 96
 export const WORLD_SIZE_Z = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ + 1; // 1024
 export const WORLD_VOLUME = WORLD_SIZE_X * WORLD_SIZE_Y * WORLD_SIZE_Z;
 
-export const BAG_SIZE = 27;
+export const BAG_SIZE = 36;   // 9 hotbar + 27 bag slots (3 rows!)
 export const CHEST_SIZE = 27;
 
 // Placeable blocks (numId 1..30; 0 = air)
@@ -220,19 +220,23 @@ export const RECIPES = [
   { id: 'r-dshovel', category: '도구', out: { item: 'diamond_shovel', count: 1 },  in: [{ item: 'diamond_gem', count: 1 }, { item: 'stick', count: 2 }] }
 ];
 
+export function createStarterTools() {
+  return {
+    pickaxe: 'wood_pickaxe',
+    axe:     'wood_axe',
+    shovel:  'wood_shovel',
+    hoe:     'wood_hoe'
+  };
+}
+
 export function createStarterBag() {
   const slots = Array(BAG_SIZE).fill(null);
   // Hotbar slots 1..4 (indices 0..3) intentionally left EMPTY so newly mined items pop right into slots 1..4!
+  // Tools are stored in dedicated player.tools (0 bag slots occupied)!
   slots[4] = { block: 'planks', count: 24 };
   slots[5] = { block: 'wheat_seeds', count: 8 };
   slots[6] = { block: 'sapling', count: 3 };
   slots[7] = { block: 'apple', count: 4 };
   slots[8] = { block: 'chest', count: 2 };
-
-  // Starter tools live in bag slots 9..12 and are accessed anytime via the Q key (pickaxe -> axe -> shovel -> hoe)!
-  slots[9]  = { block: 'wood_pickaxe', count: 1 };
-  slots[10] = { block: 'wood_axe', count: 1 };
-  slots[11] = { block: 'wood_shovel', count: 1 };
-  slots[12] = { block: 'wood_hoe', count: 1 };
   return slots;
 }

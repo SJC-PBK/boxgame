@@ -13,6 +13,7 @@ export class GameUI {
     this.recipes = [];
     this.textures = null;
     this.bag = [];
+    this.tools = null;
     this.activeSlot = 0;
     this.usingTool = false;
     this.lastToolType = 'pickaxe';
@@ -569,7 +570,20 @@ export class GameUI {
     this.cb.onModalChange(false);
   }
 
+  updateTools(tools) {
+    this.tools = tools || null;
+    if (!this.tools) this.usingTool = false;
+    this.renderHotbar();
+    this.cb.onActiveSlotChange(this.getActiveItemId());
+    if (this.openModalId === 'modal-bag') this.renderBagModal();
+  }
+
   findBestToolSlot(toolType) {
+    if (this.tools && this.tools[toolType]) {
+      const id = this.tools[toolType];
+      const def = this.catalog[id];
+      return { index: -1, block: id, tier: def?.tier || 0, slot: { block: id, count: 1 }, fromToolbelt: true };
+    }
     let best = null;
     for (let i = 0; i < this.bag.length; i++) {
       const s = this.bag[i];
@@ -596,7 +610,7 @@ export class GameUI {
         }
       }
       if (!found) {
-        this.toast('가방에 보유한 도구가 없습니다. (C키로 제작)', 'warn');
+        this.toast('보유한 도구가 없습니다. (C키로 제작)', 'warn');
         return;
       }
       this.usingTool = true;
@@ -626,18 +640,28 @@ export class GameUI {
     this.cb.onActiveSlotChange(this.getActiveItemId());
   }
 
+  getActiveToolType() {
+    if (!this.usingTool) return null;
+    if (this.tools && this.tools[this.lastToolType]) return this.lastToolType;
+    return null;
+  }
+
   getActiveBagIndex() {
     if (this.usingTool) {
       const found = this.findBestToolSlot(this.lastToolType);
-      if (found) return found.index;
+      if (found) return found.fromToolbelt ? this.activeSlot : found.index;
       this.usingTool = false;
     }
     return this.activeSlot;
   }
 
   getActiveItemId() {
-    const idx = this.getActiveBagIndex();
-    return this.bag[idx]?.block || null;
+    if (this.usingTool) {
+      const found = this.findBestToolSlot(this.lastToolType);
+      if (found) return found.block;
+      this.usingTool = false;
+    }
+    return this.bag[this.activeSlot]?.block || null;
   }
 
   updateBag(bag) {
@@ -715,8 +739,10 @@ export class GameUI {
       container.appendChild(el);
     }
 
-    const activeIdx = this.getActiveBagIndex();
-    const cur = this.bag[activeIdx];
+    const heldId = this.getActiveItemId();
+    const cur = this.usingTool
+      ? (heldId ? { block: heldId, count: 1 } : null)
+      : this.bag[this.activeSlot];
     const def = cur ? this.catalog[cur.block] : null;
     document.getElementById('hotbar-label').textContent = def
       ? `${this.usingTool ? '[Q 도구] ' : ''}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
@@ -724,6 +750,28 @@ export class GameUI {
   }
 
   renderBagModal() {
+    const toolsGrid = document.getElementById('bag-tools-grid');
+    if (toolsGrid) {
+      toolsGrid.innerHTML = '';
+      for (const t of TOOL_ORDER) {
+        const found = this.findBestToolSlot(t);
+        const el = this._makeSlotEl(found?.slot || null, {
+          active: this.usingTool && this.lastToolType === t,
+          keyLabel: 'Q'
+        });
+        el.classList.add('tool-q-slot');
+        el.addEventListener('click', () => {
+          if (!found) return;
+          this.lastToolType = t;
+          this.usingTool = true;
+          this.renderHotbar();
+          this.renderBagModal();
+          this.cb.onActiveSlotChange(this.getActiveItemId());
+        });
+        toolsGrid.appendChild(el);
+      }
+    }
+
     const mainGrid = document.getElementById('bag-grid');
     const hotGrid = document.getElementById('bag-hotbar-grid');
     mainGrid.innerHTML = '';
@@ -747,7 +795,7 @@ export class GameUI {
       });
     };
 
-    for (let i = 9; i < 27; i++) {
+    for (let i = 9; i < 36; i++) {
       const el = this._makeSlotEl(this.bag[i], { selectedMove: this.moveSourceIdx === i });
       bindBagSlot(el, i);
       mainGrid.appendChild(el);
@@ -958,7 +1006,7 @@ export class GameUI {
 
     const bagGrid = document.getElementById('furnace-bag-grid');
     bagGrid.innerHTML = '';
-    for (let i = 0; i < 27; i++) {
+    for (let i = 0; i < 36; i++) {
       const slot = this.bag[i];
       const el = this._makeSlotEl(slot, i < 9 ? { keyLabel: i + 1 } : {});
       el.addEventListener('click', () => {
@@ -1003,7 +1051,7 @@ export class GameUI {
       chestGrid.appendChild(el);
     }
 
-    for (let i = 0; i < 27; i++) {
+    for (let i = 0; i < 36; i++) {
       const slot = this.bag[i];
       const el = this._makeSlotEl(slot, i < 9 ? { keyLabel: i + 1 } : {});
       el.addEventListener('click', (e) => {

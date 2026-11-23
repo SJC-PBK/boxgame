@@ -449,6 +449,7 @@ function handleServerMessage(msg) {
 
       ui.init(catalog, msg.recipes, textures, selfPlayer);
       ui.setWorldMode(currentWorldMode, msg.cafeRecipes, msg.cafeFridgeItems, msg.jobOrder, msg.jobScore, msg.jobCompleted);
+      ui.updateTools(msg.tools);
       ui.updateBag(msg.bag);
       ui.setRegions(msg.regions);
       ui.setBlueprints(msg.blueprints);
@@ -528,6 +529,10 @@ function handleServerMessage(msg) {
 
     case 'bag_update':
       ui.updateBag(msg.bag);
+      break;
+
+    case 'tools_update':
+      ui.updateTools(msg.tools);
       break;
 
     case 'block_update': {
@@ -755,7 +760,12 @@ function handleRightClickOrInteract(interactOnly = false) {
   // 3. Hoe tilling grass/dirt -> farmland
   if (currentHit && heldDef?.toolType === 'hoe' && (currentHit.block === 'grass' || currentHit.block === 'dirt')) {
     fpHand?.triggerSwing();
-    send({ type: 'till_soil', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: activeIdx });
+    send({
+      type: 'till_soil',
+      x: currentHit.x, y: currentHit.y, z: currentHit.z,
+      slotIndex: activeIdx,
+      toolType: ui.getActiveToolType()
+    });
     return;
   }
 
@@ -1027,7 +1037,8 @@ function updateMining(dt) {
     send({
       type: 'block_break',
       x: currentHit.x, y: currentHit.y, z: currentHit.z,
-      slotIndex: ui.getActiveBagIndex()
+      slotIndex: ui.getActiveBagIndex(),
+      toolType: ui.getActiveToolType()
     });
     miningElapsed = 0;
     miningTargetKey = null;
