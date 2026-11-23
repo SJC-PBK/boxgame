@@ -576,6 +576,28 @@ function handleServerMessage(msg) {
       break;
     }
 
+    case 'fill_bomb_ignited':
+      worldExtras.igniteTNT(msg.x, msg.y, msg.z, msg.durationMs, 0x22c55e, 0x4ade80);
+      sound.playHit('dirt', { x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
+      if (!msg.durationMs || msg.durationMs >= 1800) {
+        ui.toast('🌱 흙 채움 폭탄 작동! 곧 주변 빈 공간이 흙으로 채워집니다...', 'success');
+      }
+      break;
+
+    case 'fill_bomb_explode': {
+      const ex = msg.x + 0.5, ey = msg.y + 0.5, ez = msg.z + 0.5;
+      sound.playCraft();
+      worldExtras.explodeFillBomb(msg.x, msg.y, msg.z);
+      if (worldRenderer) {
+        worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'dirt', 24);
+      }
+      const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
+      if (dist < 18) {
+        cameraShake = Math.max(cameraShake, (1 - dist / 18) * 0.28);
+      }
+      break;
+    }
+
     case 'warp_to':
       warpPlayer(msg.x, msg.y, msg.z, msg.label);
       break;
@@ -788,11 +810,13 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'toggle_door', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
-    if (currentHit.block === 'tnt') {
+    if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb') {
       fpHand?.triggerSwing();
       const heldIdNow = ui.getActiveItemId();
       if (heldIdNow === 'detonator') {
         send({ type: 'tnt_link_remote', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+      } else if (currentHit.block === 'fill_bomb') {
+        send({ type: 'fill_bomb_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       } else {
         send({ type: 'tnt_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       }

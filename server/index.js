@@ -236,6 +236,33 @@ function igniteTNTAt(x, y, z, isAdmin, delayMs = 2800) {
   return true;
 }
 
+function igniteFillBombAt(x, y, z, isAdmin, delayMs = 2200) {
+  const key = `${x},${y},${z}`;
+  if (ignitedTnts.has(key)) return false;
+  if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fill_bomb') return false;
+  if (!isAdmin && store.findProtectingRegion(x, y, z)) return false;
+
+  ignitedTnts.add(key);
+  broadcast({ type: 'fill_bomb_ignited', x, y, z, durationMs: delayMs });
+  setTimeout(() => {
+    ignitedTnts.delete(key);
+    if (store.getBlock(x, y, z) !== 'fill_bomb') return;
+    const { changes, chainFills } = store.fillDirtAt(x, y, z, 4, isAdmin);
+    broadcast({ type: 'fill_bomb_explode', x, y, z });
+    if (changes.length > 0) broadcast({ type: 'blocks_batch', changes });
+    for (const p of players.values()) {
+      if (p.linkedTnts?.delete(key)) {
+        send(p.ws, { type: 'remote_links_update', links: [...p.linkedTnts] });
+      }
+    }
+    for (let i = 0; i < chainFills.length; i++) {
+      const cf = chainFills[i];
+      setTimeout(() => igniteFillBombAt(cf.x, cf.y, cf.z, isAdmin, 650), 160 + i * 110);
+    }
+  }, delayMs);
+  return true;
+}
+
 const FUSE_STEP_DIRS = [
   [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0],
   [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1],
@@ -265,6 +292,8 @@ function igniteFuseAt(x, y, z, isAdmin, depth = 0) {
         igniteFuseAt(nx, ny, nz, isAdmin, depth + 1);
       } else if (nb === 'tnt') {
         igniteTNTAt(nx, ny, nz, isAdmin, 2400);
+      } else if (nb === 'fill_bomb') {
+        igniteFillBombAt(nx, ny, nz, isAdmin, 2000);
       }
     }
   }, 115);
@@ -809,6 +838,17 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'fill_bomb_ignite': {
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fill_bomb') return;
+        if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역에서는 흙 채움 폭탄을 작동할 수 없습니다.' });
+          return;
+        }
+        igniteFillBombAt(x, y, z, player.isAdmin, 2200);
+        break;
+      }
+
       case 'fuse_ignite': {
         const { x, y, z } = msg;
         if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fuse') return;
@@ -817,7 +857,7 @@ wss.on('connection', (ws) => {
           return;
         }
         if (igniteFuseAt(x, y, z, player.isAdmin, 0)) {
-          send(ws, { type: 'toast', level: 'warn', text: '🔥 도화선에 불이 붙었습니다! 불꽃이 TNT를 향해 타들어갑니다...' });
+          send(ws, { type: 'toast', level: 'warn', text: '🔥 도화선에 불이 붙었습니다! 불꽃이 폭탄을 향해 타들어갑니다...' });
         }
         break;
       }
@@ -826,24 +866,26 @@ wss.on('connection', (ws) => {
         const { x, y, z, slotIndex } = msg;
         const held = player.bag[Number(slotIndex)];
         if (!held || held.block !== 'detonator') return;
-        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'tnt') return;
+        if (!store.inBounds(x, y, z)) return;
+        const targetBlock = store.getBlock(x, y, z);
+        if (targetBlock !== 'tnt' && targetBlock !== 'fill_bomb') return;
         if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
-          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 TNT에는 리모컨을 설치할 수 없습니다.' });
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 폭탄에는 리모컨을 설치할 수 없습니다.' });
           return;
         }
         const key = `${x},${y},${z}`;
         if (player.linkedTnts.has(key)) {
           player.linkedTnts.delete(key);
           send(ws, { type: 'remote_links_update', links: [...player.linkedTnts] });
-          send(ws, { type: 'toast', level: 'info', text: `📡 리모컨 수신기를 해제했습니다. (연결된 TNT: ${player.linkedTnts.size}개)` });
+          send(ws, { type: 'toast', level: 'info', text: `📡 리모컨 수신기를 해제했습니다. (연결된 폭탄: ${player.linkedTnts.size}개)` });
         } else {
           if (player.linkedTnts.size >= 24) {
-            send(ws, { type: 'toast', level: 'warn', text: '📡 리모컨은 최대 24개의 TNT까지 동시 연결할 수 있습니다.' });
+            send(ws, { type: 'toast', level: 'warn', text: '📡 리모컨은 최대 24개의 폭탄까지 동시 연결할 수 있습니다.' });
             return;
           }
           player.linkedTnts.add(key);
           send(ws, { type: 'remote_links_update', links: [...player.linkedTnts] });
-          send(ws, { type: 'toast', level: 'success', text: `📡 TNT에 리모컨 수신기 설치! (연결된 TNT: ${player.linkedTnts.size}개 · 멀리서 우클릭으로 폭파)` });
+          send(ws, { type: 'toast', level: 'success', text: `📡 리모컨 수신기 설치! (연결된 폭탄: ${player.linkedTnts.size}개 · 멀리서 우클릭으로 작동)` });
         }
         break;
       }
@@ -854,22 +896,23 @@ wss.on('connection', (ws) => {
         const valid = [];
         for (const key of player.linkedTnts) {
           const [tx, ty, tz] = key.split(',').map(Number);
-          if (store.inBounds(tx, ty, tz) && store.getBlock(tx, ty, tz) === 'tnt') {
-            valid.push({ x: tx, y: ty, z: tz });
-          }
+          if (!store.inBounds(tx, ty, tz)) continue;
+          const b = store.getBlock(tx, ty, tz);
+          if (b === 'tnt' || b === 'fill_bomb') valid.push({ x: tx, y: ty, z: tz, kind: b });
         }
         player.linkedTnts.clear();
         send(ws, { type: 'remote_links_update', links: [] });
         if (valid.length === 0) {
-          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 TNT가 없습니다. 먼저 TNT를 리모컨으로 우클릭해 수신기를 설치하세요!' });
+          send(ws, { type: 'toast', level: 'warn', text: '📡 연결된 폭탄이 없습니다. 먼저 TNT나 흙 채움 폭탄을 리모컨으로 우클릭하세요!' });
           return;
         }
         let ignited = 0;
         for (const t of valid) {
-          if (igniteTNTAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
+          if (t.kind === 'tnt' && igniteTNTAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
+          else if (t.kind === 'fill_bomb' && igniteFillBombAt(t.x, t.y, t.z, player.isAdmin, 650)) ignited++;
         }
         if (ignited > 0) {
-          send(ws, { type: 'toast', level: 'warn', text: `💥 원격 폭파 신호 전송! (TNT ${ignited}개 점화)` });
+          send(ws, { type: 'toast', level: 'warn', text: `💥 원격 작동 신호 전송! (폭탄 ${ignited}개 점화)` });
         }
         break;
       }

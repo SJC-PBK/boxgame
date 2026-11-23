@@ -502,6 +502,36 @@ export class WorldStore {
     return { changes, fell, chainTnts };
   }
 
+  fillDirtAt(cx, cy, cz, radius, isAdmin) {
+    const changes = [];
+    const chainFills = [];
+    // Replace the bomb itself with dirt too
+    if (this.inBounds(cx, cy, cz) && (isAdmin || !this.findProtectingRegion(cx, cy, cz))) {
+      this.setBlock(cx, cy, cz, 'dirt');
+      changes.push({ x: cx, y: cy, z: cz, block: 'dirt' });
+    }
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          if (dx * dx + dy * dy + dz * dz > radius * radius + 1) continue;
+          const x = cx + dx, y = cy + dy, z = cz + dz;
+          if (!this.inBounds(x, y, z) || y <= WORLD_BOUNDS.minY || y >= WORLD_BOUNDS.maxY) continue;
+          if (!isAdmin && this.findProtectingRegion(x, y, z)) continue;
+          const b = this.getBlock(x, y, z);
+          if (b === 'fill_bomb' && !(x === cx && y === cy && z === cz)) {
+            chainFills.push({ x, y, z });
+            continue;
+          }
+          // Only fill completely empty (air) spaces — never overwrite existing blocks/buildings!
+          if (b !== null) continue;
+          this.setBlock(x, y, z, 'dirt');
+          changes.push({ x, y, z, block: 'dirt' });
+        }
+      }
+    }
+    return { changes, chainFills };
+  }
+
   addRegion({ name, pos1, pos2, createdBy }) {
     const region = {
       id: `reg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

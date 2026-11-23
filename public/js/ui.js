@@ -813,7 +813,7 @@ export class GameUI {
     const supplyAllow = [
       'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
       'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
-      'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
+      'bed', 'door_closed', 'ladder', 'sign', 'tnt', 'fill_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
     ];
     for (const id of supplyAllow) {
       const def = this.catalog[id];

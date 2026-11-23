@@ -373,6 +373,31 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(7, 7, 2, 2);
         break;
       }
+      case 'fill_bomb': {
+        if (face === 'top' || face === 'bottom') {
+          fillNoise(ctx, ['#15803d', '#166534', '#22c55e'], 986);
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(5, 5, 6, 6);
+          ctx.fillStyle = '#bbf7d0';
+          ctx.fillRect(7, 7, 2, 2);
+        } else {
+          ctx.fillStyle = '#16a34a';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#15803d';
+          for (let x = 0; x < 16; x += 4) ctx.fillRect(x, 0, 1, 16);
+          ctx.fillStyle = '#92400e';
+          ctx.fillRect(0, 12, 16, 4);
+          ctx.fillStyle = '#f0fdf4';
+          ctx.fillRect(0, 5, 16, 6);
+          ctx.fillStyle = '#14532d';
+          // Pixel "FILL"
+          ctx.fillRect(1, 6, 3, 1); ctx.fillRect(1, 6, 1, 4); ctx.fillRect(1, 8, 2, 1);
+          ctx.fillRect(5, 6, 1, 4);
+          ctx.fillRect(8, 6, 1, 4); ctx.fillRect(8, 9, 3, 1);
+          ctx.fillRect(12, 6, 1, 4); ctx.fillRect(12, 9, 3, 1);
+        }
+        break;
+      }
       case 'portal': {
         fillNoise(ctx, ['rgba(147,51,234,0.78)', 'rgba(192,132,252,0.82)', 'rgba(88,28,135,0.82)', 'rgba(56,189,248,0.75)'], 990);
         ctx.fillStyle = 'rgba(255,255,255,0.65)';
