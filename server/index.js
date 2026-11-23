@@ -5,11 +5,13 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import {
-  BLOCKS, ITEMS, CATALOG, RECIPES, SMELT_MAP, FUEL_POWER, TIER_NAMES, WORLD_BOUNDS,
+  BLOCKS, ITEMS, CATALOG, RECIPES, CAFE_RECIPES, CAFE_FRIDGE_ITEMS,
+  SMELT_MAP, FUEL_POWER, TIER_NAMES, WORLD_BOUNDS,
   BAG_SIZE, CHEST_SIZE, createStarterBag
 } from './blocks.js';
 import { WorldStore } from './worldStore.js';
 import { AnimalManager } from './animals.js';
+import { createJobVillageWorld } from './jobWorld.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +45,7 @@ const DATA_DIR = path.resolve(ROOT_DIR, process.env.DATA_DIR || './data');
 
 const store = new WorldStore(DATA_DIR);
 const animals = new AnimalManager(store);
+const jobWorld = createJobVillageWorld();
 
 // Shared in-game clock & weather
 const DAY_LENGTH_SEC = 360;
@@ -96,11 +99,18 @@ function send(ws, payload) {
   if (ws.readyState === 1) ws.send(JSON.stringify(payload));
 }
 
-function broadcast(payload, excludeId = null) {
+function broadcast(payload, excludeId = null, worldFilter = null) {
   const data = JSON.stringify(payload);
   for (const p of players.values()) {
-    if (p.id !== excludeId && p.ws.readyState === 1) p.ws.send(data);
+    if (p.id !== excludeId && (!worldFilter || p.world === worldFilter) && p.ws.readyState === 1) {
+      p.ws.send(data);
+    }
   }
+}
+
+function pickRandomCafeOrder(prevId = null) {
+  const pool = CAFE_RECIPES.filter(r => r.id !== prevId);
+  return pool[Math.floor(Math.random() * pool.length)] || CAFE_RECIPES[0];
 }
 
 function serializePlayer(p) {
@@ -194,11 +204,13 @@ function scheduleCropGrowth(x, y, z, stage) {
   }, delay);
 }
 
-// World simulation loops (animals, furnaces, day/night clock)
+// World simulation loops (animals only in sandbox, furnaces, day/night clock)
 setInterval(() => {
-  if (players.size === 0) return;
+  let hasSandbox = false;
+  for (const p of players.values()) if (p.world === 'sandbox') { hasSandbox = true; break; }
+  if (!hasSandbox) return;
   animals.tick(0.25);
-  broadcast({ type: 'animals_update', animals: animals.serializeAll() });
+  broadcast({ type: 'animals_update', animals: animals.serializeAll() }, null, 'sandbox');
 }, 250);
 
 let _timeSyncTick = 0;
@@ -252,48 +264,65 @@ wss.on('connection', (ws) => {
       }
 
       const id = `p${nextPlayerSeq++}`;
+      const worldMode = msg.world === 'job' ? 'job' : 'sandbox';
       const color = AVATAR_COLORS[(nextPlayerSeq - 2) % AVATAR_COLORS.length];
       const defaultSkin = {
         skinColor: '#f5cfa0', hairColor: '#3b2416', shirtColor: color,
         pantsColor: '#334155', hatColor: '', eyeColor: '#0f172a', blush: true, pixelDataUrl: null
       };
 
-      const bag = createStarterBag();
+      const bag = worldMode === 'job' ? Array(BAG_SIZE).fill(null) : createStarterBag();
+      const startPos = worldMode === 'job'
+        ? { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z }
+        : { x: 0.5 + (Math.random() - 0.5) * 3, y: 17.1, z: 0.5 + (Math.random() - 0.5) * 3 };
+
+      const initialOrder = worldMode === 'job' ? pickRandomCafeOrder() : null;
+
       player = {
-        id, ws, nickname: rawNick, color, skin: defaultSkin,
+        id, ws, world: worldMode, nickname: rawNick, color, skin: defaultSkin,
         heldItem: bag[0]?.block || null,
-        x: 0.5 + (Math.random() - 0.5) * 3, y: 17.1, z: 0.5 + (Math.random() - 0.5) * 3,
-        spawn: { x: 0.5, y: 17.1, z: 0.5 },
+        x: startPos.x, y: startPos.y, z: startPos.z,
+        spawn: { ...startPos },
         yaw: 0, pitch: 0, isAdmin: isAdminLogin, bag,
+        jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
         openChestKey: null, openFurnaceKey: null
       };
       players.set(id, player);
 
+      const sameWorldPlayers = [...players.values()].filter(p => p.id !== id && p.world === worldMode);
+
       send(ws, {
         type: 'welcome',
+        worldMode,
         self: serializePlayer(player),
         bag: player.bag,
         catalog: CATALOG,
         recipes: RECIPES,
-        worldBounds: WORLD_BOUNDS,
-        worldRLE: store.getWorldRLE(),
+        cafeRecipes: CAFE_RECIPES,
+        cafeFridgeItems: CAFE_FRIDGE_ITEMS,
+        jobOrder: player.jobOrder,
+        jobScore: player.jobScore,
+        jobCompleted: player.jobCompleted,
+        worldBounds: worldMode === 'job' ? jobWorld.bounds : WORLD_BOUNDS,
+        worldRLE: worldMode === 'job' ? jobWorld.rle : store.getWorldRLE(),
         worldTime,
         worldWeather,
-        animals: animals.serializeAll(),
-        signs: store.signs,
-        portals: store.portals,
-        players: [...players.values()].filter(p => p.id !== id).map(serializePlayer),
-        regions: store.regions,
-        blueprints: store.blueprints,
+        animals: worldMode === 'job' ? [] : animals.serializeAll(),
+        signs: worldMode === 'job' ? jobWorld.signs : store.signs,
+        portals: worldMode === 'job' ? {} : store.portals,
+        players: sameWorldPlayers.map(serializePlayer),
+        regions: worldMode === 'job' ? [] : store.regions,
+        blueprints: worldMode === 'job' ? [] : store.blueprints,
         skins: store.skins,
         maxPlayers: MAX_PLAYERS
       });
 
-      broadcast({ type: 'player_join', player: serializePlayer(player) }, id);
+      broadcast({ type: 'player_join', player: serializePlayer(player) }, id, worldMode);
+      const modeLabel = worldMode === 'job' ? '직업 체험 마을' : 'Boxworld';
       broadcast({
         type: 'chat', system: true,
-        text: `${isAdminLogin ? '🛡️ 관리자 ' : ''}${player.nickname}님이 Boxworld에 입장했습니다. (${players.size}/${MAX_PLAYERS})`
-      });
+        text: `${isAdminLogin ? '🛡️ 관리자 ' : ''}${player.nickname}님이 ${modeLabel}에 입장했습니다.`
+      }, null, worldMode);
       return;
     }
 
@@ -304,15 +333,16 @@ wss.on('connection', (ws) => {
         const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z);
         const yaw = Number(msg.yaw), pitch = Number(msg.pitch);
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
-        player.x = Math.max(WORLD_BOUNDS.minX - 2, Math.min(WORLD_BOUNDS.maxX + 2, x));
-        player.y = Math.max(-5, Math.min(WORLD_BOUNDS.maxY + 20, y));
-        player.z = Math.max(WORLD_BOUNDS.minZ - 2, Math.min(WORLD_BOUNDS.maxZ + 2, z));
+        const b = player.world === 'job' ? jobWorld.bounds : WORLD_BOUNDS;
+        player.x = Math.max(b.minX - 2, Math.min(b.maxX + 2, x));
+        player.y = Math.max(-5, Math.min(b.maxY + 20, y));
+        player.z = Math.max(b.minZ - 2, Math.min(b.maxZ + 2, z));
         player.yaw = Number.isFinite(yaw) ? yaw : 0;
         player.pitch = Number.isFinite(pitch) ? pitch : 0;
         broadcast({
           type: 'player_move', id: player.id,
           x: player.x, y: player.y, z: player.z, yaw: player.yaw, pitch: player.pitch
-        }, player.id);
+        }, player.id, player.world);
         break;
       }
 
@@ -320,8 +350,111 @@ wss.on('connection', (ws) => {
         const item = msg.item && CATALOG[msg.item] ? msg.item : null;
         if (player.heldItem !== item) {
           player.heldItem = item;
-          broadcast({ type: 'player_held', id: player.id, heldItem: item }, player.id);
+          broadcast({ type: 'player_held', id: player.id, heldItem: item }, player.id, player.world);
         }
+        break;
+      }
+
+      // ===== Job Experience Village: Barista Cafe Handlers =====
+      case 'job_new_order': {
+        if (player.world !== 'job') return;
+        player.jobOrder = pickRandomCafeOrder(player.jobOrder?.id);
+        send(ws, {
+          type: 'job_state',
+          jobOrder: player.jobOrder,
+          jobScore: player.jobScore,
+          jobCompleted: player.jobCompleted
+        });
+        send(ws, { type: 'toast', level: 'info', text: `🧾 새 주문: "${player.jobOrder.name}" (${player.jobOrder.tip})` });
+        break;
+      }
+
+      case 'job_espresso': {
+        if (player.world !== 'job') return;
+        const leftover = addItemToSlots(player.bag, 'espresso', 1);
+        send(ws, { type: 'bag_update', bag: player.bag });
+        send(ws, {
+          type: 'toast',
+          level: leftover ? 'warn' : 'success',
+          text: leftover ? '쟁반(가방)이 가득 찼습니다.' : '☕ 커피머신에서 에스프레소 샷 1개를 추출했습니다!'
+        });
+        break;
+      }
+
+      case 'job_fridge_take': {
+        if (player.world !== 'job') return;
+        const itemId = String(msg.item || '');
+        if (!CAFE_FRIDGE_ITEMS.includes(itemId)) return;
+        const leftover = addItemToSlots(player.bag, itemId, 1);
+        send(ws, { type: 'bag_update', bag: player.bag });
+        const nm = CATALOG[itemId]?.name || itemId;
+        send(ws, {
+          type: 'toast',
+          level: leftover ? 'warn' : 'success',
+          text: leftover ? '쟁반(가방)이 가득 찼습니다.' : `🧊 냉장고에서 ${nm}을(를) 꺼냈습니다.`
+        });
+        break;
+      }
+
+      case 'job_mix': {
+        if (player.world !== 'job') return;
+        const recipe = CAFE_RECIPES.find(r => r.id === msg.recipeId);
+        if (!recipe) return;
+        for (const req of recipe.ingredients) {
+          if (countItemInSlots(player.bag, req) < 1) {
+            const nm = CATALOG[req]?.name || req;
+            send(ws, { type: 'toast', level: 'warn', text: `재료가 부족합니다: ${nm}이(가) 필요합니다.` });
+            return;
+          }
+        }
+        for (const req of recipe.ingredients) consumeItemFromSlots(player.bag, req, 1);
+        addItemToSlots(player.bag, recipe.id, 1);
+        send(ws, { type: 'bag_update', bag: player.bag });
+        send(ws, { type: 'toast', level: 'success', text: `🥤 "${recipe.name}" 완성! 이제 ⑤ 픽업 서빙대로 가져가세요!` });
+        break;
+      }
+
+      case 'job_serve': {
+        if (player.world !== 'job') return;
+        if (!player.jobOrder) {
+          player.jobOrder = pickRandomCafeOrder();
+          send(ws, { type: 'job_state', jobOrder: player.jobOrder, jobScore: player.jobScore, jobCompleted: player.jobCompleted });
+          return;
+        }
+        if (countItemInSlots(player.bag, player.jobOrder.id) < 1) {
+          send(ws, { type: 'toast', level: 'warn', text: `🛎️ 주문하신 "${player.jobOrder.name}"이(가) 아직 완성되지 않았습니다!` });
+          return;
+        }
+        consumeItemFromSlots(player.bag, player.jobOrder.id, 1);
+        const servedName = player.jobOrder.name;
+        player.jobScore += 100;
+        player.jobCompleted += 1;
+        player.jobOrder = pickRandomCafeOrder(player.jobOrder.id);
+
+        send(ws, { type: 'bag_update', bag: player.bag });
+        send(ws, {
+          type: 'job_state',
+          jobOrder: player.jobOrder,
+          jobScore: player.jobScore,
+          jobCompleted: player.jobCompleted,
+          served: servedName
+        });
+        send(ws, {
+          type: 'toast', level: 'success',
+          text: `🎉 "${servedName}" 서빙 성공! (+100점 · 총 ${player.jobScore}점) 다음 주문: ${player.jobOrder.name}`
+        });
+        broadcast({
+          type: 'chat', system: true,
+          text: `☕ ${player.nickname}님이 "${servedName}" 서빙에 성공했습니다! (${player.jobCompleted}잔 완료 · ${player.jobScore}점)`
+        }, null, 'job');
+        break;
+      }
+
+      case 'job_clear_bag': {
+        if (player.world !== 'job') return;
+        player.bag = Array(BAG_SIZE).fill(null);
+        send(ws, { type: 'bag_update', bag: player.bag });
+        send(ws, { type: 'toast', level: 'info', text: '🧹 바리스타 쟁반을 비웠습니다.' });
         break;
       }
 
@@ -370,6 +503,10 @@ wss.on('connection', (ws) => {
       }
 
       case 'block_place': {
+        if (player.world === 'job') {
+          send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 설치할 수 없습니다.' });
+          return;
+        }
         const { x, y, z, slotIndex } = msg;
         if (!store.inBounds(x, y, z)) {
           send(ws, { type: 'toast', level: 'warn', text: '월드 경계 밖에는 설치할 수 없습니다.' });
@@ -414,6 +551,7 @@ wss.on('connection', (ws) => {
 
       // Multi-mode Builder Brush: place up to 5x5 / wall / row / column at once!
       case 'block_place_brush': {
+        if (player.world === 'job') return;
         const { positions, slotIndex } = msg;
         if (!Array.isArray(positions) || positions.length === 0 || positions.length > 25) return;
         const idx = Number(slotIndex);
@@ -653,6 +791,10 @@ wss.on('connection', (ws) => {
       }
 
       case 'block_break': {
+        if (player.world === 'job') {
+          send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 부술 수 없습니다.' });
+          return;
+        }
         const { x, y, z, slotIndex } = msg;
         if (!store.inBounds(x, y, z)) return;
         const existing = store.getBlock(x, y, z);
@@ -1096,7 +1238,7 @@ wss.on('connection', (ws) => {
           broadcast({ type: 'chat', system: true, text: `☀️ 하늘이 맑게 개었습니다.` });
           return;
         }
-        broadcast({ type: 'chat', from: player.nickname, color: player.color, isAdmin: player.isAdmin, text });
+        broadcast({ type: 'chat', from: player.nickname, color: player.color, isAdmin: player.isAdmin, text }, null, player.world);
         break;
       }
 
@@ -1111,10 +1253,11 @@ wss.on('connection', (ws) => {
     if (!player) return;
     const nick = player.nickname;
     const id = player.id;
+    const w = player.world;
     player.bag = null;
     players.delete(id);
-    broadcast({ type: 'player_leave', id });
-    broadcast({ type: 'chat', system: true, text: `${nick}님이 퇴장했습니다. (개인 가방 자동 삭제 · ${players.size}/${MAX_PLAYERS})` });
+    broadcast({ type: 'player_leave', id }, null, w);
+    broadcast({ type: 'chat', system: true, text: `${nick}님이 퇴장했습니다.` }, null, w);
     player = null;
   });
 });

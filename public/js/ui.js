@@ -16,6 +16,12 @@ export class GameUI {
     this.currentChest = null;
     this.currentFurnace = null;
     this.pixelEditor = null;
+    this.worldMode = 'sandbox';
+    this.cafeRecipes = [];
+    this.cafeFridgeItems = [];
+    this.jobOrder = null;
+    this.jobScore = 0;
+    this.jobCompleted = 0;
     this.isAdmin = false;
     this.selfNick = '';
     this.blueprints = [];
@@ -66,6 +72,7 @@ export class GameUI {
       });
     }
     document.getElementById('chat-hint')?.addEventListener('click', () => this.openChat());
+    document.getElementById('btn-job-clear')?.addEventListener('click', () => this.cb.send({ type: 'job_clear_bag' }));
 
     document.getElementById('btn-sound').addEventListener('click', (e) => {
       const muted = this.cb.onToggleSound();
@@ -473,6 +480,8 @@ export class GameUI {
     if (id === 'modal-blueprint') this.renderBlueprints();
     if (id === 'modal-admin') { this.renderRegions(); this.renderAdminPlayers(); }
     if (id === 'modal-map') this.renderMinimap();
+    if (id === 'modal-job-fridge') this.renderJobFridge();
+    if (id === 'modal-job-mixer') this.renderJobMixer();
     this.cb.onModalChange(true);
   }
 
@@ -511,6 +520,8 @@ export class GameUI {
     if (this.openModalId === 'modal-craft') this.renderCraftModal();
     if (this.openModalId === 'modal-chest') this.renderChestModal();
     if (this.openModalId === 'modal-furnace') this.renderFurnaceModal();
+    if (this.openModalId === 'modal-job-mixer') this.renderJobMixer();
+    if (this.worldMode === 'job') this.renderJobHUD();
   }
 
   _countInBag(itemId) {
@@ -1044,6 +1055,123 @@ export class GameUI {
     el.textContent = text;
     container.appendChild(el);
     setTimeout(() => el.remove(), 3200);
+  }
+
+  setWorldMode(mode, cafeRecipes, cafeFridgeItems, jobOrder, jobScore, jobCompleted) {
+    this.worldMode = mode || 'sandbox';
+    this.cafeRecipes = cafeRecipes || [];
+    this.cafeFridgeItems = cafeFridgeItems || [];
+    this.jobOrder = jobOrder || null;
+    this.jobScore = jobScore || 0;
+    this.jobCompleted = jobCompleted || 0;
+
+    const isJob = this.worldMode === 'job';
+    document.getElementById('job-order-hud').classList.toggle('hidden', !isJob);
+    for (const id of ['btn-brush', 'btn-craft', 'btn-blueprint', 'btn-bag']) {
+      document.getElementById(id)?.classList.toggle('hidden', isJob);
+    }
+    if (isJob) this.renderJobHUD();
+  }
+
+  updateJobState(jobOrder, jobScore, jobCompleted) {
+    this.jobOrder = jobOrder;
+    this.jobScore = jobScore;
+    this.jobCompleted = jobCompleted;
+    this.renderJobHUD();
+    if (this.openModalId === 'modal-job-mixer') this.renderJobMixer();
+  }
+
+  renderJobHUD() {
+    document.getElementById('job-hud-score').textContent = `⭐ ${this.jobScore}점 (${this.jobCompleted}잔)`;
+    const nameEl = document.getElementById('job-order-name');
+    const reqsEl = document.getElementById('job-order-reqs');
+    if (!this.jobOrder) {
+      nameEl.textContent = '① 주문 카운터를 클릭해 주문을 받으세요!';
+      reqsEl.innerHTML = '';
+      return;
+    }
+    const readyDrink = this._countInBag(this.jobOrder.id) > 0;
+    nameEl.textContent = readyDrink
+      ? `✅ ${this.jobOrder.name} 완성! (⑤ 픽업대로 서빙)`
+      : `🧾 주문: ${this.jobOrder.name}`;
+    reqsEl.innerHTML = '';
+    for (const ing of this.jobOrder.ingredients) {
+      const have = this._countInBag(ing) > 0 || readyDrink;
+      const chip = document.createElement('span');
+      chip.className = `req-chip${have ? ' have' : ''}`;
+      chip.textContent = `${have ? '✅ ' : ''}${this.catalog[ing]?.name || ing}`;
+      reqsEl.appendChild(chip);
+    }
+  }
+
+  renderJobFridge() {
+    const grid = document.getElementById('job-fridge-grid');
+    grid.innerHTML = '';
+    if (this.jobOrder) {
+      document.getElementById('fridge-order-hint').textContent =
+        `현재 주문: "${this.jobOrder.name}" — 필요 재료: ${this.jobOrder.tip}`;
+    }
+    for (const id of this.cafeFridgeItems) {
+      const def = this.catalog[id];
+      if (!def) continue;
+      const btn = document.createElement('div');
+      btn.className = 'supply-item';
+      const img = document.createElement('img');
+      img.src = this.textures.getIcon(id);
+      const span = document.createElement('span');
+      span.textContent = `${def.name} (보유: ${this._countInBag(id)})`;
+      btn.append(img, span);
+      btn.addEventListener('click', () => {
+        this.cb.send({ type: 'job_fridge_take', item: id });
+        setTimeout(() => { if (this.openModalId === 'modal-job-fridge') this.renderJobFridge(); }, 80);
+      });
+      grid.appendChild(btn);
+    }
+  }
+
+  renderJobMixer() {
+    const list = document.getElementById('job-mixer-list');
+    list.innerHTML = '';
+    if (this.jobOrder) {
+      document.getElementById('mixer-order-hint').textContent =
+        `🧾 현재 손님 주문: "${this.jobOrder.name}" (${this.jobOrder.tip})`;
+    }
+    // Sort current ordered drink first!
+    const sorted = [...this.cafeRecipes].sort((a, b) =>
+      (a.id === this.jobOrder?.id ? -1 : b.id === this.jobOrder?.id ? 1 : 0)
+    );
+    for (const r of sorted) {
+      const isTarget = r.id === this.jobOrder?.id;
+      let canMix = true;
+      const reqTexts = r.ingredients.map((ing) => {
+        const have = this._countInBag(ing);
+        if (have < 1) canMix = false;
+        return `${have >= 1 ? '✅' : '⬜'}${this.catalog[ing]?.name || ing}`;
+      });
+
+      const card = document.createElement('div');
+      card.className = `craft-card${canMix ? ' can-craft' : ''}`;
+      if (isTarget) card.style.boxShadow = '0 0 0 2px rgba(250, 204, 21, 0.7)';
+
+      const info = document.createElement('div');
+      info.className = 'craft-info';
+      const img = document.createElement('img');
+      img.src = this.textures.getIcon(r.id);
+      const txt = document.createElement('div');
+      txt.innerHTML = `<div class="craft-name">${isTarget ? '⭐ ' : ''}${this._esc(r.name)}</div><div class="craft-reqs">${reqTexts.join(' ')}</div>`;
+      info.append(img, txt);
+
+      const btn = document.createElement('button');
+      btn.className = `btn-sm${canMix ? ' accent' : ''}`;
+      btn.textContent = '섞기';
+      btn.disabled = !canMix;
+      btn.addEventListener('click', () => {
+        this.cb.send({ type: 'job_mix', recipeId: r.id });
+      });
+
+      card.append(info, btn);
+      list.appendChild(card);
+    }
   }
 
   _esc(s) {

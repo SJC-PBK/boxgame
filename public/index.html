@@ -17,6 +17,19 @@
       <p class="subtitle">채굴·제작·농사·포털·스킨·건축을 함께 즐기는 웹 3D 블록 월드 (최대 5명)</p>
 
       <form id="login-form">
+        <div class="world-mode-grid">
+          <button type="button" class="mode-card active" data-world="sandbox">
+            <div class="mode-icon">🏗️</div>
+            <div class="mode-title">자유 건축 월드</div>
+            <div class="mode-desc">채굴·제작·농사·포털·건축</div>
+          </button>
+          <button type="button" class="mode-card" data-world="job">
+            <div class="mode-icon">💼</div>
+            <div class="mode-title">직업 체험 마을</div>
+            <div class="mode-desc">☕ 바리스타 카페 체험 (보호 월드)</div>
+          </button>
+        </div>
+
         <label for="nickname-input">닉네임</label>
         <input id="nickname-input" type="text" maxlength="16" placeholder="사용할 닉네임을 입력하세요" autocomplete="off" required />
 
@@ -75,6 +88,19 @@
       <div class="bp-hud-title">📐 <span id="bp-hud-name">-</span></div>
       <div class="bp-progress-bar"><div id="bp-hud-fill" class="bp-progress-fill"></div></div>
       <div id="bp-hud-stats" class="bp-hud-stats">0 / 0 (0%)</div>
+    </div>
+
+    <!-- Job Village: Barista Order HUD -->
+    <div id="job-order-hud" class="job-order-hud hidden">
+      <div class="job-hud-top">
+        <span>☕ 바리스타 체험</span>
+        <span id="job-hud-score" class="job-score-pill">⭐ 0점 (0잔)</span>
+      </div>
+      <div class="job-order-name" id="job-order-name">주문 대기 중...</div>
+      <div class="job-order-reqs" id="job-order-reqs"></div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button id="btn-job-clear" class="btn-sm" style="font-size:11px;padding:4px 8px;">🧹 쟁반 비우기</button>
+      </div>
     </div>
 
     <!-- Crosshair (block destruction uses 3D crack & shatter animation, no gauge!) -->
@@ -535,6 +561,34 @@
           <button id="btn-set-reset" class="btn-sm">기본값 복원</button>
           <button class="btn-sm accent modal-close" data-close="modal-settings">저장 후 닫기</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Job Village Cafe Fridge -->
+  <div id="modal-job-fridge" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>🧊 카페 재료 냉장고 (클릭해서 꺼내기)</h2>
+        <button class="modal-close" data-close="modal-job-fridge">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="small-note" id="fridge-order-hint">필요한 재료를 클릭해 쟁반(핫바)에 담으세요.</div>
+        <div id="job-fridge-grid" class="supply-grid" style="margin-top:10px;grid-template-columns:repeat(2,1fr);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Job Village Drink Mixer -->
+  <div id="modal-job-mixer" class="modal hidden">
+    <div class="modal-box modal-wide">
+      <div class="modal-header">
+        <h2>🥤 음료 조합대 (재료를 섞어 음료 완성)</h2>
+        <button class="modal-close" data-close="modal-job-mixer">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="small-note" id="mixer-order-hint">현재 주문 음료를 확인하고 재료가 모이면 [만들기]를 누르세요!</div>
+        <div id="job-mixer-list" class="craft-grid" style="margin-top:10px;"></div>
       </div>
     </div>
   </div>

@@ -379,6 +379,61 @@ function drawBlockFace(blockId, face) {
         }
         break;
       }
+      case 'job_counter': {
+        fillNoise(ctx, ['#9a6534', '#8b5a2b', '#a8703c'], 991);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(3, 2, 10, 7);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(4, 3, 8, 5);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(5, 4, 5, 1); ctx.fillRect(5, 6, 4, 1);
+        break;
+      }
+      case 'job_espresso': {
+        fillNoise(ctx, ['#475569', '#334155', '#64748b'], 992);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(2, 2, 12, 4);
+        ctx.fillRect(4, 7, 8, 7);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(11, 3, 2, 2);
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(7, 8, 2, 4);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(6, 11, 4, 3);
+        break;
+      }
+      case 'job_fridge': {
+        fillNoise(ctx, ['#e2e8f0', '#f1f5f9', '#cbd5e1'], 993);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(3, 3, 10, 5);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(12, 9, 2, 4);
+        break;
+      }
+      case 'job_mixer': {
+        fillNoise(ctx, ['#b88d56', '#a87c45', '#c2975f'], 994);
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(4, 3, 8, 9);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(5, 6, 6, 5);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(3, 12, 10, 3);
+        break;
+      }
+      case 'job_pickup': {
+        fillNoise(ctx, ['#8b5a2b', '#784820', '#9a6534'], 995);
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(4, 6, 8, 5);
+        ctx.fillRect(6, 4, 4, 2);
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(6, 6, 2, 3);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(3, 11, 10, 2);
+        break;
+      }
       default:
         fillNoise(ctx, ['#94a3b8', '#64748b'], 999);
     }
@@ -451,6 +506,58 @@ function drawItemIcon(def) {
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(11, 7, 2, 3);
         break;
+      case 'cup':
+        ctx.fillStyle = '#e2e8f0'; ctx.fillRect(4, 4, 8, 10);
+        ctx.fillStyle = '#cbd5e1'; ctx.fillRect(3, 3, 10, 2);
+        break;
+      case 'espresso':
+        ctx.fillStyle = '#451a03'; ctx.fillRect(4, 5, 8, 8);
+        ctx.fillStyle = '#92400e'; ctx.fillRect(4, 5, 8, 2);
+        ctx.fillStyle = '#f8fafc'; ctx.fillRect(12, 7, 2, 4);
+        break;
+      case 'water_cup':
+        ctx.fillStyle = '#38bdf8'; ctx.fillRect(4, 4, 8, 10);
+        ctx.fillStyle = '#bae6fd'; ctx.fillRect(5, 5, 3, 4);
+        break;
+      case 'ice':
+        ctx.fillStyle = '#7dd3fc'; ctx.fillRect(3, 3, 10, 10);
+        ctx.fillStyle = '#e0f2fe'; ctx.fillRect(4, 4, 4, 4);
+        break;
+      case 'milk':
+        ctx.fillStyle = '#f8fafc'; ctx.fillRect(4, 3, 8, 11);
+        ctx.fillStyle = '#38bdf8'; ctx.fillRect(4, 6, 8, 3);
+        break;
+      case 'syrup_vanilla':
+        ctx.fillStyle = '#fde68a'; ctx.fillRect(5, 4, 6, 10);
+        ctx.fillStyle = '#d97706'; ctx.fillRect(6, 2, 4, 2);
+        break;
+      case 'syrup_choco':
+        ctx.fillStyle = '#5c2d16'; ctx.fillRect(5, 4, 6, 10);
+        ctx.fillStyle = '#9a3412'; ctx.fillRect(6, 2, 4, 2);
+        break;
+      case 'syrup_berry':
+        ctx.fillStyle = '#f43f5e'; ctx.fillRect(5, 4, 6, 10);
+        ctx.fillStyle = '#fda4af'; ctx.fillRect(6, 2, 4, 2);
+        break;
+      case 'drink_americano':
+      case 'drink_ice_americano':
+      case 'drink_latte':
+      case 'drink_ice_latte':
+      case 'drink_vanilla_latte':
+      case 'drink_choco_latte':
+      case 'drink_berry_latte': {
+        const col = id.includes('berry') ? '#fb7185'
+          : id.includes('choco') ? '#7c2d12'
+          : id.includes('vanilla') ? '#fcd34d'
+          : id.includes('latte') ? '#d6a473'
+          : '#451a03';
+        ctx.fillStyle = col; ctx.fillRect(4, 5, 8, 9);
+        ctx.fillStyle = '#f8fafc'; ctx.fillRect(3, 4, 10, 2);
+        if (id.includes('ice') || id.includes('berry') || id.includes('choco') || id.includes('vanilla')) {
+          ctx.fillStyle = '#22c55e'; ctx.fillRect(8, 1, 2, 4); // straw
+        }
+        break;
+      }
       case 'stick':
         ctx.fillStyle = '#8b5a2b';
         for (let i = 3; i <= 12; i++) ctx.fillRect(i, 15 - i, 2, 2);

@@ -52,6 +52,8 @@ window.addEventListener('resize', () => {
 // Game State
 let ws = null;
 let joined = false;
+let currentWorldMode = 'sandbox';
+let selectedLoginWorld = 'sandbox';
 let selfPlayer = null;
 let maxPlayers = 5;
 let catalog = {};
@@ -334,6 +336,15 @@ const adminLoginToggle = document.getElementById('admin-login-toggle');
 const loginAdminPw = document.getElementById('login-admin-pw');
 const loginError = document.getElementById('login-error');
 
+// World mode selector on Login Screen
+document.querySelectorAll('.mode-card').forEach((card) => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    selectedLoginWorld = card.dataset.world || 'sandbox';
+  });
+});
+
 adminLoginToggle.addEventListener('change', () => {
   loginAdminPw.classList.toggle('hidden', !adminLoginToggle.checked);
   if (adminLoginToggle.checked) loginAdminPw.focus();
@@ -353,7 +364,7 @@ loginForm.addEventListener('submit', (e) => {
 
   if (ws) { ws.close(); ws = null; }
   ws = new WebSocket(buildWsUrl());
-  ws.addEventListener('open', () => send({ type: 'join', nickname, adminPassword }));
+  ws.addEventListener('open', () => send({ type: 'join', nickname, adminPassword, world: selectedLoginWorld }));
   ws.addEventListener('message', (ev) => handleServerMessage(JSON.parse(ev.data)));
   ws.addEventListener('close', () => {
     if (joined) {
@@ -373,6 +384,7 @@ function handleServerMessage(msg) {
     case 'welcome': {
       loginError.textContent = '';
       joined = true;
+      currentWorldMode = msg.worldMode || 'sandbox';
       selfPlayer = msg.self;
       maxPlayers = msg.maxPlayers || 5;
       catalog = msg.catalog || {};
@@ -392,7 +404,17 @@ function handleServerMessage(msg) {
       if (!textures) textures = new TextureLibrary(catalog);
       remotePlayers.setAssets(catalog, textures);
 
-      if (!worldRenderer) worldRenderer = new WorldRenderer(scene, textures, catalog, worldBounds);
+      // Rebuild WorldRenderer if bounds changed (e.g. switching between 128x48x128 Sandbox & 64x24x64 Job Village)
+      if (worldRenderer) {
+        for (const g of worldRenderer.chunkGroups.values()) {
+          worldRenderer._disposeGroup(g);
+          worldRenderer.worldGroup.remove(g);
+        }
+        scene.remove(worldRenderer.worldGroup, worldRenderer.highlightBox, worldRenderer.crackBox, worldRenderer.brushGroup);
+        worldRenderer = null;
+        projector = null;
+      }
+      worldRenderer = new WorldRenderer(scene, textures, catalog, worldBounds);
       worldRenderer.loadFromRLE(msg.worldRLE);
 
       if (!fpHand) fpHand = new FirstPersonHand(camera, catalog, textures);
@@ -415,6 +437,7 @@ function handleServerMessage(msg) {
       animalRenderer.syncAll(msg.animals);
 
       ui.init(catalog, msg.recipes, textures, selfPlayer);
+      ui.setWorldMode(currentWorldMode, msg.cafeRecipes, msg.cafeFridgeItems, msg.jobOrder, msg.jobScore, msg.jobCompleted);
       ui.updateBag(msg.bag);
       ui.setRegions(msg.regions);
       ui.setBlueprints(msg.blueprints);
@@ -429,10 +452,17 @@ function handleServerMessage(msg) {
       document.getElementById('chat-messages').innerHTML = '';
       ui.addChatMessage({
         system: true,
-        text: `Boxworld v3에 오신 것을 환영합니다! 화로(4,17,3) · 광산(-9,16,-9) · 밭(8,16,-2) · 시간 변경: /낮 /노을 /밤`
+        text: currentWorldMode === 'job'
+          ? '☕ 직업 체험 마을에 오신 것을 환영합니다! 앞쪽 카페로 들어가 바리스타 체험을 시작해 보세요!'
+          : 'Boxworld에 오신 것을 환영합니다! 화로(4,17,3) · 광산(-9,16,-9) · 밭(8,16,-2) · 시간 변경: /낮 /노을 /밤'
       });
       break;
     }
+
+    case 'job_state':
+      if (msg.served) sound.playCraft();
+      ui.updateJobState(msg.jobOrder, msg.jobScore, msg.jobCompleted);
+      break;
 
     case 'world_time':
       if (typeof msg.time === 'number') sky.setTime(msg.time);
@@ -621,8 +651,37 @@ function handleRightClickOrInteract(interactOnly = false) {
     return;
   }
 
-  // 2. Open Chest, Furnace, Bed, Door, Sign, TNT, Portal
+  // 2. Open Chest, Furnace, Bed, Door, Sign, TNT, Portal, & Job Village Cafe Stations
   if (currentHit) {
+    if (currentHit.block === 'job_counter') {
+      fpHand?.triggerSwing();
+      sound.playOpen();
+      send({ type: 'job_new_order' });
+      return;
+    }
+    if (currentHit.block === 'job_espresso') {
+      fpHand?.triggerSwing();
+      sound.playCraft();
+      send({ type: 'job_espresso' });
+      return;
+    }
+    if (currentHit.block === 'job_fridge') {
+      fpHand?.triggerSwing();
+      sound.playOpen();
+      ui.openModal('modal-job-fridge');
+      return;
+    }
+    if (currentHit.block === 'job_mixer') {
+      fpHand?.triggerSwing();
+      sound.playOpen();
+      ui.openModal('modal-job-mixer');
+      return;
+    }
+    if (currentHit.block === 'job_pickup') {
+      fpHand?.triggerSwing();
+      send({ type: 'job_serve' });
+      return;
+    }
     if (currentHit.block === 'chest') {
       fpHand?.triggerSwing();
       send({ type: 'chest_open', x: currentHit.x, y: currentHit.y, z: currentHit.z });

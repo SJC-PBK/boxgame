@@ -56,7 +56,13 @@ export const BLOCKS = {
   sign:        { numId: 35, id: 'sign',        name: '표지판',       transparent: true,  solid: false, hardness: 0.5,      preferredTool: 'axe',     minTier: 0,  drop: 'sign',        sound: 'wood',  stackable: 16, category: '기능' },
   tnt:         { numId: 36, id: 'tnt',         name: 'TNT 폭탄',     transparent: false, solid: true,  hardness: 0.25,     preferredTool: null,      minTier: 0,  drop: 'tnt',         sound: 'dirt',  stackable: 16, category: '특수' },
   portal:      { numId: 37, id: 'portal',      name: '순간이동 포털', transparent: true,  solid: false, hardness: 1.8,      preferredTool: 'pickaxe', minTier: 1,  drop: 'portal',      sound: 'glass', stackable: 8,  category: '특수' },
-  jumppad:     { numId: 38, id: 'jumppad',     name: '점프 패드',    transparent: false, solid: true,  hardness: 0.8,      preferredTool: 'pickaxe', minTier: 0,  drop: 'jumppad',     sound: 'stone', stackable: 16, category: '특수' }
+  jumppad:     { numId: 38, id: 'jumppad',     name: '점프 패드',    transparent: false, solid: true,  hardness: 0.8,      preferredTool: 'pickaxe', minTier: 0,  drop: 'jumppad',     sound: 'stone', stackable: 16, category: '특수' },
+  // Job Village: Barista Cafe interactive stations
+  job_counter:  { numId: 39, id: 'job_counter',  name: '🧾 주문 카운터', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
+  job_espresso: { numId: 40, id: 'job_espresso', name: '☕ 커피머신',    transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'stone', stackable: 1, category: '직업체험' },
+  job_fridge:   { numId: 41, id: 'job_fridge',   name: '🧊 재료 냉장고', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'stone', stackable: 1, category: '직업체험' },
+  job_mixer:    { numId: 42, id: 'job_mixer',    name: '🥤 음료 조합대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' },
+  job_pickup:   { numId: 43, id: 'job_pickup',   name: '🛎️ 픽업 서빙대', transparent: false, solid: true, hardness: Infinity, preferredTool: null, minTier: 99, drop: null, sound: 'wood',  stackable: 1, category: '직업체험' }
 };
 
 export const NUM_TO_BLOCK = {};
@@ -101,8 +107,39 @@ export const ITEMS = {
   // Hoes (괭이 — for farming!)
   wood_hoe:  { id: 'wood_hoe',  name: '나무 괭이', kind: 'tool', toolType: 'hoe', tier: 1, speed: 2.0, color: '#a16207', stackable: 1, category: '도구' },
   stone_hoe: { id: 'stone_hoe', name: '돌 괭이',   kind: 'tool', toolType: 'hoe', tier: 2, speed: 3.5, color: '#94a3b8', stackable: 1, category: '도구' },
-  iron_hoe:  { id: 'iron_hoe',  name: '철 괭이',   kind: 'tool', toolType: 'hoe', tier: 3, speed: 5.5, color: '#e2e8f0', stackable: 1, category: '도구' }
+  iron_hoe:  { id: 'iron_hoe',  name: '철 괭이',   kind: 'tool', toolType: 'hoe', tier: 3, speed: 5.5, color: '#e2e8f0', stackable: 1, category: '도구' },
+
+  // Job Village: Barista Ingredients
+  cup:           { id: 'cup',           name: '빈 컵',        kind: 'item', stackable: 16, category: '카페재료' },
+  espresso:      { id: 'espresso',      name: '에스프레소 샷', kind: 'item', stackable: 16, category: '카페재료' },
+  water_cup:     { id: 'water_cup',     name: '정수 (물)',    kind: 'item', stackable: 16, category: '카페재료' },
+  ice:           { id: 'ice',           name: '얼음',         kind: 'item', stackable: 16, category: '카페재료' },
+  milk:          { id: 'milk',          name: '우유',         kind: 'item', stackable: 16, category: '카페재료' },
+  syrup_vanilla: { id: 'syrup_vanilla', name: '바닐라 시럽',  kind: 'item', stackable: 16, category: '카페재료' },
+  syrup_choco:   { id: 'syrup_choco',   name: '초코 시럽',    kind: 'item', stackable: 16, category: '카페재료' },
+  syrup_berry:   { id: 'syrup_berry',   name: '딸기 시럽',    kind: 'item', stackable: 16, category: '카페재료' },
+
+  // Job Village: Finished Drinks
+  drink_americano:     { id: 'drink_americano',     name: '따뜻한 아메리카노',  kind: 'item', stackable: 8, category: '완성음료' },
+  drink_ice_americano: { id: 'drink_ice_americano', name: '아이스 아메리카노',  kind: 'item', stackable: 8, category: '완성음료' },
+  drink_latte:         { id: 'drink_latte',         name: '따뜻한 카페라떼',    kind: 'item', stackable: 8, category: '완성음료' },
+  drink_ice_latte:     { id: 'drink_ice_latte',     name: '아이스 카페라떼',    kind: 'item', stackable: 8, category: '완성음료' },
+  drink_vanilla_latte: { id: 'drink_vanilla_latte', name: '아이스 바닐라 라떼', kind: 'item', stackable: 8, category: '완성음료' },
+  drink_choco_latte:   { id: 'drink_choco_latte',   name: '아이스 초코 라떼',   kind: 'item', stackable: 8, category: '완성음료' },
+  drink_berry_latte:   { id: 'drink_berry_latte',   name: '딸기 라떼',          kind: 'item', stackable: 8, category: '완성음료' }
 };
+
+export const CAFE_FRIDGE_ITEMS = ['cup', 'water_cup', 'ice', 'milk', 'syrup_vanilla', 'syrup_choco', 'syrup_berry'];
+
+export const CAFE_RECIPES = [
+  { id: 'drink_americano',     name: '따뜻한 아메리카노',  ingredients: ['cup', 'water_cup', 'espresso'],                       tip: '컵 + 정수 + 에스프레소' },
+  { id: 'drink_ice_americano', name: '아이스 아메리카노',  ingredients: ['cup', 'ice', 'water_cup', 'espresso'],                tip: '컵 + 얼음 + 정수 + 에스프레소' },
+  { id: 'drink_latte',         name: '따뜻한 카페라떼',    ingredients: ['cup', 'milk', 'espresso'],                            tip: '컵 + 우유 + 에스프레소' },
+  { id: 'drink_ice_latte',     name: '아이스 카페라떼',    ingredients: ['cup', 'ice', 'milk', 'espresso'],                     tip: '컵 + 얼음 + 우유 + 에스프레소' },
+  { id: 'drink_vanilla_latte', name: '아이스 바닐라 라떼', ingredients: ['cup', 'ice', 'milk', 'espresso', 'syrup_vanilla'],    tip: '컵 + 얼음 + 우유 + 에스프레소 + 바닐라 시럽' },
+  { id: 'drink_choco_latte',   name: '아이스 초코 라떼',   ingredients: ['cup', 'ice', 'milk', 'syrup_choco'],                  tip: '컵 + 얼음 + 우유 + 초코 시럽' },
+  { id: 'drink_berry_latte',   name: '딸기 라떼',          ingredients: ['cup', 'ice', 'milk', 'syrup_berry'],                  tip: '컵 + 얼음 + 우유 + 딸기 시럽' }
+];
 
 // Furnace smelting recipes (input -> output)
 export const SMELT_MAP = {
