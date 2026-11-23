@@ -15,11 +15,12 @@
 
 html, body {
   margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+  overscroll-behavior: none;
   background: #0f172a; color: var(--text);
   font-family: 'Pretendard', 'Malgun Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-#game-canvas { display: block; width: 100vw; height: 100vh; }
+#game-canvas { display: block; width: 100vw; height: 100vh; touch-action: none; }
 .hidden { display: none !important; }
 
 /* Login */
@@ -335,6 +336,73 @@ input[type="text"], input[type="password"] {
 .img-preview-canvas {
   width: 128px; height: 128px; border-radius: 8px; border: 1px solid var(--border);
   background: #0f172a; image-rendering: pixelated; flex-shrink: 0;
+}
+
+.top-right-wrap { position: relative; pointer-events: auto; }
+.mobile-menu-btn { display: none; }
+
+/* Mobile / Tablet Touch Controls */
+.touch-controls {
+  position: fixed; inset: 0; pointer-events: none; z-index: 15;
+}
+.touch-joystick {
+  position: fixed; left: 20px; bottom: 96px;
+  width: 118px; height: 118px; border-radius: 50%;
+  background: rgba(15, 23, 42, 0.48); border: 2px solid rgba(148, 163, 184, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto; touch-action: none;
+}
+.touch-joy-knob {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(56, 189, 248, 0.72); border: 2px solid #e0f2fe;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.touch-actions {
+  position: fixed; right: 16px; bottom: 96px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  pointer-events: auto; touch-action: none;
+}
+.touch-mini-row, .touch-main-row { display: flex; gap: 8px; }
+.t-mini-btn {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(148, 163, 184, 0.45);
+  color: #fff; font-size: 17px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; touch-action: none;
+}
+.t-mini-btn.active { background: rgba(2, 132, 199, 0.85); border-color: #38bdf8; }
+.t-act-btn {
+  width: 68px; height: 62px; border-radius: 14px;
+  background: rgba(15, 23, 42, 0.76); border: 2px solid rgba(148, 163, 184, 0.5);
+  color: #fff; font-size: 20px; font-weight: 700;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  cursor: pointer; touch-action: none;
+}
+.t-act-btn span { font-size: 10.5px; color: #e2e8f0; }
+.t-act-btn.mine { border-color: rgba(245, 158, 11, 0.75); }
+.t-act-btn.use { border-color: rgba(34, 197, 94, 0.75); }
+.t-act-btn.jump { border-color: rgba(56, 189, 248, 0.75); }
+.t-act-btn.pressed, .t-act-btn:active { transform: scale(0.93); background: rgba(56, 189, 248, 0.38); }
+
+@media (max-width: 920px) {
+  .mobile-menu-btn { display: inline-flex; align-items: center; gap: 4px; }
+  .top-right {
+    display: none;
+    position: absolute; top: 38px; right: 0;
+    flex-direction: column; align-items: stretch; min-width: 155px;
+    padding: 8px; border-radius: 12px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); z-index: 40;
+  }
+  .top-right.mobile-open { display: flex; }
+  .top-right .hud-btn { text-align: left; }
+  .play-hint { max-width: 92vw; white-space: normal; text-align: center; font-size: 11px; bottom: 86px; }
+  .hotbar { gap: 3px; padding: 4px; max-width: 96vw; }
+  .hotbar .slot { width: clamp(32px, 9.4vw, 44px); height: clamp(32px, 9.4vw, 44px); }
+  .hotbar .slot img { width: 70%; height: 70%; }
+  .chat-panel { width: min(260px, 60vw); bottom: 224px; left: 10px; }
+  .player-list { top: 52px; right: 10px; min-width: 105px; }
+  .info-pill { font-size: 11px; padding: 4px 7px; }
 }
 
 @media (max-width: 780px) {

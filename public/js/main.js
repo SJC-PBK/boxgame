@@ -9,6 +9,7 @@ import { SkySystem } from './sky.js';
 import { SoundEngine } from './sound.js';
 import { AnimalRenderer } from './animals.js';
 import { WorldExtras } from './worldExtras.js';
+import { TouchControls } from './touchControls.js';
 import { GameUI } from './ui.js';
 
 // Global contextmenu suppression (fixes right-click browser menu when opening chests/furnaces!)
@@ -184,6 +185,65 @@ function computeBrushPositions(px, py, pz) {
   return out;
 }
 
+let touchJumpHeld = false;
+let touchDescendHeld = false;
+let isTouchMining = false;
+
+function toggleFlyMode() {
+  flyMode = !flyMode;
+  playerVel.y = 0;
+  document.getElementById('hud-mode').textContent = flyMode
+    ? '🕊️ 비행 모드 (Space↑ / Shift↓)'
+    : '🚶 걷기 (Space×2 비행)';
+  touchControls.setFlyMode(flyMode);
+}
+
+function toggleCameraView() {
+  thirdPerson = !thirdPerson;
+  if (fpHand) fpHand.setVisible(!thirdPerson);
+  if (selfRig) selfRig.group.visible = thirdPerson;
+  ui.toast(thirdPerson ? '📷 3인칭 시점 (V키로 전환)' : '👁️ 1인칭 시점', 'info');
+}
+
+const touchControls = new TouchControls(canvas, {
+  onLook: (dx, dy) => {
+    if (!joined || ui.openModalId || ui.chatOpen) return;
+    const sens = 0.0055 * mouseSensitivity;
+    yaw -= dx * sens;
+    pitch -= dy * sens * (invertY ? -1 : 1);
+    pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+  },
+  onMineStart: () => {
+    if (!joined || ui.openModalId || ui.chatOpen) return;
+    const { eyePos, lookDir } = getEyeAndLook();
+    const animalHit = animalRenderer.raycast(eyePos, lookDir, 4.8);
+    if (animalHit) {
+      fpHand?.triggerSwing();
+      sound.playAnimal(animalHit.type, animalHit.point);
+      send({ type: 'animal_interact', id: animalHit.id, action: 'hit' });
+      return;
+    }
+    isTouchMining = true;
+    fpHand?.triggerSwing();
+  },
+  onMineEnd: () => {
+    isTouchMining = false;
+    resetMining();
+  },
+  onUse: () => {
+    if (!joined || ui.openModalId || ui.chatOpen) return;
+    handleRightClickOrInteract(false);
+  },
+  onJumpStart: () => { touchJumpHeld = true; },
+  onJumpEnd: () => { touchJumpHeld = false; },
+  onDescendStart: () => { touchDescendHeld = true; },
+  onDescendEnd: () => { touchDescendHeld = false; },
+  onFlyToggle: () => { if (joined) toggleFlyMode(); },
+  onChat: () => { if (joined) ui.openChat(); },
+  onViewToggle: () => { if (joined) toggleCameraView(); },
+  onUndo: () => { if (joined) send({ type: 'block_undo_brush' }); }
+});
+
 function applyGameSettings(s) {
   camera.fov = s.fov || 75;
   camera.far = Math.max(120, (s.viewDist || 125) + 65);
@@ -196,6 +256,8 @@ function applyGameSettings(s) {
   sound.setVolume(typeof s.volume === 'number' ? s.volume : 1.0);
   if (worldRenderer) worldRenderer.particlesEnabled = s.particles !== false;
   elHudCoords.classList.toggle('hidden', s.showCoords === false);
+  touchControls.setEnabled(!!s.touchUI);
+  document.getElementById('play-hint').classList.toggle('hidden', pointerLocked || !!s.touchUI);
 }
 
 function warpPlayer(x, y, z, label = '') {
@@ -662,13 +724,13 @@ function handleRightClickOrInteract(interactOnly = false) {
 }
 
 canvas.addEventListener('click', () => {
-  if (!joined || ui.openModalId || ui.chatOpen) return;
+  if (!joined || ui.openModalId || ui.chatOpen || touchControls.enabled) return;
   if (!pointerLocked) canvas.requestPointerLock?.();
 });
 
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === canvas;
-  document.getElementById('play-hint').classList.toggle('hidden', pointerLocked);
+  document.getElementById('play-hint').classList.toggle('hidden', pointerLocked || touchControls.enabled);
   if (!pointerLocked) { isLeftDown = false; resetMining(); }
 });
 
@@ -738,10 +800,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.code === 'KeyV' || e.code === 'F5') {
     e.preventDefault();
-    thirdPerson = !thirdPerson;
-    if (fpHand) fpHand.setVisible(!thirdPerson);
-    if (selfRig) selfRig.group.visible = thirdPerson;
-    ui.toast(thirdPerson ? '📷 3인칭 시점 (V키로 전환)' : '👁️ 1인칭 시점', 'info');
+    toggleCameraView();
     return;
   }
 
@@ -753,11 +812,7 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space' && !e.repeat) {
     const now = performance.now();
     if (now - lastSpaceTime < 280) {
-      flyMode = !flyMode;
-      playerVel.y = 0;
-      document.getElementById('hud-mode').textContent = flyMode
-        ? '🕊️ 비행 모드 (Space↑ / Shift↓)'
-        : '🚶 걷기 (Space×2 비행)';
+      toggleFlyMode();
       lastSpaceTime = 0;
     } else {
       lastSpaceTime = now;
@@ -793,8 +848,12 @@ function updatePhysics(dt) {
   if (keys.has('KeyS')) _move.sub(_forward);
   if (keys.has('KeyD')) _move.add(_right);
   if (keys.has('KeyA')) _move.sub(_right);
+  if (touchControls.enabled && (touchControls.moveX !== 0 || touchControls.moveZ !== 0)) {
+    _move.addScaledVector(_forward, touchControls.moveZ);
+    _move.addScaledVector(_right, touchControls.moveX);
+  }
   const isMoving = _move.lengthSq() > 0;
-  if (isMoving) _move.normalize();
+  if (isMoving && _move.lengthSq() > 1) _move.normalize();
 
   const speed = flyMode ? 10.5 : 5.8;
   const nextX = playerPos.x + _move.x * speed * dt;
@@ -802,10 +861,13 @@ function updatePhysics(dt) {
   const nextZ = playerPos.z + _move.z * speed * dt;
   if (!collides(playerPos.x, playerPos.y, nextZ)) playerPos.z = nextZ;
 
+  const jumpActive = keys.has('Space') || touchJumpHeld;
+  const descendActive = keys.has('ShiftLeft') || keys.has('ShiftRight') || touchDescendHeld;
+
   if (flyMode) {
     let vy = 0;
-    if (keys.has('Space')) vy += 8.0;
-    if (keys.has('ShiftLeft') || keys.has('ShiftRight')) vy -= 8.0;
+    if (jumpActive) vy += 8.0;
+    if (descendActive) vy -= 8.0;
     const nextY = playerPos.y + vy * dt;
     if (!collides(playerPos.x, nextY, playerPos.z)) playerPos.y = nextY;
     onGround = false;
@@ -818,7 +880,7 @@ function updatePhysics(dt) {
     );
 
     if (onLadder) {
-      playerVel.y = keys.has('Space') || keys.has('KeyW') ? 4.8 : (keys.has('ShiftLeft') ? -3.5 : 0);
+      playerVel.y = (jumpActive || keys.has('KeyW') || touchControls.moveZ > 0.3) ? 4.8 : (descendActive ? -3.5 : 0);
       const nextY = playerPos.y + playerVel.y * dt;
       if (!collides(playerPos.x, nextY, playerPos.z)) playerPos.y = nextY;
       onGround = true;
@@ -830,7 +892,7 @@ function updatePhysics(dt) {
         playerVel.y = 18.5;
         onGround = false;
         sound.playJumpPad();
-      } else if (keys.has('Space') && onGround) {
+      } else if (jumpActive && onGround) {
         playerVel.y = 8.4;
         onGround = false;
       }
@@ -861,7 +923,8 @@ function updatePhysics(dt) {
 }
 
 function updateMining(dt) {
-  if (!isLeftDown || !pointerLocked || !currentHit) {
+  const activelyMining = (isLeftDown && pointerLocked) || (isTouchMining && touchControls.enabled);
+  if (!activelyMining || !currentHit) {
     if (miningTargetKey) resetMining();
     return;
   }
@@ -954,7 +1017,7 @@ function animate(now) {
       worldRenderer.updateParticles(dt);
     }
 
-    if (fpHand) fpHand.update(dt, isMoving, isLeftDown && pointerLocked);
+    if (fpHand) fpHand.update(dt, isMoving, (isLeftDown && pointerLocked) || (isTouchMining && touchControls.enabled));
 
     const coordsStr = `XYZ: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)}`;
     if (coordsStr !== lastCoordsStr) { lastCoordsStr = coordsStr; elHudCoords.textContent = coordsStr; }

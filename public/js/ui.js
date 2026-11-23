@@ -54,6 +54,19 @@ export class GameUI {
       m.addEventListener('click', (e) => { if (e.target === m) this.closeModal(); });
     });
 
+    const mobileMenuBtn = document.getElementById('btn-mobile-menu');
+    const topRightMenu = document.getElementById('top-right-menu');
+    if (mobileMenuBtn && topRightMenu) {
+      mobileMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        topRightMenu.classList.toggle('mobile-open');
+      });
+      topRightMenu.addEventListener('click', () => {
+        topRightMenu.classList.remove('mobile-open');
+      });
+    }
+    document.getElementById('chat-hint')?.addEventListener('click', () => this.openChat());
+
     document.getElementById('btn-sound').addEventListener('click', (e) => {
       const muted = this.cb.onToggleSound();
       e.currentTarget.textContent = muted ? '🔇' : '🔊';
@@ -147,6 +160,8 @@ export class GameUI {
     });
 
     // Game Settings modal (persisted in localStorage)
+    const defaultTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    document.getElementById('set-touch-ui').checked = defaultTouch;
     const bindSetting = () => {
       const s = {
         fov: Number(document.getElementById('set-fov').value),
@@ -156,7 +171,8 @@ export class GameUI {
         quality: Number(document.getElementById('set-quality').value),
         invertY: document.getElementById('set-invert-y').checked,
         particles: document.getElementById('set-particles').checked,
-        showCoords: document.getElementById('set-show-coords').checked
+        showCoords: document.getElementById('set-show-coords').checked,
+        touchUI: document.getElementById('set-touch-ui').checked
       };
       document.getElementById('set-fov-val').textContent = `${s.fov}°`;
       document.getElementById('set-dist-val').textContent = String(s.viewDist);
@@ -165,7 +181,7 @@ export class GameUI {
       try { localStorage.setItem('boxworld_settings', JSON.stringify(s)); } catch {}
       this.cb.onApplySettings?.(s);
     };
-    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-invert-y', 'set-particles', 'set-show-coords']) {
+    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-invert-y', 'set-particles', 'set-show-coords', 'set-touch-ui']) {
       document.getElementById(id).addEventListener('input', bindSetting);
       document.getElementById(id).addEventListener('change', bindSetting);
     }
@@ -178,6 +194,7 @@ export class GameUI {
       document.getElementById('set-invert-y').checked = false;
       document.getElementById('set-particles').checked = true;
       document.getElementById('set-show-coords').checked = true;
+      document.getElementById('set-touch-ui').checked = defaultTouch;
       bindSetting();
     });
 
@@ -193,8 +210,9 @@ export class GameUI {
         document.getElementById('set-invert-y').checked = !!saved.invertY;
         document.getElementById('set-particles').checked = saved.particles !== false;
         document.getElementById('set-show-coords').checked = saved.showCoords !== false;
-        bindSetting();
+        document.getElementById('set-touch-ui').checked = typeof saved.touchUI === 'boolean' ? saved.touchUI : defaultTouch;
       }
+      bindSetting();
     } catch {}
 
     // Skin tabs (Quick / 64x64 Pixel Editor / Gallery)

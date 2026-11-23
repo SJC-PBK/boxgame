@@ -172,19 +172,24 @@ export class PixelSkinEditor {
   }
 
   _bindCanvas() {
-    this.canvas.addEventListener('mousedown', (e) => {
+    this.canvas.style.touchAction = 'none';
+    this.canvas.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      this.canvas.setPointerCapture?.(e.pointerId);
       this._pushUndo();
       this.drawing = true;
       const { x, y } = this._pixelCoords(e);
       this._applyAt(x, y);
     });
-    this.canvas.addEventListener('mousemove', (e) => {
+    this.canvas.addEventListener('pointermove', (e) => {
       if (!this.drawing || this.tool === 'fill' || this.tool === 'picker') return;
+      e.preventDefault();
       const { x, y } = this._pixelCoords(e);
       this._applyAt(x, y);
     });
-    window.addEventListener('mouseup', () => { this.drawing = false; });
+    const endDraw = () => { this.drawing = false; };
+    window.addEventListener('pointerup', endDraw);
+    window.addEventListener('pointercancel', endDraw);
   }
 
   loadDataUrl(dataUrl) {

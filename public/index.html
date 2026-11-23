@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Boxworld — 웹 3D 멀티플레이 블록 월드</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
@@ -50,18 +50,21 @@
         <span id="hud-mode" class="info-pill">🚶 걷기 (Space×2 비행)</span>
         <span id="hud-admin-badge" class="admin-pill hidden">🛡️ 관리자</span>
       </div>
-      <div class="top-right">
-        <button id="btn-sound" class="hud-btn" title="3D 사운드 켜기/끄기">🔊</button>
-        <button id="btn-brush" class="hud-btn" title="건축 붓 모드 전환: 1×1 · 3×3 · 5×5 · 가로줄 · 세로기둥 · 벽면 (R)">🪄 1×1 일반 [R]</button>
-        <button id="btn-map" class="hud-btn" title="실시간 미니맵 & 빠른 워프 (M)">🗺️ 지도 [M]</button>
-        <button id="btn-emote" class="hud-btn" title="이모트 표현 (G)">😊 [G]</button>
-        <button id="btn-bag" class="hud-btn" title="개인 가방 & 보급함 (E)">🎒 가방 [E]</button>
-        <button id="btn-craft" class="hud-btn" title="도구·제련 제작대 (C)">🔨 제작 [C]</button>
-        <button id="btn-skin" class="hud-btn" title="스킨 꾸미기 & 64×64 에디터 (K)">🎨 스킨 [K]</button>
-        <button id="btn-blueprint" class="hud-btn" title="설계도 투영 (B)">📐 설계도 [B]</button>
-        <button id="btn-settings" class="hud-btn" title="시야·감도·화질 설정 (O)">⚙️ 설정 [O]</button>
-        <button id="btn-admin" class="hud-btn" title="관리자 패널 (P)">🛡️ 관리 [P]</button>
-        <button id="btn-logout" class="hud-btn danger" title="로그아웃 (가방 자동 삭제)">🚪 로그아웃</button>
+      <div class="top-right-wrap">
+        <button id="btn-mobile-menu" class="hud-btn mobile-menu-btn" title="메뉴 펼치기/접기">☰ 메뉴</button>
+        <div id="top-right-menu" class="top-right">
+          <button id="btn-sound" class="hud-btn" title="3D 사운드 켜기/끄기">🔊</button>
+          <button id="btn-brush" class="hud-btn" title="건축 붓 모드 전환: 1×1 · 3×3 · 5×5 · 가로줄 · 세로기둥 · 벽면 (R)">🪄 1×1 일반 [R]</button>
+          <button id="btn-map" class="hud-btn" title="실시간 미니맵 & 빠른 워프 (M)">🗺️ 지도 [M]</button>
+          <button id="btn-emote" class="hud-btn" title="이모트 표현 (G)">😊 [G]</button>
+          <button id="btn-bag" class="hud-btn" title="개인 가방 & 보급함 (E)">🎒 가방 [E]</button>
+          <button id="btn-craft" class="hud-btn" title="도구·제련 제작대 (C)">🔨 제작 [C]</button>
+          <button id="btn-skin" class="hud-btn" title="스킨 꾸미기 & 64×64 에디터 (K)">🎨 스킨 [K]</button>
+          <button id="btn-blueprint" class="hud-btn" title="설계도 투영 (B)">📐 설계도 [B]</button>
+          <button id="btn-settings" class="hud-btn" title="시야·감도·화질 설정 (O)">⚙️ 설정 [O]</button>
+          <button id="btn-admin" class="hud-btn" title="관리자 패널 (P)">🛡️ 관리 [P]</button>
+          <button id="btn-logout" class="hud-btn danger" title="로그아웃 (가방 자동 삭제)">🚪 로그아웃</button>
+        </div>
       </div>
     </div>
 
@@ -89,7 +92,31 @@
       <form id="chat-form" class="chat-form hidden">
         <input id="chat-input" type="text" maxlength="200" placeholder="메시지 입력... (Enter 전송, ESC 닫기)" autocomplete="off" />
       </form>
-      <div id="chat-hint" class="chat-hint">T 또는 Enter 키로 채팅 · 광산 입구: (-9, 16, -9)</div>
+      <div id="chat-hint" class="chat-hint" style="cursor:pointer;">💬 탭 또는 T/Enter 키로 채팅 · 광산 입구: (-9, 16, -9)</div>
+    </div>
+
+    <!-- Mobile / Tablet Touch Controls (auto-shown on touch devices or via Settings) -->
+    <div id="touch-controls" class="touch-controls hidden">
+      <div id="touch-joystick" class="touch-joystick">
+        <div id="touch-joy-knob" class="touch-joy-knob"></div>
+      </div>
+
+      <div class="touch-actions">
+        <div class="touch-mini-row">
+          <button id="touch-btn-chat" class="t-mini-btn" title="채팅">💬</button>
+          <button id="touch-btn-view" class="t-mini-btn" title="1/3인칭 전환">📷</button>
+          <button id="touch-btn-undo" class="t-mini-btn" title="직전 건축 되돌리기">↩</button>
+          <button id="touch-btn-fly" class="t-mini-btn" title="비행 모드">🕊️</button>
+        </div>
+        <div class="touch-main-row">
+          <button id="touch-btn-mine" class="t-act-btn mine">⛏️<span>채굴</span></button>
+          <button id="touch-btn-use" class="t-act-btn use">🧱<span>설치/열기</span></button>
+        </div>
+        <div class="touch-main-row">
+          <button id="touch-btn-descend" class="t-act-btn descend hidden">⬇️<span>하강</span></button>
+          <button id="touch-btn-jump" class="t-act-btn jump">⬆️<span>점프</span></button>
+        </div>
+      </div>
     </div>
 
     <!-- Bottom Status + Hotbar -->
@@ -501,6 +528,7 @@
           <label class="toggle-label"><input id="set-invert-y" type="checkbox" /> 마우스 Y축 반전</label>
           <label class="toggle-label"><input id="set-particles" type="checkbox" checked /> 3D 파괴 파편 표시</label>
           <label class="toggle-label"><input id="set-show-coords" type="checkbox" checked /> 좌표 HUD 표시</label>
+          <label class="toggle-label"><input id="set-touch-ui" type="checkbox" /> 📱 터치 컨트롤 표시</label>
         </div>
         <div class="small-note">💡 팁: <b>R</b> 키로 1×1 · 3×3 바닥 · 5×5 바닥 · 가로줄(5) · 세로기둥(5) · 벽면(5×3) 건축 모드를 전환하고, <b>Ctrl+Z</b>로 직전 건축을 되돌릴 수 있습니다.</div>
         <div class="btn-row" style="justify-content:flex-end;">
