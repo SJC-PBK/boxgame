@@ -47,6 +47,8 @@ const HELD_LIGHT_PROPS = {
   jumppad: { intensity: 1.6, distance: 9,  color: new THREE.Color(0x38bdf8) }
 };
 const DEFAULT_PLAYER_LIGHT_COLOR = new THREE.Color(0xffe6b3);
+const elUnderwaterTint = document.getElementById('underwater-tint');
+let _lastUwState = false;
 let cameraShake = 0;
 
 const sky = new SkySystem(scene, hemiLight, dirLight);
@@ -1279,7 +1281,6 @@ function animate(now) {
     }
 
     // Subtle underwater blue tint & screen overlay when camera is submerged inside a water block
-    const uwEl = document.getElementById('underwater-tint');
     if (worldRenderer) {
       const camBlock = worldRenderer.getBlock(
         Math.floor(camera.position.x),
@@ -1287,13 +1288,14 @@ function animate(now) {
         Math.floor(camera.position.z)
       );
       const isUw = camBlock === 'water';
-      if (uwEl) uwEl.classList.toggle('hidden', !isUw);
+      if (isUw !== _lastUwState) {
+        _lastUwState = isUw;
+        elUnderwaterTint?.classList.toggle('hidden', !isUw);
+      }
       if (isUw) {
         scene.fog.color.setHex(0x0369a1);
         scene.background.setHex(0x0369a1);
       }
-    } else if (uwEl) {
-      uwEl.classList.add('hidden');
     }
 
     if (selfRig) {

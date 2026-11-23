@@ -2,16 +2,16 @@ import * as THREE from '../vendor/three/three.module.min.js';
 import { getBaseBlock } from '../shared/terrainGen.js';
 
 const CHUNK_SIZE = 16;
-const MAX_LIGHT_LEVEL = 14;
+const MAX_LIGHT_LEVEL = 10;
 const LIGHT_PROPS = {
-  lamp:    { level: 14, r: 1.18, g: 1.00, b: 0.72 },
-  portal:  { level: 11, r: 0.85, g: 0.45, b: 1.18 },
-  furnace: { level: 9,  r: 1.15, g: 0.62, b: 0.28 },
-  jumppad: { level: 7,  r: 0.32, g: 0.96, b: 1.08 }
+  lamp:    { level: 10, r: 1.22, g: 1.02, b: 0.72 },
+  portal:  { level: 9,  r: 0.85, g: 0.45, b: 1.18 },
+  furnace: { level: 8,  r: 1.15, g: 0.62, b: 0.28 },
+  jumppad: { level: 6,  r: 0.32, g: 0.96, b: 1.08 }
 };
 const LIGHT_FALLOFF = new Float32Array(MAX_LIGHT_LEVEL + 1);
 for (let i = 1; i <= MAX_LIGHT_LEVEL; i++) {
-  LIGHT_FALLOFF[i] = Math.pow(i / MAX_LIGHT_LEVEL, 1.25);
+  LIGHT_FALLOFF[i] = Math.pow(i / MAX_LIGHT_LEVEL, 1.18);
 }
 const DIRS_6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -66,7 +66,7 @@ export class WorldRenderer {
       }
     }
 
-    // Voxel block-light storage & reusable zero-GC BFS buffers
+    // Voxel block-light storage & reusable zero-GC multi-source BFS buffers
     this.chunkLights = new Map();       // "cx,cz" -> Array<{ x, y, z, level, r, g, b }>
     this.chunkLightScalar = new Map();  // "cx,cz" -> Uint8Array(16 * sizeY * 16)
     this._padW = CHUNK_SIZE + 2;
@@ -75,12 +75,14 @@ export class WorldRenderer {
     this._padG = new Float32Array(this._padVol);
     this._padB = new Float32Array(this._padVol);
     this._padMaxL = new Uint8Array(this._padVol);
-    this._bfsSide = MAX_LIGHT_LEVEL * 2 + 1;
-    this._bfsVol = this._bfsSide * this._bfsSide * this._bfsSide;
+    this._bfsSide = CHUNK_SIZE + MAX_LIGHT_LEVEL * 2; // 36
+    this._bfsVol = this._bfsSide * this.sizeY * this._bfsSide;
     this._bfsVal = new Uint8Array(this._bfsVol);
+    this._bfsSrc = new Uint16Array(this._bfsVol);
     this._bfsStamp = new Uint32Array(this._bfsVol);
     this._bfsCurStamp = 0;
     this._bfsQ = new Int32Array(this._bfsVol * 3);
+    this._chunkArr = new Array(9);
 
     this.crossNums = new Set([
       this.idToNum['sapling'],
@@ -232,7 +234,7 @@ export class WorldRenderer {
     return px + this._padW * (pz + this._padW * (y - this.bounds.minY));
   }
 
-  // True Minecraft-style 6-neighbor BFS block-light propagation (blocked by opaque blocks!)
+  // Ultra-fast Single-Pass Multi-Source 6-neighbor BFS block-light propagation (blocked by opaque blocks!)
   _computeChunkLight(cx, cz) {
     const ck = `${cx},${cz}`;
     const baseX = cx * CHUNK_SIZE;
@@ -264,6 +266,16 @@ export class WorldRenderer {
       return false;
     }
 
+    // Pre-cache 3x3 chunk Uint8Array references (zero Map.get / string alloc in BFS loop!)
+    const chunkArr = this._chunkArr;
+    if (this.streaming) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          chunkArr[(dx + 1) * 3 + (dz + 1)] = this.chunkData.get(`${cx + dx},${cz + dz}`) || null;
+        }
+      }
+    }
+
     const padR = this._padR;
     const padG = this._padG;
     const padB = this._padB;
@@ -275,6 +287,7 @@ export class WorldRenderer {
 
     const bfsSide = this._bfsSide;
     const bfsVal = this._bfsVal;
+    const bfsSrc = this._bfsSrc;
     const bfsStamp = this._bfsStamp;
     const bfsQ = this._bfsQ;
     const minY = this.bounds.minY;
@@ -284,79 +297,104 @@ export class WorldRenderer {
     const minZ = this.bounds.minZ;
     const maxZ = this.bounds.maxZ;
     const transNum = this.transparentNum;
+    const streaming = this.streaming;
+    const grid = this.grid;
+    const sizeX = this.sizeX;
+    const sizeZ = this.sizeZ;
 
+    this._bfsCurStamp++;
+    if (this._bfsCurStamp === 0xffffffff) {
+      bfsStamp.fill(0);
+      this._bfsCurStamp = 1;
+    }
+    const stamp = this._bfsCurStamp;
+    const offX = baseX - MAX_LIGHT_LEVEL;
+    const offZ = baseZ - MAX_LIGHT_LEVEL;
+
+    // Seed ALL nearby light sources into ONE multi-source BFS queue (highest level first)
+    nearbyLights.sort((a, b) => b.level - a.level);
+    let head = 0;
+    let tail = 0;
     for (let li = 0; li < nearbyLights.length; li++) {
       const src = nearbyLights[li];
-      const rad = src.level;
-      this._bfsCurStamp++;
-      if (this._bfsCurStamp === 0xffffffff) {
-        bfsStamp.fill(0);
-        this._bfsCurStamp = 1;
-      }
-      const stamp = this._bfsCurStamp;
-      const offX = src.x - rad;
-      const offY = src.y - rad;
-      const offZ = src.z - rad;
-
-      const cIdx = rad + bfsSide * (rad + bfsSide * rad);
-      bfsStamp[cIdx] = stamp;
-      bfsVal[cIdx] = rad;
-
-      let head = 0;
-      let tail = 0;
+      const lx = src.x - offX;
+      const ly = src.y - minY;
+      const lz = src.z - offZ;
+      if (lx < 0 || lx >= bfsSide || ly < 0 || ly >= this.sizeY || lz < 0 || lz >= bfsSide) continue;
+      const idx = lx + bfsSide * (lz + bfsSide * ly);
+      if (bfsStamp[idx] === stamp && bfsVal[idx] >= src.level) continue;
+      bfsStamp[idx] = stamp;
+      bfsVal[idx] = src.level;
+      bfsSrc[idx] = li;
       bfsQ[tail++] = src.x;
       bfsQ[tail++] = src.y;
       bfsQ[tail++] = src.z;
+    }
 
-      while (head < tail) {
-        const x = bfsQ[head++];
-        const y = bfsQ[head++];
-        const z = bfsQ[head++];
-        const lx = x - offX;
-        const ly = y - offY;
-        const lz = z - offZ;
-        const curL = bfsVal[lx + bfsSide * (lz + bfsSide * ly)];
+    while (head < tail) {
+      const x = bfsQ[head++];
+      const y = bfsQ[head++];
+      const z = bfsQ[head++];
+      const lx = x - offX;
+      const ly = y - minY;
+      const lz = z - offZ;
+      const idx = lx + bfsSide * (lz + bfsSide * ly);
+      const curL = bfsVal[idx];
+      const src = nearbyLights[bfsSrc[idx]];
 
-        // Deposit light into padded chunk grid if inside bounds
-        if (x >= minPX && x <= maxPX && z >= minPZ && z <= maxPZ && y >= minY && y <= maxY) {
-          const pIdx = this._padIdx(x - minPX, y, z - minPZ);
-          const f = LIGHT_FALLOFF[curL];
-          const rr = src.r * f;
-          const gg = src.g * f;
-          const bb = src.b * f;
-          if (rr > padR[pIdx]) padR[pIdx] = rr;
-          if (gg > padG[pIdx]) padG[pIdx] = gg;
-          if (bb > padB[pIdx]) padB[pIdx] = bb;
-          if (curL > padMaxL[pIdx]) padMaxL[pIdx] = curL;
+      // Deposit light into padded chunk grid if inside bounds
+      if (x >= minPX && x <= maxPX && z >= minPZ && z <= maxPZ) {
+        const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+        const f = LIGHT_FALLOFF[curL];
+        const rr = src.r * f;
+        const gg = src.g * f;
+        const bb = src.b * f;
+        if (rr > padR[pIdx]) padR[pIdx] = rr;
+        if (gg > padG[pIdx]) padG[pIdx] = gg;
+        if (bb > padB[pIdx]) padB[pIdx] = bb;
+        if (curL > padMaxL[pIdx]) padMaxL[pIdx] = curL;
+      }
+
+      if (curL <= 1) continue;
+      const nextL = curL - 1;
+      const srcIdx = bfsSrc[idx];
+
+      for (let d = 0; d < 6; d++) {
+        const dir = DIRS_6[d];
+        const nx = x + dir[0];
+        const ny = y + dir[1];
+        const nz = z + dir[2];
+        if (nx < minX || nx > maxX || ny < minY || ny > maxY || nz < minZ || nz > maxZ) continue;
+        const nlx = nx - offX;
+        const nly = ny - minY;
+        const nlz = nz - offZ;
+        if (nlx < 0 || nlx >= bfsSide || nlz < 0 || nlz >= bfsSide) continue;
+
+        const nIdx = nlx + bfsSide * (nlz + bfsSide * nly);
+        if (bfsStamp[nIdx] === stamp && bfsVal[nIdx] >= nextL) continue;
+
+        // Fast zero-alloc block lookup
+        let nNum = 0;
+        if (streaming) {
+          const ncx = (nx >> 4) - cx + 1;
+          const ncz = (nz >> 4) - cz + 1;
+          const cd = (ncx >= 0 && ncx <= 2 && ncz >= 0 && ncz <= 2) ? chunkArr[ncx * 3 + ncz] : null;
+          if (cd) {
+            nNum = cd[(nx & 15) + 16 * ((nz & 15) + 16 * nly)];
+          }
+        } else if (grid) {
+          nNum = grid[(nx - minX) + sizeX * ((nz - minZ) + sizeZ * nly)];
         }
 
-        if (curL <= 1) continue;
-        const nextL = curL - 1;
+        // Opaque blocks strictly block light!
+        if (nNum !== 0 && transNum[nNum] !== 1) continue;
 
-        for (let d = 0; d < 6; d++) {
-          const dir = DIRS_6[d];
-          const nx = x + dir[0];
-          const ny = y + dir[1];
-          const nz = z + dir[2];
-          if (nx < minX || nx > maxX || ny < minY || ny > maxY || nz < minZ || nz > maxZ) continue;
-          const nlx = nx - offX;
-          const nly = ny - offY;
-          const nlz = nz - offZ;
-          if (nlx < 0 || nlx >= bfsSide || nly < 0 || nly >= bfsSide || nlz < 0 || nlz >= bfsSide) continue;
-
-          const nIdx = nlx + bfsSide * (nlz + bfsSide * nly);
-          if (bfsStamp[nIdx] === stamp && bfsVal[nIdx] >= nextL) continue;
-
-          // Opaque blocks strictly block light! Only air (0) or transparent blocks transmit light.
-          const nNum = this.getNum(nx, ny, nz);
-          if (nNum !== 0 && transNum[nNum] !== 1) continue;
-
-          bfsStamp[nIdx] = stamp;
-          bfsVal[nIdx] = nextL;
-          bfsQ[tail++] = nx;
-          bfsQ[tail++] = ny;
-          bfsQ[tail++] = nz;
-        }
+        bfsStamp[nIdx] = stamp;
+        bfsVal[nIdx] = nextL;
+        bfsSrc[nIdx] = srcIdx;
+        bfsQ[tail++] = nx;
+        bfsQ[tail++] = ny;
+        bfsQ[tail++] = nz;
       }
     }
 
@@ -533,27 +571,14 @@ export class WorldRenderer {
     if (missing.length === 0) return;
     missing.sort((a, b) => a.distSq - b.distSq);
 
-    const budget = 3; // Build 3 chunks per frame for silky 60fps streaming
+    const budget = 1; // Build 1 chunk per frame for stutter-free 60fps streaming
     const relightNeighbors = new Set();
     for (let i = 0; i < Math.min(budget, missing.length); i++) {
       const { cx, cz } = missing[i];
       this._ensureChunkData(cx, cz);
       this.rebuildChunk(cx, cz);
-      const list = this.chunkLights.get(`${cx},${cz}`);
-      if (list && list.length > 0) {
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dz = -1; dz <= 1; dz++) {
-            if (dx === 0 && dz === 0) continue;
-            const nck = `${cx + dx},${cz + dz}`;
-            if (this.chunkGroups.has(nck)) relightNeighbors.add(nck);
-          }
-        }
-      }
     }
-    for (const nck of relightNeighbors) {
-      const [nx, nz] = nck.split(',').map(Number);
-      this.rebuildChunk(nx, nz);
-    }
+    void relightNeighbors;
   }
 
   _writeBlockInternal(x, y, z, blockId) {
@@ -612,13 +637,12 @@ export class WorldRenderer {
     if (localZ === 0) toRebuild.add(`${cx},${cz - 1}`);
     if (localZ === CHUNK_SIZE - 1) toRebuild.add(`${cx},${cz + 1}`);
 
-    // If a light source changed OR an occluder near a light source changed, rebuild surrounding chunks!
+    // Only rebuild neighbor chunks actually within light reach (not all 9 unconditionally!)
     if (lightChanged || this._hasLightNear(x, y, z)) {
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          toRebuild.add(`${cx + dx},${cz + dz}`);
-        }
-      }
+      if (localX < MAX_LIGHT_LEVEL) toRebuild.add(`${cx - 1},${cz}`);
+      if (localX >= CHUNK_SIZE - MAX_LIGHT_LEVEL) toRebuild.add(`${cx + 1},${cz}`);
+      if (localZ < MAX_LIGHT_LEVEL) toRebuild.add(`${cx},${cz - 1}`);
+      if (localZ >= CHUNK_SIZE - MAX_LIGHT_LEVEL) toRebuild.add(`${cx},${cz + 1}`);
     }
 
     for (const ck of toRebuild) {
@@ -644,9 +668,10 @@ export class WorldRenderer {
       if (lz === 0) dirty.add(`${cx},${cz - 1}`);
       if (lz === CHUNK_SIZE - 1) dirty.add(`${cx},${cz + 1}`);
       if (lightChanged || this._hasLightNear(c.x, c.y, c.z)) {
-        for (let dx = -1; dx <= 1; dx++) {
-          for (let dz = -1; dz <= 1; dz++) dirty.add(`${cx + dx},${cz + dz}`);
-        }
+        if (lx < MAX_LIGHT_LEVEL) dirty.add(`${cx - 1},${cz}`);
+        if (lx >= CHUNK_SIZE - MAX_LIGHT_LEVEL) dirty.add(`${cx + 1},${cz}`);
+        if (lz < MAX_LIGHT_LEVEL) dirty.add(`${cx},${cz - 1}`);
+        if (lz >= CHUNK_SIZE - MAX_LIGHT_LEVEL) dirty.add(`${cx},${cz + 1}`);
       }
     }
     for (const ck of dirty) {
