@@ -47,26 +47,6 @@
       </div>
     </div>
 
-    <!-- Hidden bottom-right corner trigger for Admin Login -->
-    <button id="admin-corner-hotspot" type="button" class="admin-corner-hotspot" aria-label="관리자 로그인 열기" tabindex="-1"></button>
-
-    <!-- Hidden Admin Login Popup -->
-    <div id="admin-login-modal" class="admin-login-modal hidden">
-      <div class="admin-login-box">
-        <div class="admin-login-header">
-          <span>🛡️ 관리자 로그인</span>
-          <button id="btn-admin-login-close" type="button" class="modal-close">✕</button>
-        </div>
-        <form id="admin-login-form" autocomplete="off">
-          <label for="admin-login-id">관리자 아이디 (닉네임)</label>
-          <input id="admin-login-id" name="bw_adm_id" type="text" maxlength="16" placeholder="관리자 닉네임 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled required />
-          <label for="admin-login-pw" style="margin-top:10px;">관리자 비밀번호</label>
-          <input id="admin-login-pw" name="bw_adm_code" type="text" class="masked-input" placeholder="관리자 비밀번호 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled required />
-          <button type="submit" class="btn-primary" style="background:linear-gradient(135deg,#f59e0b,#d97706);">🛡️ 관리자 권한으로 입장</button>
-          <div id="admin-login-error" class="error-text"></div>
-        </form>
-      </div>
-    </div>
   </div>
 
   <!-- Underwater Screen Tint -->
@@ -429,11 +409,7 @@
       </div>
       <div class="modal-body">
         <div id="admin-auth-box" class="admin-auth-box">
-          <p class="small-note">특정 영역의 블록을 보호하려면 관리자 비밀번호를 입력하세요.</p>
-          <div class="input-row">
-            <input id="admin-pw-input" type="password" placeholder="관리자 비밀번호" />
-            <button id="btn-admin-unlock" class="btn-sm accent">관리자 인증</button>
-          </div>
+          <p class="small-note">채팅창(T)에 <code>/관리자모드</code> 를 입력하면 관리자 기능이 열립니다.</p>
         </div>
 
         <div id="admin-panel-box" class="hidden">
@@ -462,15 +438,6 @@
 
           <div class="section-title">👥 접속자 관리</div>
           <div id="adm-player-list" class="item-list" style="margin-bottom:10px;"></div>
-
-          <hr class="divider" />
-          <div class="section-title">🔑 관리자 비밀번호 변경</div>
-          <div class="input-row" style="margin-bottom:10px;">
-            <input id="adm-cur-pw" type="password" placeholder="현재 비밀번호" style="width:130px;" />
-            <input id="adm-new-pw" type="password" placeholder="새 비밀번호 (4자 이상)" style="width:155px;" />
-            <input id="adm-new-pw2" type="password" placeholder="새 비밀번호 확인" style="width:140px;" />
-            <button id="btn-adm-chpw" class="btn-sm accent">변경</button>
-          </div>
 
           <hr class="divider" />
           <div class="section-title">🔒 새 보호 구역 지정</div>

@@ -197,18 +197,6 @@ export class GameUI {
       this.cb.send({ type: 'admin_announce', text: txt });
       inp.value = '';
     });
-    document.getElementById('btn-adm-chpw')?.addEventListener('click', () => {
-      const curEl = document.getElementById('adm-cur-pw');
-      const n1El = document.getElementById('adm-new-pw');
-      const n2El = document.getElementById('adm-new-pw2');
-      const currentPassword = curEl.value;
-      const newPassword = n1El.value;
-      if (!currentPassword || !newPassword) return this.toast('현재 비밀번호와 새 비밀번호를 입력해주세요.', 'warn');
-      if (newPassword.length < 4 || newPassword.length > 64) return this.toast('새 비밀번호는 4~64자로 입력해주세요.', 'warn');
-      if (newPassword !== n2El.value) return this.toast('새 비밀번호 확인이 일치하지 않습니다.', 'warn');
-      this.cb.send({ type: 'admin_change_password', currentPassword, newPassword });
-      curEl.value = ''; n1El.value = ''; n2El.value = '';
-    });
 
     // Admin Photo / Map Auto-Builder
     this._imgBuilder = new ImageAutoBuilder(document.getElementById('adm-img-preview'));
@@ -448,16 +436,6 @@ export class GameUI {
     });
 
     // Admin controls
-    const submitAdminPw = () => {
-      const pw = document.getElementById('admin-pw-input').value;
-      if (!pw) return;
-      this.cb.send({ type: 'admin_auth', password: pw });
-      document.getElementById('admin-pw-input').value = '';
-    };
-    document.getElementById('btn-admin-unlock').addEventListener('click', submitAdminPw);
-    document.getElementById('admin-pw-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); submitAdminPw(); }
-    });
     document.getElementById('reg-set-pos1').addEventListener('click', () => {
       this.regPos1 = this.cb.getPlayerBlockPos();
       document.getElementById('reg-pos1-label').textContent = `(${this.regPos1.x}, ${this.regPos1.y}, ${this.regPos1.z})`;
@@ -486,9 +464,11 @@ export class GameUI {
       this.closeChat();
       if (text === '/관리자') {
         this.openModal('modal-admin');
-        if (!this.isAdmin) {
-          setTimeout(() => document.getElementById('admin-pw-input')?.focus(), 30);
-        }
+        return;
+      }
+      if (text === '/관리자모드') {
+        this.cb.send({ type: 'chat', text });
+        this.openModal('modal-admin');
         return;
       }
       if (text) this.cb.send({ type: 'chat', text });

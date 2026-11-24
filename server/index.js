@@ -40,28 +40,8 @@ const PORT = Number(process.env.PORT || 5220);
 const HOST = process.env.HOST || '127.0.0.1';
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 5);
-let adminPassword = process.env.ADMIN_PASSWORD || 'boxworld-admin';
 const DATA_DIR = path.resolve(ROOT_DIR, process.env.DATA_DIR || './data');
 
-function persistAdminPassword(newPw) {
-  const envPath = path.join(ROOT_DIR, '.env');
-  const lines = fs.existsSync(envPath)
-    ? fs.readFileSync(envPath, 'utf8').split(/\r?\n/)
-    : [];
-  let replaced = false;
-  const out = lines.map((line) => {
-    if (/^\s*ADMIN_PASSWORD\s*=/.test(line)) {
-      replaced = true;
-      return `ADMIN_PASSWORD=${newPw}`;
-    }
-    return line;
-  });
-  if (!replaced) out.push(`ADMIN_PASSWORD=${newPw}`);
-  const tmpPath = `${envPath}.tmp`;
-  fs.writeFileSync(tmpPath, out.join('\n').replace(/\n+$/, '\n'), { mode: 0o600 });
-  fs.renameSync(tmpPath, envPath);
-  try { fs.chmodSync(envPath, 0o600); } catch {}
-}
 
 const store = new WorldStore(DATA_DIR);
 const animals = new AnimalManager(store);
@@ -111,7 +91,7 @@ if (BASE_PATH) {
 
 const server = http.createServer(app);
 const wsPath = BASE_PATH ? `${BASE_PATH}/ws` : '/ws';
-const wss = new WebSocketServer({ server, path: wsPath });
+const wss = new WebSocketServer({ server, path: wsPath, maxPayload: 2 * 1024 * 1024 }); // 기본 100MB → 인터넷 공개라 2MB
 
 const players = new Map();
 const AVATAR_COLORS = ['#38bdf8', '#4ade80', '#f472b6', '#fbbf24', '#a78bfa'];
@@ -504,15 +484,7 @@ wss.on('connection', (ws) => {
         }
       }
 
-      // Optional direct Admin login from login screen
-      let isAdminLogin = false;
-      if (msg.adminPassword !== undefined && msg.adminPassword !== null && String(msg.adminPassword).length > 0) {
-        if (String(msg.adminPassword) !== adminPassword) {
-          send(ws, { type: 'join_error', message: '관리자 비밀번호가 올바르지 않습니다.' });
-          return;
-        }
-        isAdminLogin = true;
-      }
+      const isAdminLogin = false; // 관리자는 채팅 /관리자모드 로만 전환 (2026-11-24 pbk)
 
       const id = `p${nextPlayerSeq++}`;
       const worldMode = msg.world === 'job' ? 'job' : 'sandbox';
@@ -1651,26 +1623,6 @@ wss.on('connection', (ws) => {
         break;
       }
 
-      case 'admin_auth': {
-        if (String(msg.password || '') === adminPassword) {
-          player.isAdmin = true;
-          if (player.world === 'sandbox') {
-            if (!player.bag[0]) player.bag[0] = { block: 'protect_beacon', count: 16 };
-            else addItemToSlots(player.bag, 'protect_beacon', 16);
-            if (!player.bag[1]) player.bag[1] = { block: 'stealth_beacon', count: 16 };
-            else addItemToSlots(player.bag, 'stealth_beacon', 16);
-            send(ws, { type: 'bag_update', bag: player.bag });
-            syncSaboSwordForPlayer(player);
-          }
-          send(ws, { type: 'admin_status', isAdmin: true });
-          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 1번(보호 비콘)·2번(투명 보호 비콘) 슬롯에 지급되었습니다.' });
-          broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
-        } else {
-          send(ws, { type: 'toast', level: 'error', text: '관리자 비밀번호가 올바르지 않습니다.' });
-        }
-        break;
-      }
-
       case 'admin_set_config': {
         if (!player.isAdmin) return;
         const prevSabo = store.config.saboSwordEnabled;
@@ -1684,32 +1636,6 @@ wss.on('connection', (ws) => {
           syncSaboSwordForAllAdmins();
         }
         send(ws, { type: 'toast', level: 'success', text: '⚙️ 서버 관리자 설정이 적용되었습니다.' });
-        break;
-      }
-
-      case 'admin_change_password': {
-        if (!player.isAdmin) {
-          send(ws, { type: 'toast', level: 'error', text: '관리자만 비밀번호를 변경할 수 있습니다.' });
-          return;
-        }
-        const curPw = String(msg.currentPassword || '');
-        const newPw = String(msg.newPassword || '');
-        if (curPw !== adminPassword) {
-          send(ws, { type: 'toast', level: 'error', text: '현재 관리자 비밀번호가 일치하지 않습니다.' });
-          return;
-        }
-        if (newPw.length < 4 || newPw.length > 64 || /[\r\n]/.test(newPw)) {
-          send(ws, { type: 'toast', level: 'warn', text: '새 비밀번호는 줄바꿈 없이 4~64자로 입력해주세요.' });
-          return;
-        }
-        try {
-          persistAdminPassword(newPw);
-          adminPassword = newPw;
-          send(ws, { type: 'toast', level: 'success', text: '🔑 관리자 비밀번호가 즉시 변경 및 저장되었습니다!' });
-        } catch (err) {
-          console.error('[Admin] Failed to persist password:', err);
-          send(ws, { type: 'toast', level: 'error', text: '서버 .env 저장 중 오류가 발생했습니다.' });
-        }
         break;
       }
 
@@ -1767,13 +1693,20 @@ wss.on('connection', (ws) => {
       case 'chat': {
         const text = String(msg.text || '').trim().slice(0, 200);
         if (!text) return;
-        if (text.startsWith('/admin ')) {
-          if (text.slice(7).trim() === adminPassword) {
-            player.isAdmin = true;
-            send(ws, { type: 'admin_status', isAdmin: true });
-            send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드가 활성화되었습니다.' });
-            broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
-          } else send(ws, { type: 'toast', level: 'error', text: '관리자 비밀번호가 올바르지 않습니다.' });
+        if (text === '/관리자모드') {
+          // 비밀번호 없이 누구나 관리자 전환 (2026-11-24 pbk 결정 — 게임 데이터 가치 낮음)
+          player.isAdmin = true;
+          if (player.world === 'sandbox') {
+            if (!player.bag[0]) player.bag[0] = { block: 'protect_beacon', count: 16 };
+            else addItemToSlots(player.bag, 'protect_beacon', 16);
+            if (!player.bag[1]) player.bag[1] = { block: 'stealth_beacon', count: 16 };
+            else addItemToSlots(player.bag, 'stealth_beacon', 16);
+            send(ws, { type: 'bag_update', bag: player.bag });
+            syncSaboSwordForPlayer(player);
+          }
+          send(ws, { type: 'admin_status', isAdmin: true });
+          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 1번(보호 비콘)·2번(투명 보호 비콘) 슬롯에 지급되었습니다.' });
+          broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
           return;
         }
         if (text === '/item') {
