@@ -1300,11 +1300,9 @@ wss.on('connection', (ws) => {
         const k = `${x},${y},${z}`;
         const signsMap = player.world === 'job' ? jobWorld.signs : (player.world === 'center' ? centerWorld.signs : store.signs);
         const s = signsMap[k];
-        const canEdit = player.world === 'center'
-          ? true
-          : (player.world === 'sandbox'
-            ? (player.isAdmin || !store.findProtectingRegion(x, y, z))
-            : !!player.isAdmin);
+        const canEdit = player.world === 'sandbox'
+          ? (player.isAdmin || !store.findProtectingRegion(x, y, z))
+          : !!player.isAdmin;
         const boardKey = `${player.world}:${k}`;
         send(ws, {
           type: 'sign_board_data',
@@ -1350,7 +1348,7 @@ wss.on('connection', (ws) => {
             broadcast({ type: 'signs_update', signs: store.signs }, null, 'sandbox');
             send(ws, { type: 'toast', level: 'success', text: '🪧 표지판 문구가 저장되었습니다!' });
           }
-        } else if (player.world === 'center' || player.isAdmin) {
+        } else if (player.isAdmin) {
           const signsMap = player.world === 'job' ? jobWorld.signs : centerWorld.signs;
           const k = `${x},${y},${z}`;
           if (signsMap[k]) {
