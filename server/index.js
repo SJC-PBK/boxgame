@@ -48,6 +48,16 @@ const store = new WorldStore(DATA_DIR);
 const animals = new AnimalManager(store);
 const jobWorld = createJobVillageWorld();
 const centerWorld = createCenterWorld();
+// Restore persisted sign text overrides for center & job worlds
+for (const [k, txt] of Object.entries(store.signOverrides || {})) {
+  if (k.startsWith('center:')) {
+    const coord = k.slice(7);
+    if (centerWorld.signs[coord]) centerWorld.signs[coord].text = txt;
+  } else if (k.startsWith('job:')) {
+    const coord = k.slice(4);
+    if (jobWorld.signs[coord]) jobWorld.signs[coord].text = txt;
+  }
+}
 
 // Real-time moving elevator state machine for Happiness Plus Center (1F~5F)
 const centerElevator = {
@@ -1263,9 +1273,11 @@ wss.on('connection', (ws) => {
         const k = `${x},${y},${z}`;
         const signsMap = player.world === 'job' ? jobWorld.signs : (player.world === 'center' ? centerWorld.signs : store.signs);
         const s = signsMap[k];
-        const canEdit = player.world === 'sandbox'
-          ? (player.isAdmin || !store.findProtectingRegion(x, y, z))
-          : !!player.isAdmin;
+        const canEdit = player.world === 'center'
+          ? true
+          : (player.world === 'sandbox'
+            ? (player.isAdmin || !store.findProtectingRegion(x, y, z))
+            : !!player.isAdmin);
         const boardKey = `${player.world}:${k}`;
         send(ws, {
           type: 'sign_board_data',
@@ -1311,11 +1323,12 @@ wss.on('connection', (ws) => {
             broadcast({ type: 'signs_update', signs: store.signs }, null, 'sandbox');
             send(ws, { type: 'toast', level: 'success', text: '🪧 표지판 문구가 저장되었습니다!' });
           }
-        } else if (player.isAdmin) {
+        } else if (player.world === 'center' || player.isAdmin) {
           const signsMap = player.world === 'job' ? jobWorld.signs : centerWorld.signs;
           const k = `${x},${y},${z}`;
           if (signsMap[k]) {
-            signsMap[k].text = String(text || '').trim().slice(0, 60) || '표지판';
+            const clean = store.setSignOverride(`${player.world}:${k}`, text);
+            signsMap[k].text = clean;
             broadcast({ type: 'signs_update', signs: signsMap }, null, player.world);
             send(ws, { type: 'toast', level: 'success', text: '🪧 표지판 문구가 저장되었습니다!' });
           }

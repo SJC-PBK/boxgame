@@ -48,6 +48,7 @@ export class WorldStore {
       furnaces: path.join(this.dataDir, 'furnaces.json'),
       signs: path.join(this.dataDir, 'signs.json'),
       signPosts: path.join(this.dataDir, 'sign_posts.json'),
+      signOverrides: path.join(this.dataDir, 'sign_overrides.json'),
       portals: path.join(this.dataDir, 'portals.json'),
       beacons: path.join(this.dataDir, 'beacons.json'),
       facings: path.join(this.dataDir, 'facings.json'),
@@ -64,6 +65,7 @@ export class WorldStore {
     this.furnaces = {};
     this.signs = {};
     this.signPosts = {};
+    this.signOverrides = {};
     this.portals = {};
     this.beacons = {};
     this.facings = {};
@@ -107,6 +109,7 @@ export class WorldStore {
       else if (kind === 'furnaces') this._writeJsonAtomic(this.files.furnaces, this.furnaces);
       else if (kind === 'signs') this._writeJsonAtomic(this.files.signs, this.signs);
       else if (kind === 'signPosts') this._writeJsonAtomic(this.files.signPosts, this.signPosts);
+      else if (kind === 'signOverrides') this._writeJsonAtomic(this.files.signOverrides, this.signOverrides);
       else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
       else if (kind === 'beacons') this._writeJsonAtomic(this.files.beacons, this.beacons);
       else if (kind === 'facings') this._writeJsonAtomic(this.files.facings, this.facings);
@@ -134,6 +137,8 @@ export class WorldStore {
     const savedSigns = this._readJson(this.files.signs);
     const savedSignPosts = this._readJson(this.files.signPosts);
     this.signPosts = (savedSignPosts && typeof savedSignPosts === 'object') ? savedSignPosts : {};
+    const savedSignOverrides = this._readJson(this.files.signOverrides);
+    this.signOverrides = (savedSignOverrides && typeof savedSignOverrides === 'object') ? savedSignOverrides : {};
     const savedPortals = this._readJson(this.files.portals);
     const savedBeacons = this._readJson(this.files.beacons);
     const savedFacings = this._readJson(this.files.facings);
@@ -495,6 +500,12 @@ export class WorldStore {
     this.signs[k] = { x, y, z, text: String(text || '').trim().slice(0, 60) || '표지판', author };
     this._scheduleSave('signs', 100);
     return this.signs[k];
+  }
+
+  setSignOverride(key, text) {
+    this.signOverrides[key] = String(text || '').trim().slice(0, 60) || '표지판';
+    this._scheduleSave('signOverrides', 100);
+    return this.signOverrides[key];
   }
 
   getSignPosts(boardKey) {
