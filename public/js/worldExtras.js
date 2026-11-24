@@ -687,7 +687,7 @@ export class WorldExtras {
 
   getElevatorTopY() {
     if (!this._elevState) return null;
-    return (this._elevCurrentY ?? this._elevState.targetY) + 1.0;
+    return (this._elevCurrentY ?? this._elevState.targetY) + 1.005;
   }
 
   isElevatorMoving() {
@@ -701,7 +701,14 @@ export class WorldExtras {
   isInsideElevator(pos) {
     if (!this._elevState || !this._elevState.config) return false;
     const c = this._elevState.config;
-    return pos.x >= c.minX - 0.15 && pos.x <= c.maxX + 0.15 &&
-           pos.z >= c.minZ - 0.15 && pos.z <= c.maxZ - 0.05;
+    return pos.x >= c.minX - 0.1 && pos.x <= c.maxX + 0.1 &&
+           pos.z >= c.minZ - 0.1 && pos.z <= c.maxZ + 0.15;
+  }
+
+  isNearElevator(pos) {
+    if (!this._elevState || !this._elevState.config) return false;
+    const c = this._elevState.config;
+    return pos.x >= c.minX - 1.5 && pos.x <= c.maxX + 1.5 &&
+           pos.z >= c.minZ - 0.2 && pos.z <= c.maxZ + 2.5;
   }
 }

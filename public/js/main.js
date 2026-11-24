@@ -1178,13 +1178,13 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (e.code.startsWith('Digit')) {
-    const n = Number(e.code.slice(5));
-    if (currentWorldMode === 'center' && worldExtras.isInsideElevator(playerPos) && n >= 1 && n <= 5) {
+  if (e.code.startsWith('Digit') || e.code.startsWith('Numpad')) {
+    const n = Number(e.code.replace(/^(Digit|Numpad)/, ''));
+    if (currentWorldMode === 'center' && (worldExtras.isInsideElevator(playerPos) || worldExtras.isNearElevator(playerPos)) && n >= 1 && n <= 5) {
       send({ type: 'elevator_call', floor: n });
       return;
     }
-    if (n >= 1 && n <= 9) ui.setActiveSlot(n - 1);
+    if (e.code.startsWith('Digit') && n >= 1 && n <= 9) ui.setActiveSlot(n - 1);
   }
 
   if (e.code === 'Space' && !e.repeat) {
@@ -1405,13 +1405,14 @@ function updatePhysics(dt) {
   if (currentWorldMode === 'center' && worldExtras.isInsideElevator(playerPos)) {
     const cabTopY = worldExtras.getElevatorTopY();
     const evState = worldExtras.getElevatorState();
-    if (!flyMode && cabTopY !== null && playerPos.y <= cabTopY + 0.85 && playerPos.y >= cabTopY - 1.4) {
+    if (!flyMode && cabTopY !== null && playerPos.y <= cabTopY + 1.1 && playerPos.y >= cabTopY - 1.6) {
       playerPos.y = cabTopY;
-      if (playerVel.y < 0) playerVel.y = 0;
+      playerVel.y = 0;
       onGround = true;
     }
     if (evState && evState.moving && evState.config) {
       playerPos.z = Math.min(playerPos.z, evState.config.maxZ - 0.35);
+      playerPos.x = Math.max(evState.config.minX + 0.32, Math.min(evState.config.maxX - 0.32, playerPos.x));
     }
   }
 
@@ -1478,16 +1479,16 @@ function animate(now) {
   lastTime = now;
 
   if (joined) {
+    worldExtras.update(dt);
     const isMoving = updatePhysics(dt);
     remotePlayers.update(dt);
     animalRenderer.update(dt);
-    worldExtras.update(dt);
-    // Update Happiness Plus Center Elevator HUD when riding inside cab
+    // Update Happiness Plus Center Elevator HUD when inside or right outside elevator
     const elElevHud = document.getElementById('elevator-hud');
     if (elElevHud) {
-      const inElev = currentWorldMode === 'center' && worldExtras.isInsideElevator(playerPos);
-      elElevHud.classList.toggle('hidden', !inElev);
-      if (inElev) {
+      const showElev = currentWorldMode === 'center' && (worldExtras.isInsideElevator(playerPos) || worldExtras.isNearElevator(playerPos));
+      elElevHud.classList.toggle('hidden', !showElev);
+      if (showElev) {
         const es = worldExtras.getElevatorState();
         if (es) {
           const led = document.getElementById('elev-hud-floor');
