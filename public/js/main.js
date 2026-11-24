@@ -1296,10 +1296,29 @@ function updatePhysics(dt) {
   const hpFactor = 0.45 + 0.55 * (Math.max(0, ui.hp) / 20);
   const speed = flyMode ? 10.5 : (5.8 * hpFactor * (sprinting ? 1.55 : 1.0));
   const tryStepUp = (nx, nz) => {
-    if (!onGround || flyMode) return false;
-    const hitBlock = worldRenderer?.getBlock(Math.floor(nx), Math.floor(playerPos.y), Math.floor(nz));
-    if (hitBlock && hitBlock.startsWith('stairs_') && !collides(nx, playerPos.y + 1.02, nz)) {
-      playerPos.y = Math.floor(playerPos.y) + 1.01;
+    if (flyMode || !worldRenderer || (!onGround && playerVel.y > 0.2)) return false;
+    const footY = Math.floor(playerPos.y + 0.05);
+    const minBX = Math.floor(nx - PLAYER_RADIUS);
+    const maxBX = Math.floor(nx + PLAYER_RADIUS);
+    const minBZ = Math.floor(nz - PLAYER_RADIUS);
+    const maxBZ = Math.floor(nz + PLAYER_RADIUS);
+    let hitStair = false;
+    for (let bx = minBX; bx <= maxBX; bx++) {
+      for (let bz = minBZ; bz <= maxBZ; bz++) {
+        const blk = worldRenderer.getBlock(bx, footY, bz);
+        if (blk && blk.startsWith('stairs_')) {
+          hitStair = true;
+          break;
+        }
+      }
+      if (hitStair) break;
+    }
+    if (!hitStair) return false;
+    const stepY = footY + 1.005;
+    if (!collides(nx, stepY, nz)) {
+      playerPos.y = stepY;
+      if (playerVel.y < 0) playerVel.y = 0;
+      onGround = true;
       return true;
     }
     return false;
