@@ -248,6 +248,7 @@ export class GameUI {
         sensitivity: Number(document.getElementById('set-sens').value),
         volume: Number(document.getElementById('set-vol').value) / 100,
         quality: Number(document.getElementById('set-quality').value),
+        theme: document.getElementById('set-theme')?.value || 'default',
         invertY: document.getElementById('set-invert-y').checked,
         particles: document.getElementById('set-particles').checked,
         showCoords: document.getElementById('set-show-coords').checked,
@@ -261,7 +262,7 @@ export class GameUI {
       try { localStorage.setItem('boxworld_settings', JSON.stringify(s)); } catch {}
       this.cb.onApplySettings?.(s);
     };
-    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-invert-y', 'set-particles', 'set-show-coords', 'set-touch-ui', 'set-remote-look']) {
+    for (const id of ['set-fov', 'set-dist', 'set-sens', 'set-vol', 'set-quality', 'set-theme', 'set-invert-y', 'set-particles', 'set-show-coords', 'set-touch-ui', 'set-remote-look']) {
       document.getElementById(id)?.addEventListener('input', bindSetting);
       document.getElementById(id)?.addEventListener('change', bindSetting);
     }
@@ -271,6 +272,7 @@ export class GameUI {
       document.getElementById('set-sens').value = 1.0;
       document.getElementById('set-vol').value = 100;
       document.getElementById('set-quality').value = 2;
+      if (document.getElementById('set-theme')) document.getElementById('set-theme').value = 'default';
       document.getElementById('set-invert-y').checked = false;
       document.getElementById('set-particles').checked = true;
       document.getElementById('set-show-coords').checked = true;
@@ -288,6 +290,7 @@ export class GameUI {
         if (saved.sensitivity) document.getElementById('set-sens').value = saved.sensitivity;
         if (typeof saved.volume === 'number') document.getElementById('set-vol').value = Math.round(saved.volume * 100);
         if (saved.quality) document.getElementById('set-quality').value = saved.quality;
+        if (saved.theme && document.getElementById('set-theme')) document.getElementById('set-theme').value = saved.theme;
         document.getElementById('set-invert-y').checked = !!saved.invertY;
         document.getElementById('set-particles').checked = saved.particles !== false;
         document.getElementById('set-show-coords').checked = saved.showCoords !== false;
@@ -309,22 +312,41 @@ export class GameUI {
         if (tab === 'pixel' && !this.pixelEditor) {
           this.pixelEditor = new PixelSkinEditor(
             document.getElementById('pixel-skin-canvas'),
-            document.getElementById('px-palette')
+            document.getElementById('px-palette'),
+            document.getElementById('px-preview-3d')
           );
         }
         if (tab === 'gallery') this.renderSkinGallery();
       });
     });
 
-    // 64x64 Pixel Editor controls
+    // 64x64 Pixel Editor controls (Kids Paint Studio)
+    const clearToolHighlight = () => {
+      document.querySelectorAll('#px-tool-btns [data-pxtool], #px-stamp-btns [data-pxstamp]').forEach(b => b.classList.remove('accent'));
+    };
     document.querySelectorAll('#px-tool-btns [data-pxtool]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('#px-tool-btns [data-pxtool]').forEach(b => b.classList.remove('accent'));
+        clearToolHighlight();
         btn.classList.add('accent');
         this.pixelEditor?.setTool(btn.dataset.pxtool);
       });
     });
-    document.getElementById('btn-px-undo').addEventListener('click', () => this.pixelEditor?.undo());
+    document.querySelectorAll('#px-stamp-btns [data-pxstamp]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        clearToolHighlight();
+        btn.classList.add('accent');
+        this.pixelEditor?.setStamp(btn.dataset.pxstamp);
+      });
+    });
+    document.getElementById('btn-px-undo')?.addEventListener('click', () => this.pixelEditor?.undo());
+    document.getElementById('btn-px-redo')?.addEventListener('click', () => this.pixelEditor?.redo());
+    document.getElementById('btn-px-reset')?.addEventListener('click', () => this.pixelEditor?.resetTemplate());
+    document.getElementById('px-mirror')?.addEventListener('change', (e) => this.pixelEditor?.setMirrorMode(e.target.checked));
+    document.getElementById('px-brush-size')?.addEventListener('change', (e) => this.pixelEditor?.setBrushSize(e.target.value));
+    document.getElementById('btn-px-sel-fill')?.addEventListener('click', () => this.pixelEditor?.fillSelection());
+    document.getElementById('btn-px-sel-clear')?.addEventListener('click', () => this.pixelEditor?.clearSelectionPixels());
+    document.getElementById('btn-px-sel-flip')?.addEventListener('click', () => this.pixelEditor?.flipSelectionH());
+    document.getElementById('btn-px-sel-none')?.addEventListener('click', () => this.pixelEditor?.clearSelectionBox());
     document.getElementById('px-custom-color').addEventListener('input', (e) => this.pixelEditor?.setColor(e.target.value));
     document.getElementById('btn-px-download').addEventListener('click', () => this.pixelEditor?.downloadPng(`${this.selfNick || 'boxworld'}-skin.png`));
     document.getElementById('px-upload-input').addEventListener('change', (e) => {
@@ -857,6 +879,7 @@ export class GameUI {
           'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
           'bed', 'door_closed', 'door_stone_closed', 'door_iron_closed', 'door_glass_closed',
           'stairs_wood', 'stairs_cobble', 'stairs_brick', 'stairs_stone', 'torch',
+          'redstone_wire', 'lever_off', 'pressure_plate', 'redstone_lamp_off',
           'ladder', 'sign', 'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
         ]
       : ['protect_beacon', 'stealth_beacon'];
@@ -1575,7 +1598,8 @@ export class GameUI {
     if (!this.pixelEditor) {
       this.pixelEditor = new PixelSkinEditor(
         document.getElementById('pixel-skin-canvas'),
-        document.getElementById('px-palette')
+        document.getElementById('px-palette'),
+        document.getElementById('px-preview-3d')
       );
     }
     if (s.pixelDataUrl) this.pixelEditor.loadDataUrl(s.pixelDataUrl);

@@ -49,7 +49,15 @@ const HELD_LIGHT_PROPS = {
 };
 const DEFAULT_PLAYER_LIGHT_COLOR = new THREE.Color(0xffe6b3);
 const elUnderwaterTint = document.getElementById('underwater-tint');
+const elDebugHud = document.getElementById('debug-hud');
 let _lastUwState = false;
+let debugHudVisible = false;
+let _fpsFrames = 0;
+let _fpsLastTime = performance.now();
+let _curFps = 60;
+let _wsPingMs = 0;
+let _lastPingSent = 0;
+let _lastPlateSent = 0;
 let cameraShake = 0;
 
 const sky = new SkySystem(scene, hemiLight, dirLight);
@@ -287,6 +295,13 @@ function applyGameSettings(s) {
   mouseSensitivity = s.sensitivity || 1.0;
   invertY = !!s.invertY;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, s.quality || 2));
+  const themeFilters = {
+    default: 'none',
+    pastel: 'saturate(0.82) brightness(1.08) contrast(0.94)',
+    vivid: 'saturate(1.32) contrast(1.06)',
+    retro: 'sepia(0.22) contrast(1.14) saturate(1.1)'
+  };
+  canvas.style.filter = themeFilters[s.theme] || 'none';
   sound.setVolume(typeof s.volume === 'number' ? s.volume : 1.0);
   if (worldRenderer) {
     worldRenderer.particlesEnabled = s.particles !== false;
@@ -488,6 +503,7 @@ function handleServerMessage(msg) {
       }
       worldRenderer = new WorldRenderer(scene, textures, catalog, worldBounds);
       worldRenderer.showAdminBlocks = !!selfPlayer.isAdmin;
+      worldRenderer.setFacings(msg.facings || {});
       worldExtras.setBeaconsVisible(!!selfPlayer.isAdmin);
       regionVis.setVisible(!!selfPlayer.isAdmin);
       const regToggle = document.getElementById('toggle-region-boxes');
@@ -684,6 +700,10 @@ function handleServerMessage(msg) {
       ui.updateVitals(msg.hp, msg.hunger);
       break;
 
+    case 'pong_check':
+      if (typeof msg.ts === 'number') _wsPingMs = Math.max(0, Math.round(performance.now() - msg.ts));
+      break;
+
     case 'warp_to':
       warpPlayer(msg.x, msg.y, msg.z, msg.label);
       break;
@@ -721,7 +741,7 @@ function handleServerMessage(msg) {
         } else if (msg.block) {
           sound.playPlace(catalog[msg.block]?.sound || 'wood', { x: msg.x + 0.5, y: msg.y + 0.5, z: msg.z + 0.5 });
         }
-        worldRenderer.setBlock(msg.x, msg.y, msg.z, msg.block);
+        worldRenderer.setBlock(msg.x, msg.y, msg.z, msg.block, msg.facing);
         if (projector?.activeBlueprint) projector.refresh();
       }
       break;
@@ -903,6 +923,12 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'toggle_door', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
+    if (currentHit.block === 'lever_off' || currentHit.block === 'lever_on') {
+      fpHand?.triggerSwing();
+      sound.playDoor();
+      send({ type: 'toggle_lever', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      return;
+    }
     if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb' || currentHit.block === 'water_bomb' || currentHit.block === 'flatten_bomb') {
       fpHand?.triggerSwing();
       const heldIdNow = ui.getActiveItemId();
@@ -1008,7 +1034,10 @@ function handleRightClickOrInteract(interactOnly = false) {
     if (overlapsPlayer) return;
   }
   fpHand?.triggerSwing();
-  send({ type: 'block_place', x: px, y: py, z: pz, slotIndex: activeIdx });
+  // Compute 4-way cardinal facing from player look direction: 0=N(-Z), 1=E(+X), 2=S(+Z), 3=W(-X)
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const facing = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
+  send({ type: 'block_place', x: px, y: py, z: pz, slotIndex: activeIdx, facing });
 }
 
 canvas.addEventListener('click', () => {
@@ -1122,6 +1151,12 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(true); return; }
 
+  if (e.code === 'F3') {
+    e.preventDefault();
+    debugHudVisible = !debugHudVisible;
+    elDebugHud?.classList.toggle('hidden', !debugHudVisible);
+    return;
+  }
   if (e.code === 'KeyV' || e.code === 'F5') {
     e.preventDefault();
     toggleCameraView();
@@ -1278,6 +1313,10 @@ function updatePhysics(dt) {
     // Ladder climbing & water swimming check
     const bx = Math.floor(playerPos.x), by = Math.floor(playerPos.y), bz = Math.floor(playerPos.z);
     const bFeet = worldRenderer?.getBlock(bx, by, bz);
+    if (bFeet === 'pressure_plate' && performance.now() - _lastPlateSent > 600) {
+      _lastPlateSent = performance.now();
+      send({ type: 'trigger_plate', x: bx, y: by, z: bz });
+    }
     const bHead = worldRenderer?.getBlock(bx, by + 1, bz);
     const onLadder = bFeet === 'ladder' || bHead === 'ladder';
     const inWater = bFeet === 'water' || bHead === 'water';
@@ -1526,5 +1565,31 @@ function animate(now) {
   }
 
   renderer.render(scene, camera);
+
+  // F3 Performance & Debug HUD
+  _fpsFrames++;
+  if (now - _fpsLastTime >= 500) {
+    _curFps = Math.round((_fpsFrames * 1000) / (now - _fpsLastTime));
+    _fpsFrames = 0;
+    _fpsLastTime = now;
+    if (joined && debugHudVisible && elDebugHud) {
+      if (now - _lastPingSent >= 2000) {
+        _lastPingSent = now;
+        send({ type: 'ping_check', ts: now });
+      }
+      const bx = Math.floor(playerPos.x), by = Math.floor(playerPos.y), bz = Math.floor(playerPos.z);
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      const fDir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? '동(+X)' : '서(-X)') : (fz < 0 ? '북(-Z)' : '남(+Z)');
+      const bLight = worldRenderer ? worldRenderer.getBlockLightAt(bx, by + 1, bz) : 0;
+      const chunks = worldRenderer ? worldRenderer.chunkGroups.size : 0;
+      const ri = renderer.info.render;
+      elDebugHud.textContent =
+        `Boxworld F3 디버그\n` +
+        `FPS: ${_curFps}  |  Ping: ${_wsPingMs}ms\n` +
+        `DrawCalls: ${ri.calls}  |  Tris: ${ri.triangles.toLocaleString()}\n` +
+        `Chunks: ${chunks}  |  BlockLight: ${bLight}/10\n` +
+        `XYZ: ${bx}, ${by}, ${bz}  |  방향: ${fDir}`;
+    }
+  }
 }
 requestAnimationFrame(animate);

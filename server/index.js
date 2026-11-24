@@ -413,6 +413,91 @@ function igniteFuseAt(x, y, z, isAdmin, depth = 0) {
   return true;
 }
 
+const plateTimers = new Map();
+const DOOR_OPEN_MAP = {
+  door_closed: 'door_open',
+  door_stone_closed: 'door_stone_open',
+  door_iron_closed: 'door_iron_open',
+  door_glass_closed: 'door_glass_open'
+};
+const DOOR_CLOSE_MAP = {
+  door_open: 'door_closed',
+  door_stone_open: 'door_stone_closed',
+  door_iron_open: 'door_iron_closed',
+  door_glass_open: 'door_glass_closed'
+};
+
+function propagateRedstoneSignal(sx, sy, sz, powerOn, isAdmin) {
+  const visited = new Set([`${sx},${sy},${sz}`]);
+  const queue = [{ x: sx, y: sy, z: sz, dist: 0 }];
+  const changes = [];
+  const changedSet = new Set();
+
+  const applyChange = (x, y, z, nextBlock) => {
+    const k = `${x},${y},${z}`;
+    if (changedSet.has(k)) return;
+    changedSet.add(k);
+    store.setBlock(x, y, z, nextBlock);
+    changes.push({ x, y, z, block: nextBlock });
+  };
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur.dist >= 16) continue;
+
+    for (const [dx, dy, dz] of FUSE_STEP_DIRS) {
+      const nx = cur.x + dx, ny = cur.y + dy, nz = cur.z + dz;
+      if (!store.inBounds(nx, ny, nz)) continue;
+      const nk = `${nx},${ny},${nz}`;
+      const nb = store.getBlock(nx, ny, nz);
+      if (!nb) continue;
+
+      if (nb === 'redstone_wire' && !visited.has(nk)) {
+        visited.add(nk);
+        queue.push({ x: nx, y: ny, z: nz, dist: cur.dist + 1 });
+        continue;
+      }
+
+      // Only orthogonal / immediate neighbors of wire/switch get powered
+      if (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) > 1) continue;
+
+      if (powerOn) {
+        if (DOOR_OPEN_MAP[nb]) {
+          const next = DOOR_OPEN_MAP[nb];
+          applyChange(nx, ny, nz, next);
+          if (store.inBounds(nx, ny + 1, nz) && store.getBlock(nx, ny + 1, nz) === nb) applyChange(nx, ny + 1, nz, next);
+          if (store.inBounds(nx, ny - 1, nz) && store.getBlock(nx, ny - 1, nz) === nb) applyChange(nx, ny - 1, nz, next);
+        } else if (nb === 'redstone_lamp_off') {
+          applyChange(nx, ny, nz, 'redstone_lamp_on');
+        } else if (nb === 'tnt') {
+          igniteTNTAt(nx, ny, nz, isAdmin, 2400);
+        } else if (nb === 'fill_bomb') {
+          igniteFillBombAt(nx, ny, nz, isAdmin, 2000);
+        } else if (nb === 'water_bomb') {
+          igniteWaterBombAt(nx, ny, nz, isAdmin, 2000);
+        } else if (nb === 'flatten_bomb') {
+          igniteFlattenBombAt(nx, ny, nz, isAdmin, 2000);
+        } else if (nb === 'fuse') {
+          igniteFuseAt(nx, ny, nz, isAdmin, 0);
+        }
+      } else {
+        if (DOOR_CLOSE_MAP[nb]) {
+          const next = DOOR_CLOSE_MAP[nb];
+          applyChange(nx, ny, nz, next);
+          if (store.inBounds(nx, ny + 1, nz) && store.getBlock(nx, ny + 1, nz) === nb) applyChange(nx, ny + 1, nz, next);
+          if (store.inBounds(nx, ny - 1, nz) && store.getBlock(nx, ny - 1, nz) === nb) applyChange(nx, ny - 1, nz, next);
+        } else if (nb === 'redstone_lamp_on') {
+          applyChange(nx, ny, nz, 'redstone_lamp_off');
+        }
+      }
+    }
+  }
+
+  if (changes.length > 0) {
+    broadcast({ type: 'blocks_batch', changes });
+  }
+}
+
 function scheduleSaplingGrowth(x, y, z) {
   setTimeout(() => {
     const changes = store.growSapling(x, y, z);
@@ -556,6 +641,7 @@ wss.on('connection', (ws) => {
         signs: worldMode === 'job' ? jobWorld.signs : store.signs,
         portals: worldMode === 'job' ? {} : store.portals,
         beacons: worldMode === 'job' ? {} : store.beacons,
+        facings: worldMode === 'job' ? {} : store.facings,
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
         regions: worldMode === 'job' ? [] : store.regions,
@@ -808,19 +894,25 @@ wss.on('connection', (ws) => {
           slot.count -= 1;
           if (slot.count <= 0) player.bag[idx] = null;
         }
+        const facingVal = (blockId.startsWith('stairs_') || isDoorBlock) ? (Number(msg.facing || 0) & 3) : undefined;
         store.setBlock(x, y, z, blockId, player.nickname);
+        if (facingVal !== undefined) store.setFacing(x, y, z, facingVal);
         if (isDoorBlock) {
           store.setBlock(x, y + 1, z, blockId, player.nickname);
+          store.setFacing(x, y + 1, z, facingVal);
           send(ws, { type: 'bag_update', bag: player.bag });
           broadcast({
             type: 'blocks_batch',
-            changes: [{ x, y, z, block: blockId }, { x, y: y + 1, z, block: blockId }],
+            changes: [
+              { x, y, z, block: blockId, facing: facingVal },
+              { x, y: y + 1, z, block: blockId, facing: facingVal }
+            ],
             by: player.nickname
           });
           break;
         }
         send(ws, { type: 'bag_update', bag: player.bag });
-        broadcast({ type: 'block_update', x, y, z, block: blockId, by: player.nickname });
+        broadcast({ type: 'block_update', x, y, z, block: blockId, facing: facingVal, by: player.nickname });
 
         if (blockId === 'sapling') {
           send(ws, { type: 'toast', level: 'success', text: '🌱 묘목을 심었습니다! 잠시 후 나무로 자랍니다.' });
@@ -986,6 +1078,33 @@ wss.on('connection', (ws) => {
           changes.push({ x, y: y - 1, z, block: next });
         }
         broadcast({ type: 'blocks_batch', changes, by: player.nickname });
+        break;
+      }
+
+      case 'toggle_lever': {
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z)) return;
+        const cur = store.getBlock(x, y, z);
+        if (cur !== 'lever_off' && cur !== 'lever_on') return;
+        const next = cur === 'lever_off' ? 'lever_on' : 'lever_off';
+        store.setBlock(x, y, z, next);
+        broadcast({ type: 'block_update', x, y, z, block: next, by: player.nickname });
+        propagateRedstoneSignal(x, y, z, next === 'lever_on', player.isAdmin);
+        break;
+      }
+
+      case 'trigger_plate': {
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'pressure_plate') return;
+        const pk = `${x},${y},${z}`;
+        const alreadyActive = plateTimers.has(pk);
+        if (alreadyActive) clearTimeout(plateTimers.get(pk));
+        else propagateRedstoneSignal(x, y, z, true, player.isAdmin);
+
+        plateTimers.set(pk, setTimeout(() => {
+          plateTimers.delete(pk);
+          propagateRedstoneSignal(x, y, z, false, false);
+        }, 1600));
         break;
       }
 
@@ -1773,6 +1892,11 @@ wss.on('connection', (ws) => {
           return;
         }
         broadcast({ type: 'chat', from: player.nickname, color: player.color, isAdmin: player.isAdmin, text }, null, player.world);
+        break;
+      }
+
+      case 'ping_check': {
+        send(ws, { type: 'pong_check', ts: msg.ts });
         break;
       }
 

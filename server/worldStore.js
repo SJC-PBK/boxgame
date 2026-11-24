@@ -49,6 +49,7 @@ export class WorldStore {
       signs: path.join(this.dataDir, 'signs.json'),
       portals: path.join(this.dataDir, 'portals.json'),
       beacons: path.join(this.dataDir, 'beacons.json'),
+      facings: path.join(this.dataDir, 'facings.json'),
       regions: path.join(this.dataDir, 'regions.json'),
       blueprints: path.join(this.dataDir, 'blueprints.json'),
       skins: path.join(this.dataDir, 'skins.json'),
@@ -63,6 +64,7 @@ export class WorldStore {
     this.signs = {};
     this.portals = {};
     this.beacons = {};
+    this.facings = {};
     this.regions = [];
     this.blueprints = [];
     this.skins = [];
@@ -104,6 +106,7 @@ export class WorldStore {
       else if (kind === 'signs') this._writeJsonAtomic(this.files.signs, this.signs);
       else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
       else if (kind === 'beacons') this._writeJsonAtomic(this.files.beacons, this.beacons);
+      else if (kind === 'facings') this._writeJsonAtomic(this.files.facings, this.facings);
       else if (kind === 'regions') this._writeJsonAtomic(this.files.regions, this.regions);
       else if (kind === 'blueprints') this._writeJsonAtomic(this.files.blueprints, this.blueprints);
       else if (kind === 'skins') this._writeJsonAtomic(this.files.skins, this.skins);
@@ -128,6 +131,7 @@ export class WorldStore {
     const savedSigns = this._readJson(this.files.signs);
     const savedPortals = this._readJson(this.files.portals);
     const savedBeacons = this._readJson(this.files.beacons);
+    const savedFacings = this._readJson(this.files.facings);
     const savedRegions = this._readJson(this.files.regions);
     const savedBlueprints = this._readJson(this.files.blueprints);
     const savedSkins = this._readJson(this.files.skins);
@@ -139,6 +143,7 @@ export class WorldStore {
       this.signs = savedSigns || {};
       this.portals = savedPortals || {};
       this.beacons = savedBeacons || {};
+      this.facings = savedFacings || {};
     } else {
       console.log('[WorldStore] Initializing 1024x96x1024 Streaming Multi-Biome World...');
       const starterChestSlots = Array(CHEST_SIZE).fill(null);
@@ -261,6 +266,7 @@ export class WorldStore {
       if (this.furnaces[k]) { delete this.furnaces[k]; this._scheduleSave('furnaces', 100); }
       if (this.signs[k]) { delete this.signs[k]; this._scheduleSave('signs', 100); }
       if (this.portals[k]) { delete this.portals[k]; this._scheduleSave('portals', 100); }
+      if (this.facings[k] !== undefined) { delete this.facings[k]; this._scheduleSave('facings', 200); }
       if (this.beacons[k]) {
         delete this.beacons[k];
         this._scheduleSave('beacons', 100);
@@ -297,6 +303,12 @@ export class WorldStore {
     }
     this._scheduleSave('world', 400);
     return true;
+  }
+
+  setFacing(x, y, z, facing) {
+    const k = keyOf(x, y, z);
+    this.facings[k] = Number(facing) & 3;
+    this._scheduleSave('facings', 200);
   }
 
   _syncBeaconRegion(save = true) {

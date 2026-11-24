@@ -417,6 +417,54 @@ function drawBlockFace(blockId, face) {
         }
         break;
       }
+      case 'redstone_wire': {
+        ctx.clearRect(0, 0, 16, 16);
+        ctx.fillStyle = '#991b1b';
+        ctx.fillRect(0, 6, 16, 4); ctx.fillRect(6, 0, 4, 16);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(0, 7, 16, 2); ctx.fillRect(7, 0, 2, 16);
+        ctx.fillStyle = '#fca5a5';
+        ctx.fillRect(6, 6, 4, 4);
+        break;
+      }
+      case 'lever_off':
+      case 'lever_on': {
+        fillNoise(ctx, ['#64748b', '#475569', '#94a3b8'], 988);
+        ctx.fillStyle = blockId === 'lever_on' ? '#ef4444' : '#334155';
+        ctx.fillRect(5, 2, 6, 6);
+        if (blockId === 'lever_on') {
+          ctx.fillStyle = '#fef08a';
+          ctx.fillRect(7, 4, 2, 2);
+        }
+        break;
+      }
+      case 'pressure_plate': {
+        fillNoise(ctx, ['#b88248', '#c69255', '#a6743d'], 989);
+        ctx.fillStyle = '#785026';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        ctx.fillStyle = '#facc15';
+        ctx.fillRect(6, 6, 4, 4);
+        break;
+      }
+      case 'redstone_lamp_off': {
+        fillNoise(ctx, ['#451a03', '#78350f', '#5c2d0c'], 990);
+        ctx.fillStyle = '#292524';
+        ctx.fillRect(0, 0, 16, 2); ctx.fillRect(0, 14, 16, 2);
+        ctx.fillRect(0, 0, 2, 16); ctx.fillRect(14, 0, 2, 16);
+        ctx.fillStyle = '#92400e';
+        ctx.fillRect(5, 5, 6, 6);
+        break;
+      }
+      case 'redstone_lamp_on': {
+        fillNoise(ctx, ['#fef08a', '#fde047', '#facc15'], 991);
+        ctx.fillStyle = '#b45309';
+        ctx.fillRect(0, 0, 16, 2); ctx.fillRect(0, 14, 16, 2);
+        ctx.fillRect(0, 0, 2, 16); ctx.fillRect(14, 0, 2, 16);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(5, 5, 6, 6);
+        break;
+      }
       case 'ladder': {
         ctx.fillStyle = '#9a6534';
         ctx.fillRect(2, 0, 2, 16);
@@ -935,7 +983,7 @@ export class TextureLibrary {
         this.icons[def.id] = sideC.toDataURL();
 
         const isTransparent = !!def.transparent;
-        const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign' || def.id === 'fuse';
+        const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign' || def.id === 'fuse' || def.id === 'redstone_wire';
         const isDoor = def.id.startsWith('door_');
         const isStair = def.id.startsWith('stairs_');
         const opts = {
@@ -944,27 +992,29 @@ export class TextureLibrary {
           depthWrite: def.id !== 'water' && def.id !== 'stealth_beacon',
           alphaTest: (def.id === 'leaves' || isCross || isDoor) ? 0.25 : 0,
           side: (isCross || def.id === 'water' || def.id === 'stealth_beacon' || isDoor || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
-          emissive: def.id === 'lamp' ? new THREE.Color('#fef08a')
+          emissive: def.id === 'lamp' || def.id === 'redstone_lamp_on' ? new THREE.Color('#fef08a')
             : def.id === 'torch' ? new THREE.Color('#fb923c')
+            : def.id === 'redstone_wire' || def.id === 'lever_on' ? new THREE.Color('#ef4444')
             : def.id === 'portal' ? new THREE.Color('#a855f7')
             : def.id === 'furnace' ? new THREE.Color('#f97316')
             : def.id === 'jumppad' ? new THREE.Color('#22d3ee')
             : def.id === 'protect_beacon' ? new THREE.Color('#38bdf8')
             : def.id === 'stealth_beacon' ? new THREE.Color('#c084fc')
             : new THREE.Color('#000000'),
-          emissiveIntensity: def.id === 'torch' ? 0.82 : (def.id === 'lamp' ? 0.78 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' ? 0.65 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0))))
+          emissiveIntensity: def.id === 'torch' ? 0.82
+            : (def.id === 'lamp' || def.id === 'redstone_lamp_on' ? 0.8 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' ? 0.65 : (def.id === 'redstone_wire' || def.id === 'lever_on' ? 0.45 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))))
         };
 
         const applyBlockLightShader = (mat) => {
           mat.onBeforeCompile = (shader) => {
             shader.vertexShader = shader.vertexShader
-              .replace('#include <common>', '#include <common>\nattribute vec3 aBlockLight;\nvarying vec3 vBlockLight;')
-              .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBlockLight = aBlockLight;');
+              .replace('#include <common>', '#include <common>\nattribute vec3 aBlockLight;\nattribute float aAoDark;\nvarying vec3 vBlockLight;\nvarying float vAoDark;')
+              .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBlockLight = aBlockLight;\nvAoDark = aAoDark;');
             shader.fragmentShader = shader.fragmentShader
-              .replace('#include <common>', '#include <common>\nvarying vec3 vBlockLight;')
-              .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.directDiffuse += diffuseColor.rgb * vBlockLight;');
+              .replace('#include <common>', '#include <common>\nvarying vec3 vBlockLight;\nvarying float vAoDark;')
+              .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nfloat bwAo = 1.0 - vAoDark;\nreflectedLight.directDiffuse *= bwAo;\nreflectedLight.indirectDiffuse *= bwAo;\nreflectedLight.directDiffuse += diffuseColor.rgb * vBlockLight * (0.65 + 0.35 * bwAo);');
           };
-          mat.customProgramCacheKey = () => 'boxworld_block_light_v1';
+          mat.customProgramCacheKey = () => 'boxworld_block_light_ao_v2';
           return mat;
         };
 

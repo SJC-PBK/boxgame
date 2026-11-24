@@ -82,7 +82,14 @@ export const BLOCKS = {
   stairs_brick:   { numId: 58, id: 'stairs_brick',  name: '벽돌 계단',   transparent: true, solid: true, hardness: 1.8, preferredTool: 'pickaxe', minTier: 1, drop: 'stairs_brick',  sound: 'stone', stackable: 64, category: '건축' },
   stairs_stone:   { numId: 59, id: 'stairs_stone',  name: '돌 계단',     transparent: true, solid: true, hardness: 2.0, preferredTool: 'pickaxe', minTier: 1, drop: 'stairs_stone',  sound: 'stone', stackable: 64, category: '건축' },
   // Torch (light-emitting, craftable from stick + coal)
-  torch:          { numId: 60, id: 'torch',         name: '🔥 횃불',     transparent: true, solid: false, hardness: 0.1, preferredTool: null, minTier: 0, drop: 'torch', sound: 'wood', stackable: 64, category: '건축' }
+  torch:             { numId: 60, id: 'torch',             name: '🔥 횃불',         transparent: true,  solid: false, hardness: 0.1, preferredTool: null,      minTier: 0, drop: 'torch',             sound: 'wood',  stackable: 64, category: '건축' },
+  // Mini Redstone Circuit (wire, lever, pressure plate, switchable lamp)
+  redstone_wire:     { numId: 61, id: 'redstone_wire',     name: '⚡ 신호선',       transparent: true,  solid: false, hardness: 0.1, preferredTool: null,      minTier: 0, drop: 'redstone_wire',     sound: 'dirt',  stackable: 64, category: '특수' },
+  lever_off:         { numId: 62, id: 'lever_off',         name: '🔘 스위치 레버',  transparent: true,  solid: false, hardness: 0.3, preferredTool: null,      minTier: 0, drop: 'lever_off',         sound: 'stone', stackable: 16, category: '특수' },
+  lever_on:          { numId: 63, id: 'lever_on',          name: '🔴 스위치 (켜짐)',transparent: true,  solid: false, hardness: 0.3, preferredTool: null,      minTier: 0, drop: 'lever_off',         sound: 'stone', stackable: 16, category: '특수' },
+  pressure_plate:    { numId: 64, id: 'pressure_plate',    name: '🦶 압력판',       transparent: true,  solid: false, hardness: 0.3, preferredTool: null,      minTier: 0, drop: 'pressure_plate',    sound: 'wood',  stackable: 16, category: '특수' },
+  redstone_lamp_off: { numId: 65, id: 'redstone_lamp_off', name: '💡 스위치 조명',  transparent: false, solid: true,  hardness: 0.5, preferredTool: null,      minTier: 0, drop: 'redstone_lamp_off', sound: 'glass', stackable: 32, category: '특수' },
+  redstone_lamp_on:  { numId: 66, id: 'redstone_lamp_on',  name: '🌟 스위치 조명(ON)',transparent: false, solid: true, hardness: 0.5, preferredTool: null,     minTier: 0, drop: 'redstone_lamp_off', sound: 'glass', stackable: 32, category: '특수' }
 };
 
 export const NUM_TO_BLOCK = {};
@@ -216,7 +223,11 @@ export const RECIPES = [
   { id: 'r-flatten-bomb', category: '특수', out: { item: 'flatten_bomb', count: 1 }, in: [{ item: 'tnt', count: 1 }, { item: 'iron_ingot', count: 2 }] },
   { id: 'r-fill-bomb',    category: '특수', out: { item: 'fill_bomb', count: 1 },    in: [{ item: 'dirt', count: 8 }, { item: 'coal', count: 2 }] },
   { id: 'r-water-bomb', category: '특수', out: { item: 'water_bomb', count: 1 },  in: [{ item: 'glass', count: 4 }, { item: 'sand', count: 4 }, { item: 'coal', count: 2 }] },
-  { id: 'r-fuse',      category: '특수', out: { item: 'fuse', count: 8 },        in: [{ item: 'coal', count: 1 }, { item: 'stick', count: 1 }] },
+  { id: 'r-fuse',         category: '특수', out: { item: 'fuse', count: 8 },              in: [{ item: 'coal', count: 1 }, { item: 'stick', count: 1 }] },
+  { id: 'r-wire',         category: '특수', out: { item: 'redstone_wire', count: 8 },     in: [{ item: 'coal', count: 1 }, { item: 'iron_ingot', count: 1 }] },
+  { id: 'r-lever',        category: '특수', out: { item: 'lever_off', count: 2 },         in: [{ item: 'cobble', count: 1 }, { item: 'stick', count: 1 }] },
+  { id: 'r-plate',        category: '특수', out: { item: 'pressure_plate', count: 2 },    in: [{ item: 'planks', count: 2 }] },
+  { id: 'r-rlamp',        category: '특수', out: { item: 'redstone_lamp_off', count: 2 }, in: [{ item: 'lamp', count: 1 }, { item: 'iron_ingot', count: 1 }] },
   { id: 'r-detonator', category: '특수', out: { item: 'detonator', count: 1 },   in: [{ item: 'iron_ingot', count: 2 }, { item: 'coal', count: 1 }] },
   { id: 'r-portal',   category: '특수', out: { item: 'portal', count: 2 },      in: [{ item: 'diamond_gem', count: 1 }, { item: 'glass', count: 4 }] },
   { id: 'r-jumppad',  category: '특수', out: { item: 'jumppad', count: 2 },     in: [{ item: 'iron_ingot', count: 2 }, { item: 'wool_yellow', count: 2 }] },

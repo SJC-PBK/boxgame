@@ -4,11 +4,13 @@ import { getBaseBlock } from '../shared/terrainGen.js';
 const CHUNK_SIZE = 16;
 const MAX_LIGHT_LEVEL = 10;
 const LIGHT_PROPS = {
-  lamp:    { level: 10, r: 1.22, g: 1.02, b: 0.72 },
-  torch:   { level: 10, r: 1.25, g: 0.92, b: 0.54 },
-  portal:  { level: 9,  r: 0.85, g: 0.45, b: 1.18 },
-  furnace: { level: 8,  r: 1.15, g: 0.62, b: 0.28 },
-  jumppad: { level: 6,  r: 0.32, g: 0.96, b: 1.08 }
+  lamp:            { level: 10, r: 1.22, g: 1.02, b: 0.72 },
+  redstone_lamp_on:{ level: 10, r: 1.25, g: 1.12, b: 0.82 },
+  torch:           { level: 10, r: 1.25, g: 0.92, b: 0.54 },
+  portal:          { level: 9,  r: 0.85, g: 0.45, b: 1.18 },
+  furnace:         { level: 8,  r: 1.15, g: 0.62, b: 0.28 },
+  jumppad:         { level: 6,  r: 0.32, g: 0.96, b: 1.08 },
+  lever_on:        { level: 4,  r: 1.15, g: 0.28, b: 0.28 }
 };
 const LIGHT_FALLOFF = new Float32Array(MAX_LIGHT_LEVEL + 1);
 for (let i = 1; i <= MAX_LIGHT_LEVEL; i++) {
@@ -43,6 +45,7 @@ export class WorldRenderer {
     this.viewRadius = 5; // chunks around player (5 -> 11x11 = 176x176 blocks)
     this.grid = null;    // Used in fixed RLE mode (Job Village)
     this.deltas = new Map();
+    this.facings = new Map(); // "x,y,z" -> 0(N) | 1(E) | 2(S) | 3(W)
     this.chunkData = new Map(); // "cx,cz" -> Uint8Array(16 * sizeY * 16)
     this.chunkGroups = new Map();
 
@@ -94,12 +97,22 @@ export class WorldRenderer {
       this.idToNum['sign']
     ].filter(Boolean));
     this.fuseNum = this.idToNum['fuse'] || -1;
+    this.wireNum = this.idToNum['redstone_wire'] || -1;
+    this.plateNum = this.idToNum['pressure_plate'] || -1;
+    this.leverOffNum = this.idToNum['lever_off'] || -1;
+    this.leverOnNum = this.idToNum['lever_on'] || -1;
     this.torchNum = this.idToNum['torch'] || -1;
     this.stairNums = new Set([
       this.idToNum['stairs_wood'],
       this.idToNum['stairs_cobble'],
       this.idToNum['stairs_brick'],
       this.idToNum['stairs_stone']
+    ].filter(Boolean));
+    this.doorNums = new Set([
+      this.idToNum['door_closed'], this.idToNum['door_open'],
+      this.idToNum['door_stone_closed'], this.idToNum['door_stone_open'],
+      this.idToNum['door_iron_closed'], this.idToNum['door_iron_open'],
+      this.idToNum['door_glass_closed'], this.idToNum['door_glass_open']
     ].filter(Boolean));
     this.stealthBeaconNum = this.idToNum['stealth_beacon'] || -1;
     this.showAdminBlocks = false;
@@ -631,8 +644,23 @@ export class WorldRenderer {
     return oldIsLight || !!newLp;
   }
 
-  setBlock(x, y, z, blockId) {
+  setFacings(facingsObj) {
+    this.facings.clear();
+    for (const [k, v] of Object.entries(facingsObj || {})) {
+      this.facings.set(k, Number(v) & 3);
+    }
+  }
+
+  setFacing(x, y, z, f) {
+    const k = `${x},${y},${z}`;
+    if (f === null || f === undefined) this.facings.delete(k);
+    else this.facings.set(k, Number(f) & 3);
+  }
+
+  setBlock(x, y, z, blockId, facing) {
     if (!this.inBounds(x, y, z)) return;
+    if (facing !== undefined) this.setFacing(x, y, z, facing);
+    else if (!blockId) this.facings.delete(`${x},${y},${z}`);
     const lightChanged = this._writeBlockInternal(x, y, z, blockId);
 
     const cx = Math.floor(x / CHUNK_SIZE);
@@ -665,6 +693,8 @@ export class WorldRenderer {
     const dirty = new Set();
     for (const c of changes) {
       if (!this.inBounds(c.x, c.y, c.z)) continue;
+      if (c.facing !== undefined) this.setFacing(c.x, c.y, c.z, c.facing);
+      else if (!c.block) this.facings.delete(`${c.x},${c.y},${c.z}`);
       const lightChanged = this._writeBlockInternal(c.x, c.y, c.z, c.block);
       const cx = Math.floor(c.x / CHUNK_SIZE);
       const cz = Math.floor(c.z / CHUNK_SIZE);
@@ -727,13 +757,24 @@ export class WorldRenderer {
       const key = `${blockId}:${faceKind}`;
       let buf = buckets.get(key);
       if (!buf) {
-        buf = { blockId, faceKind, positions: [], normals: [], uvs: [], lights: [], indices: [] };
+        buf = { blockId, faceKind, positions: [], normals: [], uvs: [], lights: [], aoDarks: [], indices: [] };
         buckets.set(key, buf);
       }
       return buf;
     };
 
-    const pushSubBox = (blockId, bx, by, bz, x0, y0, z0, x1, y1, z1, lr, lg, lb) => {
+    const isOpaqueFast = (qx, qy, qz) => {
+      if (qy < minY || qy > maxY) return false;
+      let qNum;
+      if (cData && qx >= baseX && qx < baseX + CHUNK_SIZE && qz >= baseZ && qz < baseZ + CHUNK_SIZE) {
+        qNum = cData[this._chunkLocalIdx(qx - baseX, qy, qz - baseZ)];
+      } else {
+        qNum = this.getNum(qx, qy, qz);
+      }
+      return qNum !== 0 && this.transparentNum[qNum] === 0;
+    };
+
+    const pushSubBox = (blockId, bx, by, bz, x0, y0, z0, x1, y1, z1, lr, lg, lb, aoVal = 0.05) => {
       for (let f = 0; f < 6; f++) {
         const face = FACES[f];
         const buf = getBucket(blockId, face.faceKind);
@@ -748,6 +789,7 @@ export class WorldRenderer {
           buf.normals.push(face.dir[0], face.dir[1], face.dir[2]);
           buf.uvs.push(UVS[i][0], UVS[i][1]);
           buf.lights.push(lr, lg, lb);
+          buf.aoDarks.push(aoVal);
         }
         buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
       }
@@ -770,7 +812,49 @@ export class WorldRenderer {
               const pIdx = this._padIdx(x - minPX, y, z - minPZ);
               lr = Math.max(lr, padR[pIdx]); lg = Math.max(lg, padG[pIdx]); lb = Math.max(lb, padB[pIdx]);
             }
-            pushSubBox(blockId, x, y, z, 0.42, 0, 0.42, 0.58, 0.72, 0.58, lr, lg, lb);
+            pushSubBox(blockId, x, y, z, 0.42, 0, 0.42, 0.58, 0.72, 0.58, lr, lg, lb, 0);
+            continue;
+          }
+
+          if (num === this.plateNum) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            pushSubBox(blockId, x, y, z, 0.08, 0, 0.08, 0.92, 0.08, 0.92, lr, lg, lb, 0.06);
+            continue;
+          }
+
+          if (num === this.leverOffNum || num === this.leverOnNum) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            // Base stone pedestal + tilted switch handle
+            pushSubBox(blockId, x, y, z, 0.28, 0, 0.28, 0.72, 0.18, 0.72, lr, lg, lb, 0.08);
+            if (num === this.leverOnNum) {
+              pushSubBox(blockId, x, y, z, 0.44, 0.16, 0.22, 0.56, 0.68, 0.46, Math.max(lr, 0.9), lg, lb, 0);
+            } else {
+              pushSubBox(blockId, x, y, z, 0.44, 0.16, 0.54, 0.56, 0.68, 0.78, lr, lg, lb, 0.05);
+            }
+            continue;
+          }
+
+          if (this.doorNums.has(num)) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            const baseFacing = this.facings.get(`${x},${y},${z}`) || 0;
+            const isOpen = blockId.endsWith('_open');
+            const fDir = isOpen ? ((baseFacing + 1) & 3) : baseFacing;
+            if (fDir === 0) pushSubBox(blockId, x, y, z, 0, 0, 0, 1, 1, 0.18, lr, lg, lb, 0.08);
+            else if (fDir === 1) pushSubBox(blockId, x, y, z, 0.82, 0, 0, 1, 1, 1, lr, lg, lb, 0.08);
+            else if (fDir === 2) pushSubBox(blockId, x, y, z, 0, 0, 0.82, 1, 1, 1, lr, lg, lb, 0.08);
+            else pushSubBox(blockId, x, y, z, 0, 0, 0, 0.18, 1, 1, lr, lg, lb, 0.08);
             continue;
           }
 
@@ -780,14 +864,18 @@ export class WorldRenderer {
               const pIdx = this._padIdx(x - minPX, y, z - minPZ);
               lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
             }
-            // Lower half-step + upper back step (classic 2-step voxel stairs!)
-            pushSubBox(blockId, x, y, z, 0, 0, 0, 1, 0.5, 1, lr, lg, lb);
-            pushSubBox(blockId, x, y, z, 0, 0.5, 0, 1, 1, 0.5, lr, lg, lb);
+            const fDir = this.facings.get(`${x},${y},${z}`) || 0;
+            // Lower half-step + 4-direction rotated upper step!
+            pushSubBox(blockId, x, y, z, 0, 0, 0, 1, 0.5, 1, lr, lg, lb, 0.10);
+            if (fDir === 0) pushSubBox(blockId, x, y, z, 0, 0.5, 0, 1, 1, 0.5, lr, lg, lb, 0.06);
+            else if (fDir === 1) pushSubBox(blockId, x, y, z, 0.5, 0.5, 0, 1, 1, 1, lr, lg, lb, 0.06);
+            else if (fDir === 2) pushSubBox(blockId, x, y, z, 0, 0.5, 0.5, 1, 1, 1, lr, lg, lb, 0.06);
+            else pushSubBox(blockId, x, y, z, 0, 0.5, 0, 0.5, 1, 1, lr, lg, lb, 0.06);
             continue;
           }
 
-          if (num === this.fuseNum) {
-            // Flat ground-hugging gunpowder fuse cord
+          if (num === this.fuseNum || num === this.wireNum) {
+            // Flat ground-hugging gunpowder fuse cord / redstone wire
             const buf = getBucket(blockId, 'top');
             let lr = 0, lg = 0, lb = 0;
             if (hasLight) {
@@ -806,6 +894,7 @@ export class WorldRenderer {
               buf.normals.push(0, 1, 0);
               buf.uvs.push(UVS[i][0], UVS[i][1]);
               buf.lights.push(lr, lg, lb);
+              buf.aoDarks.push(0);
             }
             buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
             continue;
@@ -829,6 +918,7 @@ export class WorldRenderer {
                 buf.normals.push(0, 1, 0);
                 buf.uvs.push(UVS[i][0], UVS[i][1]);
                 buf.lights.push(lr, lg, lb);
+                buf.aoDarks.push(0.05);
               }
               buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
             }
@@ -838,9 +928,10 @@ export class WorldRenderer {
           const selfTrans = this.transparentNum[num] === 1;
           for (let f = 0; f < 6; f++) {
             const face = FACES[f];
-            const nx = x + face.dir[0];
-            const ny = y + face.dir[1];
-            const nz = z + face.dir[2];
+            const dx = face.dir[0], dy = face.dir[1], dz = face.dir[2];
+            const nx = x + dx;
+            const ny = y + dy;
+            const nz = z + dz;
 
             let nNum;
             if (cData && nx >= baseX && nx < baseX + CHUNK_SIZE && nz >= baseZ && nz < baseZ + CHUNK_SIZE && ny >= minY && ny <= maxY) {
@@ -864,14 +955,46 @@ export class WorldRenderer {
 
             const buf = getBucket(blockId, face.faceKind);
             const base = buf.positions.length / 3;
+            const ao4 = [0, 0, 0, 0];
             for (let i = 0; i < 4; i++) {
               const c = face.corners[i];
               buf.positions.push(x + c[0], y + c[1], z + c[2]);
-              buf.normals.push(face.dir[0], face.dir[1], face.dir[2]);
+              buf.normals.push(dx, dy, dz);
               buf.uvs.push(UVS[i][0], UVS[i][1]);
               buf.lights.push(lr, lg, lb);
+
+              // Smooth Minecraft-style Vertex Ambient Occlusion (0.0 = bright, 0.42 = deep corner shadow)
+              let aoDark = 0;
+              if (!selfTrans) {
+                const ox = c[0] ? 1 : -1;
+                const oy = c[1] ? 1 : -1;
+                const oz = c[2] ? 1 : -1;
+                let s1, s2, cr;
+                if (dx !== 0) {
+                  s1 = isOpaqueFast(nx, y + oy, z) ? 1 : 0;
+                  s2 = isOpaqueFast(nx, y, z + oz) ? 1 : 0;
+                  cr = isOpaqueFast(nx, y + oy, z + oz) ? 1 : 0;
+                } else if (dy !== 0) {
+                  s1 = isOpaqueFast(x + ox, ny, z) ? 1 : 0;
+                  s2 = isOpaqueFast(x, ny, z + oz) ? 1 : 0;
+                  cr = isOpaqueFast(x + ox, ny, z + oz) ? 1 : 0;
+                } else {
+                  s1 = isOpaqueFast(x + ox, y, nz) ? 1 : 0;
+                  s2 = isOpaqueFast(x, y + oy, nz) ? 1 : 0;
+                  cr = isOpaqueFast(x + ox, y + oy, nz) ? 1 : 0;
+                }
+                const occ = (s1 && s2) ? 3 : (s1 + s2 + cr);
+                aoDark = occ * 0.135;
+              }
+              ao4[i] = aoDark;
+              buf.aoDarks.push(aoDark);
             }
-            buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+            // Flip quad diagonal when AO favors it (eliminates shading artifacts)
+            if (ao4[0] + ao4[2] > ao4[1] + ao4[3]) {
+              buf.indices.push(base + 1, base + 2, base + 3, base + 1, base + 3, base);
+            } else {
+              buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+            }
           }
         }
       }
@@ -884,6 +1007,7 @@ export class WorldRenderer {
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(buf.normals, 3));
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(buf.uvs, 2));
       geo.setAttribute('aBlockLight', new THREE.Float32BufferAttribute(buf.lights, 3));
+      geo.setAttribute('aAoDark', new THREE.Float32BufferAttribute(buf.aoDarks, 1));
       geo.setIndex(buf.indices);
       const mat = this.textures.getFaceMaterial(buf.blockId, buf.faceKind);
       const mesh = new THREE.Mesh(geo, mat);
