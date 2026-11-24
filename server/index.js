@@ -1376,6 +1376,18 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'sprint_drain': {
+        if (player.world !== 'sandbox') return;
+        const now = Date.now();
+        if (now - (player.lastSprintDrainAt || 0) < 3200) return;
+        player.lastSprintDrainAt = now;
+        if ((player.hp ?? 20) > 2) {
+          player.hp = Math.max(2, (player.hp ?? 20) - 1);
+          send(ws, { type: 'vitals_update', hp: player.hp, hunger: player.hunger ?? 20 });
+        }
+        break;
+      }
+
       case 'craft': {
         const recipe = RECIPES.find(r => r.id === msg.recipeId);
         if (!recipe) return;

@@ -108,6 +108,13 @@ let pitch = 0;
 let onGround = false;
 let flyMode = false;
 let lastSpaceTime = 0;
+let baseFov = 75;
+let doubleTapSprint = false;
+let lastMoveKeyCode = '';
+let lastMoveKeyTime = 0;
+let sprintDrainTimer = 0;
+let lastExhaustToastTime = 0;
+let isSprintingNow = false;
 let pointerLocked = false;
 let currentHit = null;
 let selfWalkPhase = 0;
@@ -271,7 +278,8 @@ const touchControls = new TouchControls(canvas, {
 });
 
 function applyGameSettings(s) {
-  camera.fov = s.fov || 75;
+  baseFov = s.fov || 75;
+  camera.fov = baseFov;
   camera.far = Math.max(120, (s.viewDist || 125) + 65);
   camera.updateProjectionMatrix();
   scene.fog.near = Math.max(18, (s.viewDist || 125) * 0.38);
@@ -302,6 +310,43 @@ function warpPlayer(x, y, z, label = '') {
   playerVel.set(0, 0, 0);
   sound.playWarp();
   if (label) ui.toast(`🌀 ${label}(으)로 순간이동했습니다!`, 'success');
+}
+
+function applyBombKnockback(ex, ey, ez, radius, maxPower, popOutOfFill = false) {
+  if (!joined) return;
+  const dx = playerPos.x - ex;
+  const dy = (playerPos.y + 0.9) - ey;
+  const dz = playerPos.z - ez;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist >= radius) return;
+
+  const closeness = Math.max(0.22, 1 - dist / radius);
+  let hDist = Math.hypot(dx, dz);
+  let nx, nz;
+  if (hDist < 0.15) {
+    const ang = Math.random() * Math.PI * 2;
+    nx = Math.cos(ang);
+    nz = Math.sin(ang);
+  } else {
+    nx = dx / hDist;
+    nz = dz / hDist;
+  }
+
+  // If fill_bomb fills blocks right around the player, immediately pop them outside the filled sphere so they never suffocate!
+  if (popOutOfFill && dist < 5.0) {
+    const escapeY = Math.max(playerPos.y, ey + 4.35);
+    playerPos.set(
+      ex + nx * Math.max(hDist, 2.2),
+      escapeY,
+      ez + nz * Math.max(hDist, 2.2)
+    );
+  }
+
+  const hPower = maxPower * (0.4 + 0.85 * closeness);
+  playerVel.x = nx * hPower;
+  playerVel.z = nz * hPower;
+  playerVel.y = Math.max(playerVel.y, 7.2 + maxPower * 0.42 * closeness);
+  onGround = false;
 }
 
 const ui = new GameUI({
@@ -596,6 +641,7 @@ function handleServerMessage(msg) {
         worldRenderer.spawnBreakParticles(msg.x, msg.y, msg.z, 'tnt', 34);
         worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'stone', 22);
       }
+      applyBombKnockback(ex, ey, ez, 8.5, 19, false);
       const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
       if (dist < 26) {
         cameraShake = Math.max(cameraShake, (1 - dist / 26) * 0.65);
@@ -619,6 +665,7 @@ function handleServerMessage(msg) {
       if (worldRenderer) {
         worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, fb, 26);
       }
+      applyBombKnockback(ex, ey, ez, 7.5, 17, true);
       const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
       if (dist < 18) {
         cameraShake = Math.max(cameraShake, (1 - dist / 18) * 0.28);
@@ -643,6 +690,7 @@ function handleServerMessage(msg) {
       if (worldRenderer) {
         worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'water', 24);
       }
+      applyBombKnockback(ex, ey, ez, 6.8, 13.5, false);
       const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
       if (dist < 18) {
         cameraShake = Math.max(cameraShake, (1 - dist / 18) * 0.24);
@@ -666,6 +714,7 @@ function handleServerMessage(msg) {
       if (worldRenderer) {
         worldRenderer.spawnBreakParticles(msg.x, msg.y + 1, msg.z, 'stone', 26);
       }
+      applyBombKnockback(ex, ey, ez, 8.0, 16, false);
       const dist = Math.hypot(playerPos.x - ex, playerPos.y - ey, playerPos.z - ez);
       if (dist < 22) {
         cameraShake = Math.max(cameraShake, (1 - dist / 22) * 0.45);
@@ -1140,10 +1189,25 @@ window.addEventListener('keydown', (e) => {
       lastSpaceTime = now;
     }
   }
+  if ((e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD') && !e.repeat) {
+    const now = performance.now();
+    if (e.code === lastMoveKeyCode && now - lastMoveKeyTime < 280) {
+      doubleTapSprint = true;
+      lastMoveKeyTime = 0;
+    } else {
+      lastMoveKeyCode = e.code;
+      lastMoveKeyTime = now;
+    }
+  }
   keys.add(e.code);
 });
 
-window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('keyup', (e) => {
+  keys.delete(e.code);
+  if (!keys.has('KeyW') && !keys.has('KeyA') && !keys.has('KeyS') && !keys.has('KeyD')) {
+    doubleTapSprint = false;
+  }
+});
 
 function collides(x, y, z) {
   if (!worldRenderer) return false;
@@ -1184,9 +1248,46 @@ function updatePhysics(dt) {
   const isMoving = _move.lengthSq() > 0;
   if (isMoving && _move.lengthSq() > 1) _move.normalize();
 
-  // Low HP (from hunger) smoothly slows walking speed (100% at HP 20 -> 45% at HP 0)
+  // Sprint check: Shift hold OR double-tap WASD (locked when HP <= 2 until eating food!)
+  const shiftHeld = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  const wantsSprint = !flyMode && isMoving && (shiftHeld || doubleTapSprint);
+  const canSprint = ui.hp > 2;
+  const sprinting = wantsSprint && canSprint;
+  if (wantsSprint && !canSprint) {
+    doubleTapSprint = false;
+    const nowMs = performance.now();
+    if (nowMs - lastExhaustToastTime > 4500) {
+      lastExhaustToastTime = nowMs;
+      ui.toast('😫 체력이 다 떨어져 달릴 수 없습니다! 음식을 먹어 HP를 채워주세요.', 'warn');
+    }
+  }
+  if (sprinting) {
+    sprintDrainTimer += dt;
+    if (sprintDrainTimer >= 4.0) {
+      sprintDrainTimer = 0;
+      send({ type: 'sprint_drain' });
+    }
+  } else {
+    sprintDrainTimer = Math.max(0, sprintDrainTimer - dt * 0.5);
+  }
+  if (sprinting !== isSprintingNow) {
+    isSprintingNow = sprinting;
+    if (!flyMode) {
+      document.getElementById('hud-mode').textContent = sprinting
+        ? '🏃 달리기 중 (HP 소모)'
+        : '🚶 걷기 (Shift/W×2 달리기)';
+    }
+  }
+  // Subtle dynamic FOV boost when sprinting
+  const targetFov = baseFov + (sprinting ? 7 : 0);
+  if (Math.abs(camera.fov - targetFov) > 0.05) {
+    camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 10);
+    camera.updateProjectionMatrix();
+  }
+
+  // Low HP (from hunger/sprint) smoothly slows walking speed; sprinting adds 1.55x boost
   const hpFactor = 0.45 + 0.55 * (Math.max(0, ui.hp) / 20);
-  const speed = flyMode ? 10.5 : (5.8 * hpFactor);
+  const speed = flyMode ? 10.5 : (5.8 * hpFactor * (sprinting ? 1.55 : 1.0));
   const tryStepUp = (nx, nz) => {
     if (!onGround || flyMode) return false;
     const hitBlock = worldRenderer?.getBlock(Math.floor(nx), Math.floor(playerPos.y), Math.floor(nz));
@@ -1196,10 +1297,19 @@ function updatePhysics(dt) {
     }
     return false;
   };
-  const nextX = playerPos.x + _move.x * speed * dt;
+  const nextX = playerPos.x + (_move.x * speed + playerVel.x) * dt;
   if (!collides(nextX, playerPos.y, playerPos.z) || tryStepUp(nextX, playerPos.z)) playerPos.x = nextX;
-  const nextZ = playerPos.z + _move.z * speed * dt;
+  else playerVel.x = 0;
+  const nextZ = playerPos.z + (_move.z * speed + playerVel.z) * dt;
   if (!collides(playerPos.x, playerPos.y, nextZ) || tryStepUp(playerPos.x, nextZ)) playerPos.z = nextZ;
+  else playerVel.z = 0;
+
+  // Smooth ballistic friction for bomb knockback horizontal velocity
+  const hDrag = Math.pow(onGround ? 0.0025 : 0.16, dt);
+  playerVel.x *= hDrag;
+  playerVel.z *= hDrag;
+  if (Math.abs(playerVel.x) < 0.04) playerVel.x = 0;
+  if (Math.abs(playerVel.z) < 0.04) playerVel.z = 0;
 
   const jumpActive = keys.has('Space') || touchJumpHeld;
   const descendActive = keys.has('ShiftLeft') || keys.has('ShiftRight') || touchDescendHeld;
