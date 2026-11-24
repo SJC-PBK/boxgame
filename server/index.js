@@ -39,7 +39,7 @@ loadEnvFile();
 const PORT = Number(process.env.PORT || 5220);
 const HOST = process.env.HOST || '127.0.0.1';
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
-const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 5);
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 20);
 const DATA_DIR = path.resolve(ROOT_DIR, process.env.DATA_DIR || './data');
 
 
