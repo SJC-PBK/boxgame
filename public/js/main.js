@@ -431,8 +431,11 @@ const nickInput = document.getElementById('nickname-input');
 const loginError = document.getElementById('login-error');
 
 // World mode selector on Login Screen
+document.getElementById('elevator-hud')?.addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('elevator-hud')?.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
 document.querySelectorAll('#elev-floor-btns .elev-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
     const floor = Number(btn.dataset.floor);
     if (floor >= 1 && floor <= 5) send({ type: 'elevator_call', floor });
   });
