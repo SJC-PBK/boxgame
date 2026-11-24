@@ -768,6 +768,7 @@ wss.on('connection', (ws) => {
         beacons: isStaticZone ? {} : store.beacons,
         facings: worldMode === 'job' ? {} : (worldMode === 'center' ? centerWorld.facings : store.facings),
         elevator: worldMode === 'center' ? getCenterElevatorPayload() : null,
+        centerPylon: worldMode === 'center' ? store.centerPylon : null,
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
         regions: isStaticZone ? [] : store.regions,
@@ -2078,6 +2079,29 @@ wss.on('connection', (ws) => {
             type: 'chat', system: true,
             text: `🎁 관리자(${player.nickname})님이 가방 아이템 보급함을 ${updated.supplyEnabled ? '켰습니다 (ON)' : '껐습니다 (OFF)'}.`
           });
+          return;
+        }
+        if (text === '/간판이동' || text === '/간판회전') {
+          if (player.world !== 'center') {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 행복플러스센터 구역에서만 사용할 수 있습니다.' });
+            return;
+          }
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 먼저 /관리자모드 를 입력해 주세요.' });
+            return;
+          }
+          let updated;
+          if (text === '/간판이동') {
+            // Snap rotY to nearest 90° facing the player's horizontal look direction
+            const snapped = Math.round(player.yaw / (Math.PI / 2)) * (Math.PI / 2);
+            updated = store.setCenterPylon(player.x, Math.floor(player.y), player.z, snapped);
+            send(ws, { type: 'toast', level: 'success', text: `🪧 지주간판을 현재 위치 (${updated.x}, ${updated.y}, ${updated.z})로 이동했습니다! (방향 조정: /간판회전)` });
+          } else {
+            const cur = store.centerPylon || { x: -25.5, y: 5.0, z: 2.2, rotY: 0 };
+            updated = store.setCenterPylon(cur.x, cur.y, cur.z, (cur.rotY || 0) + Math.PI / 2);
+            send(ws, { type: 'toast', level: 'success', text: '↻ 지주간판을 90° 회전했습니다!' });
+          }
+          broadcast({ type: 'pylon_update', centerPylon: updated }, null, 'center');
           return;
         }
         if (text === '/사보검') {

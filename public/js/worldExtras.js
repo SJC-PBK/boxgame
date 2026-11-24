@@ -713,15 +713,19 @@ export class WorldExtras {
   }
 
   // ---- Iconic Navy-Blue Freestanding Pylon Sign (1F Entrance, Photo 6!) ----
-  syncCenterPylon(show) {
-    if (!show) {
+  syncCenterPylon(pylonData) {
+    if (!pylonData) {
       if (this._pylonGroup) {
         this.scene.remove(this._pylonGroup);
         this._pylonGroup = null;
       }
       return;
     }
-    if (this._pylonGroup) return;
+    if (this._pylonGroup) {
+      this._pylonGroup.position.set(pylonData.x ?? -25.5, pylonData.y ?? 5.0, pylonData.z ?? 2.2);
+      this._pylonGroup.rotation.y = pylonData.rotY || 0;
+      return;
+    }
 
     const c = document.createElement('canvas');
     c.width = 512;
@@ -863,8 +867,8 @@ export class WorldExtras {
 
     const group = new THREE.Group();
     group.add(pylon, basePlinth);
-    // Positioned right next to the 1F entrance walkway & tactile paving!
-    group.position.set(-25.2, 5.0, -0.5);
+    group.position.set(pylonData.x ?? -25.5, pylonData.y ?? 5.0, pylonData.z ?? 2.2);
+    group.rotation.y = pylonData.rotY || 0;
     this.scene.add(group);
     this._pylonGroup = group;
   }

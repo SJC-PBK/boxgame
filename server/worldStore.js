@@ -50,6 +50,7 @@ export class WorldStore {
       signPosts: path.join(this.dataDir, 'sign_posts.json'),
       signOverrides: path.join(this.dataDir, 'sign_overrides.json'),
       centerFurn: path.join(this.dataDir, 'center_furn.json'),
+      centerPylon: path.join(this.dataDir, 'center_pylon.json'),
       portals: path.join(this.dataDir, 'portals.json'),
       beacons: path.join(this.dataDir, 'beacons.json'),
       facings: path.join(this.dataDir, 'facings.json'),
@@ -68,6 +69,7 @@ export class WorldStore {
     this.signPosts = {};
     this.signOverrides = {};
     this.centerFurn = {};
+    this.centerPylon = { x: -25.5, y: 5.0, z: 2.2, rotY: 0 };
     this.portals = {};
     this.beacons = {};
     this.facings = {};
@@ -113,6 +115,7 @@ export class WorldStore {
       else if (kind === 'signPosts') this._writeJsonAtomic(this.files.signPosts, this.signPosts);
       else if (kind === 'signOverrides') this._writeJsonAtomic(this.files.signOverrides, this.signOverrides);
       else if (kind === 'centerFurn') this._writeJsonAtomic(this.files.centerFurn, this.centerFurn);
+      else if (kind === 'centerPylon') this._writeJsonAtomic(this.files.centerPylon, this.centerPylon);
       else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
       else if (kind === 'beacons') this._writeJsonAtomic(this.files.beacons, this.beacons);
       else if (kind === 'facings') this._writeJsonAtomic(this.files.facings, this.facings);
@@ -144,6 +147,8 @@ export class WorldStore {
     this.signOverrides = (savedSignOverrides && typeof savedSignOverrides === 'object') ? savedSignOverrides : {};
     const savedCenterFurn = this._readJson(this.files.centerFurn);
     this.centerFurn = (savedCenterFurn && typeof savedCenterFurn === 'object') ? savedCenterFurn : {};
+    const savedPylon = this._readJson(this.files.centerPylon);
+    if (savedPylon && typeof savedPylon.x === 'number') this.centerPylon = savedPylon;
     const savedPortals = this._readJson(this.files.portals);
     const savedBeacons = this._readJson(this.files.beacons);
     const savedFacings = this._readJson(this.files.facings);
@@ -518,6 +523,17 @@ export class WorldStore {
     if (!blockId) delete this.centerFurn[k];
     else this.centerFurn[k] = { x, y, z, block: blockId, facing: Number(facing) & 3 };
     this._scheduleSave('centerFurn', 150);
+  }
+
+  setCenterPylon(x, y, z, rotY = 0) {
+    this.centerPylon = {
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10,
+      z: Math.round(z * 10) / 10,
+      rotY: Number(rotY) || 0
+    };
+    this._scheduleSave('centerPylon', 100);
+    return this.centerPylon;
   }
 
   getSignPosts(boardKey) {

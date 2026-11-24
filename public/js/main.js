@@ -490,7 +490,7 @@ function handleServerMessage(msg) {
       worldExtras.syncPortals(currentPortals);
       worldExtras.syncBeacons(msg.beacons || {});
       worldExtras.syncElevator(msg.elevator || null);
-      worldExtras.syncCenterPylon(currentWorldMode === 'center');
+      worldExtras.syncCenterPylon(currentWorldMode === 'center' ? (msg.centerPylon || { x: -25.5, y: 5.0, z: 2.2, rotY: 0 }) : null);
 
       playerPos.set(selfPlayer.x, selfPlayer.y, selfPlayer.z);
       playerVel.set(0, 0, 0);
@@ -726,6 +726,10 @@ function handleServerMessage(msg) {
     case 'elevator_state':
       worldExtras.syncElevator(msg.elevator);
       if (msg.chime) sound.playElevatorChime();
+      break;
+
+    case 'pylon_update':
+      worldExtras.syncCenterPylon(msg.centerPylon);
       break;
 
     case 'warp_to':
