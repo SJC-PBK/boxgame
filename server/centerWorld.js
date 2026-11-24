@@ -380,8 +380,8 @@ export function createCenterWorld() {
       }
     }
 
-    // 2e. Upper Floor (2F~5F) Open-Space Sign (rest of floor intentionally kept empty!)
-    if (f >= 1) {
+    // 2e. Upper Floor (2F~4F) Open-Space Sign (rest of floor intentionally kept empty!)
+    if (f >= 1 && f <= 3) {
       addSign(bx(15), baseY + 2, bz(6), `🏢 ${f + 1}층 오픈 공간\n(화장실·계단·ELV 외 빈 공간)`);
     }
   }
@@ -546,6 +546,139 @@ export function createCenterWorld() {
   set(bx(38), Y1 + 1, bz(17), 'stairs_wood', 0);
   set(bx(39), Y1 + 1, bz(17), 'stairs_wood', 0);
   addSign(bx(35), Y1 + 2, bz(15), '📋 미팅실 #2');
+
+  // 3.5. 5F Detailed Interior (Matches 5F Floor Plan: 카운터·휴게라운지(16)·탕비장·교육장(36)·문서고·대기공간!)
+  const Y5 = GROUND + 4 * FLOOR_H; // floor slab y = 28, interior y = 29..33
+
+  // 3.5a. Top-left small utility alcove next to ELEV (dx = 1..4, dz = 1..4)
+  for (let y = Y5 + 1; y <= Y5 + 5; y++) {
+    for (let dx = 1; dx <= 4; dx++) set(bx(dx), y, bz(4), 'stone');
+  }
+  setDoor(bx(2), Y5 + 1, bz(4), 'door_closed', 2);
+
+  // 3.5b. 카운터 & 휴게라운지 (16) + 탕비장 (left zone: dx = 1..10, dz = 5..18)
+  fill(bx(1), Y5, bz(5), bx(10), Y5, bz(18), 'sand');
+
+  // 카운터 (Reception Counter, dx = 2..4, dz = 7..10)
+  for (let dz = 7; dz <= 10; dz++) set(bx(4), Y5 + 1, bz(dz), 'planks');
+  set(bx(3), Y5 + 1, bz(7), 'planks');
+  set(bx(3), Y5 + 1, bz(10), 'planks');
+  set(bx(2), Y5 + 1, bz(8), 'stairs_wood', 1);
+  set(bx(2), Y5 + 1, bz(9), 'stairs_wood', 1);
+  addSign(bx(4), Y5 + 2, bz(7), '🖥️ 카운터\n(5F 안내 데스크)');
+
+  // 휴게라운지 (16) seating (dx = 1..8, dz = 11..18)
+  // Left lounge tables, stools & sofa
+  set(bx(3), Y5 + 1, bz(12), 'planks');
+  set(bx(2), Y5 + 1, bz(12), 'wool_yellow');
+  set(bx(4), Y5 + 1, bz(11), 'wool_yellow');
+  set(bx(1), Y5 + 1, bz(14), 'wood');
+  set(bx(1), Y5 + 2, bz(14), 'leaves'); // potted plant
+  // Bottom-left sofa + coffee table + stools
+  set(bx(1), Y5 + 1, bz(16), 'stairs_wood', 1);
+  set(bx(1), Y5 + 1, bz(17), 'stairs_wood', 1);
+  set(bx(3), Y5 + 1, bz(16), 'planks');
+  set(bx(4), Y5 + 1, bz(15), 'wool_yellow');
+  set(bx(4), Y5 + 1, bz(17), 'wool_yellow');
+  // Right-side lounge 2-person tables along divider
+  set(bx(7), Y5 + 1, bz(12), 'planks');
+  set(bx(7), Y5 + 1, bz(13), 'stairs_wood', 0);
+  set(bx(7), Y5 + 1, bz(16), 'planks');
+  set(bx(7), Y5 + 1, bz(17), 'stairs_wood', 0);
+  addSign(bx(5), Y5 + 2, bz(14), '🛋️ 휴게라운지 (16)');
+
+  // 탕비장 (Pantry niche along dx = 10, dz = 10..18, leaving stairwell exit dz=6..9 open!)
+  set(bx(10), Y5 + 1, bz(10), 'cobble');
+  set(bx(10), Y5 + 1, bz(11), 'water');
+  for (let dz = 12; dz <= 18; dz++) {
+    set(bx(10), Y5 + 1, bz(dz), dz % 2 === 0 ? 'chest' : 'wood');
+  }
+  addSign(bx(10), Y5 + 2, bz(10), '☕ 탕비장');
+
+  // 3.5c. Partition walls framing 중앙 교육장 (36) (dx = 11..34, dz = 6..18)
+  fill(bx(11), Y5, bz(6), bx(34), Y5, bz(18), 'planks');
+  for (let y = Y5 + 1; y <= Y5 + 5; y++) {
+    for (let dz = 6; dz <= 18; dz++) {
+      set(bx(11), y, bz(dz), 'stone');
+      set(bx(34), y, bz(dz), 'stone');
+    }
+  }
+  // Main entrance door from 휴게라운지 into 교육장 (dx = 11, dz = 7..8)
+  setDoor(bx(11), Y5 + 1, bz(7), 'door_closed', 3);
+  setDoor(bx(11), Y5 + 1, bz(8), 'door_closed', 3);
+  // Doors on right partition: into 문서고 (dz = 7) & 대기공간 (dz = 17)
+  setDoor(bx(34), Y5 + 1, bz(7), 'door_closed', 1);
+  setDoor(bx(34), Y5 + 1, bz(17), 'door_closed', 1);
+
+  // 교육장 (36): 3 rows × 3 columns of desks & chairs facing South projector screen!
+  const deskCols = [[13, 16], [20, 23], [27, 30]];
+  const deskRows = [9, 12, 15]; // chairs behind each desk at row-1 facing +Z (facing 2)
+  for (let rIdx = 0; rIdx < deskRows.length; rIdx++) {
+    const rz = deskRows[rIdx];
+    const deskMat = rIdx === 1 ? 'sand' : 'planks';
+    for (const [cStart, cEnd] of deskCols) {
+      for (let dx = cStart; dx <= cEnd; dx++) {
+        set(bx(dx), Y5 + 1, bz(rz), deskMat);
+        set(bx(dx), Y5 + 1, bz(rz - 1), 'stairs_wood', 2);
+      }
+    }
+  }
+  // 빔프로젝터 스크린 along South wall (dx = 18..28, dz = 18)
+  for (let dx = 18; dx <= 28; dx++) {
+    set(bx(dx), Y5 + 2, bz(18), 'wool_white');
+    set(bx(dx), Y5 + 3, bz(18), 'wool_white');
+    set(bx(dx), Y5 + 4, bz(18), 'stone');
+  }
+  addSign(bx(23), Y5 + 1, bz(18), '📽️ 빔프로젝터 스크린');
+  addSign(bx(22), Y5 + 2, bz(6), '🎓 교육장 (36)');
+  // Bottom-left corner potted plant inside 교육장
+  set(bx(12), Y5 + 1, bz(18), 'wood');
+  set(bx(12), Y5 + 2, bz(18), 'leaves');
+
+  // 3.5d. 문서고 (5F top-right, dx = 35..40, dz = 1..9)
+  fill(bx(35), Y5, bz(1), bx(40), Y5, bz(9), 'sand');
+  for (let y = Y5 + 1; y <= Y5 + 5; y++) {
+    for (let dx = 35; dx <= 40; dx++) set(bx(dx), y, bz(9), 'stone');
+  }
+  // Top-left sink
+  set(bx(36), Y5 + 1, bz(1), 'cobble');
+  set(bx(36), Y5 + 1, bz(2), 'water');
+  // Tall document shelving (chests & wood) lining East, South & West walls
+  for (let dz = 1; dz <= 8; dz++) {
+    set(bx(40), Y5 + 1, bz(dz), 'chest');
+    set(bx(40), Y5 + 2, bz(dz), 'wood');
+  }
+  for (let dx = 35; dx <= 39; dx++) {
+    set(bx(dx), Y5 + 1, bz(8), 'chest');
+    set(bx(dx), Y5 + 2, bz(8), 'wood');
+  }
+  set(bx(36), Y5 + 1, bz(4), 'chest');
+  set(bx(36), Y5 + 1, bz(5), 'chest');
+  addSign(bx(38), Y5 + 2, bz(5), '📁 문서고\n(5F 자료 보관실)');
+
+  // 3.5e. 대기공간 (5F bottom-right, dx = 35..40, dz = 10..18)
+  fill(bx(35), Y5, bz(10), bx(40), Y5, bz(18), 'sand');
+  // Top sofa facing +Z
+  set(bx(37), Y5 + 1, bz(10), 'stairs_wood', 2);
+  set(bx(38), Y5 + 1, bz(10), 'stairs_wood', 2);
+  // Right-wall sofas & chairs facing -X
+  set(bx(40), Y5 + 1, bz(12), 'stairs_wood', 3);
+  set(bx(40), Y5 + 1, bz(15), 'stairs_wood', 3);
+  set(bx(40), Y5 + 1, bz(16), 'stairs_wood', 3);
+  // Bottom armchairs facing -Z
+  set(bx(37), Y5 + 1, bz(18), 'stairs_wood', 0);
+  set(bx(38), Y5 + 1, bz(18), 'stairs_wood', 0);
+  // Round coffee tables & left console table
+  set(bx(38), Y5 + 1, bz(12), 'planks');
+  set(bx(38), Y5 + 1, bz(16), 'planks');
+  set(bx(35), Y5 + 1, bz(13), 'wood');
+  set(bx(35), Y5 + 1, bz(14), 'wood');
+  // 3 corner potted plants (matching 5F floor plan!)
+  for (const [px, pz] of [[35, 10], [40, 10], [40, 18]]) {
+    set(bx(px), Y5 + 1, bz(pz), 'wood');
+    set(bx(px), Y5 + 2, bz(pz), 'leaves');
+  }
+  addSign(bx(37), Y5 + 2, bz(14), '🪑 대기공간\n(5F 라운지)');
 
   // 4. Rooftop Terrace & Iconic Gray Portal Frame Roof (Photos 2 & 3!)
   const ROOF_Y = GROUND + NUM_FLOORS * FLOOR_H; // y = 34
