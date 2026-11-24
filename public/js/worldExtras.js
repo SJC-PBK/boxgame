@@ -606,5 +606,102 @@ export class WorldExtras {
         e.sprite.material.opacity = Math.min(1, e.life);
       }
     }
+
+    this._updateElevator();
+  }
+
+  // ---- Real Animated 3D Elevator Cab (Happiness Plus Center) ----
+  syncElevator(state) {
+    if (!state || !state.config) {
+      if (this._elevGroup) {
+        this.scene.remove(this._elevGroup);
+        this._elevGroup = null;
+      }
+      this._elevState = null;
+      return;
+    }
+    const cfg = state.config;
+    if (!this._elevGroup) {
+      const g = new THREE.Group();
+      const w = cfg.maxX - cfg.minX; // 2
+      const d = cfg.maxZ - cfg.minZ; // 3
+      const cx = (cfg.minX + cfg.maxX) * 0.5;
+      const cz = (cfg.minZ + cfg.maxZ) * 0.5;
+
+      // Brushed metal cab floor (top surface flush at local y = 1.0!)
+      const floorMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.45, roughness: 0.35 });
+      const floorMesh = new THREE.Mesh(new THREE.BoxGeometry(w - 0.04, 0.24, d - 0.04), floorMat);
+      floorMesh.position.set(cx, 0.88, cz);
+      g.add(floorMesh);
+
+      // Dark trim border around cab floor
+      const trimMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.5, roughness: 0.4 });
+      const backPanel = new THREE.Mesh(new THREE.BoxGeometry(w - 0.08, 3.0, 0.08), new THREE.MeshStandardMaterial({
+        color: 0xcbd5e1, metalness: 0.55, roughness: 0.25
+      }));
+      backPanel.position.set(cx, 2.5, cfg.minZ + 0.08);
+      g.add(backPanel);
+
+      // Side handrails
+      const railGeo = new THREE.BoxGeometry(0.08, 0.08, d - 0.3);
+      const railL = new THREE.Mesh(railGeo, trimMat);
+      railL.position.set(cfg.minX + 0.1, 1.95, cz);
+      const railR = new THREE.Mesh(railGeo, trimMat);
+      railR.position.set(cfg.maxX - 0.1, 1.95, cz);
+      g.add(railL, railR);
+
+      // Glowing cab ceiling panel + warm interior light
+      const ceilMesh = new THREE.Mesh(new THREE.BoxGeometry(w - 0.06, 0.14, d - 0.06), new THREE.MeshBasicMaterial({ color: 0xe0f2fe }));
+      ceilMesh.position.set(cx, 4.05, cz);
+      g.add(ceilMesh);
+
+      // Cyan LED accent bar on back wall
+      const ledBar = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 0.12, 0.06), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+      ledBar.position.set(cx, 3.6, cfg.minZ + 0.14);
+      g.add(ledBar);
+
+      this.scene.add(g);
+      this._elevGroup = g;
+    }
+
+    this._elevState = {
+      ...state,
+      receivedAt: performance.now()
+    };
+    this._updateElevator();
+  }
+
+  _updateElevator() {
+    if (!this._elevState || !this._elevGroup) return;
+    const s = this._elevState;
+    let y = s.targetY;
+    if (s.moving && s.durationMs > 0) {
+      const elapsed = s.elapsedMs + (performance.now() - s.receivedAt);
+      const t = Math.max(0, Math.min(1, elapsed / s.durationMs));
+      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      y = s.startY + (s.targetY - s.startY) * ease;
+    }
+    this._elevCurrentY = y;
+    this._elevGroup.position.y = y;
+  }
+
+  getElevatorTopY() {
+    if (!this._elevState) return null;
+    return (this._elevCurrentY ?? this._elevState.targetY) + 1.0;
+  }
+
+  isElevatorMoving() {
+    return !!(this._elevState && this._elevState.moving);
+  }
+
+  getElevatorState() {
+    return this._elevState || null;
+  }
+
+  isInsideElevator(pos) {
+    if (!this._elevState || !this._elevState.config) return false;
+    const c = this._elevState.config;
+    return pos.x >= c.minX - 0.15 && pos.x <= c.maxX + 0.15 &&
+           pos.z >= c.minZ - 0.15 && pos.z <= c.maxZ - 0.05;
   }
 }

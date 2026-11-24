@@ -191,4 +191,9 @@ export class SoundEngine {
   playEmote() {
     this._tone('sine', 600, 920, 0.12, 0.12, null);
   }
+
+  playElevatorChime() {
+    this._tone('sine', 659.25, 659.25, 0.22, 0.16, null);
+    setTimeout(() => this._tone('sine', 523.25, 523.25, 0.35, 0.16, null), 180);
+  }
 }

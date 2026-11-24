@@ -94,6 +94,22 @@
     <!-- F3 Debug Performance HUD -->
     <div id="debug-hud" class="debug-hud hidden"></div>
 
+    <!-- Happiness Plus Center: Moving Elevator Floor Panel HUD -->
+    <div id="elevator-hud" class="elevator-hud hidden">
+      <div class="elev-hud-header">
+        <span>🛗 엘리베이터</span>
+        <span id="elev-hud-floor" class="elev-led">1F</span>
+      </div>
+      <div class="elev-btn-row" id="elev-floor-btns">
+        <button type="button" class="elev-btn" data-floor="1">1F</button>
+        <button type="button" class="elev-btn" data-floor="2">2F</button>
+        <button type="button" class="elev-btn" data-floor="3">3F</button>
+        <button type="button" class="elev-btn" data-floor="4">4F</button>
+        <button type="button" class="elev-btn" data-floor="5">5F</button>
+      </div>
+      <div class="elev-hud-tip">키보드 [1~5] 또는 버튼 클릭으로 층 이동</div>
+    </div>
+
     <!-- Active Blueprint Mini HUD -->
     <div id="bp-hud" class="bp-hud hidden">
       <div class="bp-hud-title">📐 <span id="bp-hud-name">-</span></div>

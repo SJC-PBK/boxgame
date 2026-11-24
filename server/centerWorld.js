@@ -235,9 +235,15 @@ export function createCenterWorld() {
     }
 
     // 2c. Shared Core on ALL 5 Floors: ELEV, 계단실, EPS/PS, 여자화장실, 남자화장실
-    // -- ELEV. (dx = 5..8, dz = 1..4) --
+    // -- ELEV. (dx = 5..8, dz = 1..4) — Real Moving Elevator Shaft (1F~5F) --
     fill(bx(5), baseY + 1, bz(1), bx(8), ceilY - 1, bz(4), null);
-    // Shaft walls
+    // Open vertical shaft through upper floor slabs (f >= 1) so the moving cab glides smoothly!
+    if (f >= 1) {
+      fill(bx(6), baseY, bz(1), bx(7), baseY, bz(3), null);
+    } else {
+      fill(bx(6), baseY, bz(1), bx(7), baseY, bz(3), 'stone'); // 1F pit floor
+    }
+    // Shaft walls (leave dz=4 doorway for iron doors)
     for (let y = baseY + 1; y < ceilY; y++) {
       for (let dz = 1; dz <= 4; dz++) {
         set(bx(5), y, bz(dz), 'stone');
@@ -247,13 +253,15 @@ export function createCenterWorld() {
         set(bx(dx), y, bz(4), 'stone');
       }
     }
-    // Iron elevator doors opening south (dz = 4, dx = 6..7)
-    setDoor(bx(6), baseY + 1, bz(4), 'door_iron_closed', 2);
-    setDoor(bx(7), baseY + 1, bz(4), 'door_iron_closed', 2);
-    set(bx(6), baseY, bz(2), 'iron_ore');
-    set(bx(7), baseY, bz(2), 'iron_ore');
-    set(bx(6), ceilY - 1, bz(2), 'lamp');
-    addSign(bx(6), baseY + 2, bz(1), `🛗 ELEV. (${f + 1}F)\n1F: 행복플러스카페\n2~5F: 오픈 플로어`);
+    // Shaft floor indicator light on left wall
+    set(bx(5), baseY + 3, bz(2), 'lamp');
+    // Iron elevator doors opening south (dz = 4, dx = 6..7) — 1F starts open!
+    const initDoor = f === 0 ? 'door_iron_open' : 'door_iron_closed';
+    setDoor(bx(6), baseY + 1, bz(4), initDoor, 2);
+    setDoor(bx(7), baseY + 1, bz(4), initDoor, 2);
+    // Call button (lever) & sign right outside elevator entrance on each floor
+    set(bx(8), baseY + 2, bz(5), 'lever_off');
+    addSign(bx(5), baseY + 2, bz(5), `🛗 엘리베이터 (${f + 1}F)\n문·버튼 우클릭: 호출\n탑승 후 [1~5]층 선택`);
 
     // -- 계단실 (dx = 9..18, dz = 1..5) --
     // Clear stairwell interior & cut ceiling void above stairs so player walks smoothly 1F->5F->Roof!
@@ -625,6 +633,23 @@ export function createCenterWorld() {
     getRLE,
     signs,
     facings,
+    elevator: {
+      minX: bx(6),      // -15
+      maxX: bx(7) + 1,  // -13 (width 2)
+      minZ: bz(1),      // -9
+      maxZ: bz(3) + 1,  // -6  (depth 3)
+      doorZ: bz(4),     // -6
+      doorXs: [bx(6), bx(7)], // [-15, -14]
+      buttonX: bx(8),   // -13
+      buttonZ: bz(5),   // -5
+      floors: [
+        { floor: 1, label: '1F', y: GROUND + 0 * FLOOR_H },
+        { floor: 2, label: '2F', y: GROUND + 1 * FLOOR_H },
+        { floor: 3, label: '3F', y: GROUND + 2 * FLOOR_H },
+        { floor: 4, label: '4F', y: GROUND + 3 * FLOOR_H },
+        { floor: 5, label: '5F', y: GROUND + 4 * FLOOR_H }
+      ]
+    },
     // Spawn on the sidewalk in front of the left main entrance, facing the building!
     spawn: { x: OX - 7.5, y: GROUND + 1.1, z: bz(6) + 0.5 }
   };

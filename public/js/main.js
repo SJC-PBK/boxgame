@@ -431,6 +431,13 @@ const nickInput = document.getElementById('nickname-input');
 const loginError = document.getElementById('login-error');
 
 // World mode selector on Login Screen
+document.querySelectorAll('#elev-floor-btns .elev-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const floor = Number(btn.dataset.floor);
+    if (floor >= 1 && floor <= 5) send({ type: 'elevator_call', floor });
+  });
+});
+
 document.querySelectorAll('.mode-card').forEach((card) => {
   card.addEventListener('click', () => {
     document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
@@ -482,6 +489,7 @@ function handleServerMessage(msg) {
       worldExtras.syncSigns(currentSigns);
       worldExtras.syncPortals(currentPortals);
       worldExtras.syncBeacons(msg.beacons || {});
+      worldExtras.syncElevator(msg.elevator || null);
 
       playerPos.set(selfPlayer.x, selfPlayer.y, selfPlayer.z);
       playerVel.set(0, 0, 0);
@@ -704,6 +712,11 @@ function handleServerMessage(msg) {
 
     case 'pong_check':
       if (typeof msg.ts === 'number') _wsPingMs = Math.max(0, Math.round(performance.now() - msg.ts));
+      break;
+
+    case 'elevator_state':
+      worldExtras.syncElevator(msg.elevator);
+      if (msg.chime) sound.playElevatorChime();
       break;
 
     case 'warp_to':
@@ -1167,6 +1180,10 @@ window.addEventListener('keydown', (e) => {
 
   if (e.code.startsWith('Digit')) {
     const n = Number(e.code.slice(5));
+    if (currentWorldMode === 'center' && worldExtras.isInsideElevator(playerPos) && n >= 1 && n <= 5) {
+      send({ type: 'elevator_call', floor: n });
+      return;
+    }
     if (n >= 1 && n <= 9) ui.setActiveSlot(n - 1);
   }
 
@@ -1365,6 +1382,20 @@ function updatePhysics(dt) {
     }
   }
 
+  // Real moving elevator cab riding physics (Happiness Plus Center)
+  if (currentWorldMode === 'center' && worldExtras.isInsideElevator(playerPos)) {
+    const cabTopY = worldExtras.getElevatorTopY();
+    const evState = worldExtras.getElevatorState();
+    if (!flyMode && cabTopY !== null && playerPos.y <= cabTopY + 0.85 && playerPos.y >= cabTopY - 1.4) {
+      playerPos.y = cabTopY;
+      if (playerVel.y < 0) playerVel.y = 0;
+      onGround = true;
+    }
+    if (evState && evState.moving && evState.config) {
+      playerPos.z = Math.min(playerPos.z, evState.config.maxZ - 0.35);
+    }
+  }
+
   if (isMoving && onGround && !flyMode) {
     stepSoundTimer -= dt;
     if (stepSoundTimer <= 0) {
@@ -1432,6 +1463,27 @@ function animate(now) {
     remotePlayers.update(dt);
     animalRenderer.update(dt);
     worldExtras.update(dt);
+    // Update Happiness Plus Center Elevator HUD when riding inside cab
+    const elElevHud = document.getElementById('elevator-hud');
+    if (elElevHud) {
+      const inElev = currentWorldMode === 'center' && worldExtras.isInsideElevator(playerPos);
+      elElevHud.classList.toggle('hidden', !inElev);
+      if (inElev) {
+        const es = worldExtras.getElevatorState();
+        if (es) {
+          const led = document.getElementById('elev-hud-floor');
+          if (led) {
+            const arrow = es.moving ? (es.targetFloor > es.floor ? '▲ ' : '▼ ') : '';
+            const curDisp = es.moving ? es.targetFloor : es.floor;
+            led.textContent = `${arrow}${curDisp}F`;
+          }
+          elElevHud.querySelectorAll('.elev-btn').forEach((b) => {
+            const fn = Number(b.dataset.floor);
+            b.classList.toggle('active', fn === (es.moving ? es.targetFloor : es.floor));
+          });
+        }
+      }
+    }
     sky.update(dt, playerPos, (currentWorldMode === 'job' || currentWorldMode === 'center') ? 4 : 36);
     sound.updateListener(playerPos, yaw);
 

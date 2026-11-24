@@ -49,6 +49,106 @@ const animals = new AnimalManager(store);
 const jobWorld = createJobVillageWorld();
 const centerWorld = createCenterWorld();
 
+// Real-time moving elevator state machine for Happiness Plus Center (1F~5F)
+const centerElevator = {
+  floor: 1,
+  targetFloor: 1,
+  startY: centerWorld.elevator.floors[0].y,
+  targetY: centerWorld.elevator.floors[0].y,
+  startTime: 0,
+  durationMs: 0,
+  moving: false,
+  doorsOpenFloor: 1,
+  timer: null
+};
+
+function getCenterElevatorFloorByY(y) {
+  let best = centerWorld.elevator.floors[0];
+  let bestDist = Infinity;
+  for (const f of centerWorld.elevator.floors) {
+    const d = Math.abs(y - (f.y + 1));
+    if (d < bestDist) { bestDist = d; best = f; }
+  }
+  return best.floor;
+}
+
+function getCenterElevatorPayload() {
+  return {
+    config: centerWorld.elevator,
+    floor: centerElevator.floor,
+    targetFloor: centerElevator.targetFloor,
+    startY: centerElevator.startY,
+    targetY: centerElevator.targetY,
+    elapsedMs: centerElevator.moving ? Math.max(0, Date.now() - centerElevator.startTime) : 0,
+    durationMs: centerElevator.durationMs,
+    moving: centerElevator.moving,
+    doorsOpenFloor: centerElevator.doorsOpenFloor
+  };
+}
+
+function setCenterElevatorDoors(floorNum, open) {
+  const fDef = centerWorld.elevator.floors.find(f => f.floor === floorNum);
+  if (!fDef) return;
+  const blockId = open ? 'door_iron_open' : 'door_iron_closed';
+  const changes = [];
+  for (const dx of centerWorld.elevator.doorXs) {
+    for (const dy of [1, 2]) {
+      const y = fDef.y + dy;
+      const z = centerWorld.elevator.doorZ;
+      centerWorld.setBlock(dx, y, z, blockId);
+      changes.push({ x: dx, y, z, block: blockId, facing: 2 });
+    }
+  }
+  broadcast({ type: 'blocks_batch', changes, by: 'Elevator' }, null, 'center');
+}
+
+function callCenterElevator(targetFloor, callerNick, callerWs) {
+  const fDef = centerWorld.elevator.floors.find(f => f.floor === targetFloor);
+  if (!fDef) return;
+  if (centerElevator.moving) {
+    if (callerWs) send(callerWs, { type: 'toast', level: 'info', text: `🛗 엘리베이터가 ${centerElevator.targetFloor}F로 이동 중입니다.` });
+    return;
+  }
+  if (centerElevator.floor === targetFloor) {
+    setCenterElevatorDoors(targetFloor, true);
+    centerElevator.doorsOpenFloor = targetFloor;
+    broadcast({ type: 'elevator_state', elevator: getCenterElevatorPayload(), chime: true }, null, 'center');
+    return;
+  }
+
+  // Close current floor doors before departing
+  if (centerElevator.doorsOpenFloor) {
+    setCenterElevatorDoors(centerElevator.doorsOpenFloor, false);
+    centerElevator.doorsOpenFloor = 0;
+  }
+
+  const fromDef = centerWorld.elevator.floors.find(f => f.floor === centerElevator.floor) || centerWorld.elevator.floors[0];
+  const distFloors = Math.abs(targetFloor - centerElevator.floor);
+  const durationMs = Math.max(1200, distFloors * 1400);
+
+  centerElevator.targetFloor = targetFloor;
+  centerElevator.startY = fromDef.y;
+  centerElevator.targetY = fDef.y;
+  centerElevator.startTime = Date.now();
+  centerElevator.durationMs = durationMs;
+  centerElevator.moving = true;
+
+  broadcast({ type: 'elevator_state', elevator: getCenterElevatorPayload(), chime: false }, null, 'center');
+
+  if (centerElevator.timer) clearTimeout(centerElevator.timer);
+  centerElevator.timer = setTimeout(() => {
+    centerElevator.timer = null;
+    centerElevator.floor = targetFloor;
+    centerElevator.startY = fDef.y;
+    centerElevator.targetY = fDef.y;
+    centerElevator.durationMs = 0;
+    centerElevator.moving = false;
+    centerElevator.doorsOpenFloor = targetFloor;
+    setCenterElevatorDoors(targetFloor, true);
+    broadcast({ type: 'elevator_state', elevator: getCenterElevatorPayload(), chime: true }, null, 'center');
+  }, durationMs);
+}
+
 // Shared in-game clock & weather
 const DAY_LENGTH_SEC = 360;
 let worldTime = 0.22;
@@ -647,6 +747,7 @@ wss.on('connection', (ws) => {
         portals: isStaticZone ? {} : store.portals,
         beacons: isStaticZone ? {} : store.beacons,
         facings: worldMode === 'job' ? {} : (worldMode === 'center' ? centerWorld.facings : store.facings),
+        elevator: worldMode === 'center' ? getCenterElevatorPayload() : null,
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
         regions: isStaticZone ? [] : store.regions,
@@ -1061,6 +1162,13 @@ wss.on('connection', (ws) => {
 
       case 'toggle_door': {
         const { x, y, z } = msg;
+        if (player.world === 'center') {
+          const ev = centerWorld.elevator;
+          if (z === ev.doorZ && ev.doorXs.includes(x)) {
+            callCenterElevator(getCenterElevatorFloorByY(y), player.nickname, ws);
+            break;
+          }
+        }
         const targetStore = player.world === 'center' ? centerWorld : (player.world === 'sandbox' ? store : null);
         if (!targetStore || !targetStore.inBounds(x, y, z)) return;
         const cur = targetStore.getBlock(x, y, z);
@@ -1092,6 +1200,14 @@ wss.on('connection', (ws) => {
 
       case 'toggle_lever': {
         const { x, y, z } = msg;
+        if (player.world === 'center') {
+          const ev = centerWorld.elevator;
+          if (x === ev.buttonX && z === ev.buttonZ) {
+            callCenterElevator(getCenterElevatorFloorByY(y), player.nickname, ws);
+            break;
+          }
+          return;
+        }
         if (!store.inBounds(x, y, z)) return;
         const cur = store.getBlock(x, y, z);
         if (cur !== 'lever_off' && cur !== 'lever_on') return;
@@ -1099,6 +1215,14 @@ wss.on('connection', (ws) => {
         store.setBlock(x, y, z, next);
         broadcast({ type: 'block_update', x, y, z, block: next, by: player.nickname });
         propagateRedstoneSignal(x, y, z, next === 'lever_on', player.isAdmin);
+        break;
+      }
+
+      case 'elevator_call': {
+        if (player.world !== 'center') return;
+        const floor = Number(msg.floor);
+        if (!Number.isInteger(floor) || floor < 1 || floor > 5) return;
+        callCenterElevator(floor, player.nickname, ws);
         break;
       }
 
