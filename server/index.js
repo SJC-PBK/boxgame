@@ -12,6 +12,7 @@ import {
 import { WorldStore } from './worldStore.js';
 import { AnimalManager } from './animals.js';
 import { createJobVillageWorld } from './jobWorld.js';
+import { createCenterWorld } from './centerWorld.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,6 +47,7 @@ const DATA_DIR = path.resolve(ROOT_DIR, process.env.DATA_DIR || './data');
 const store = new WorldStore(DATA_DIR);
 const animals = new AnimalManager(store);
 const jobWorld = createJobVillageWorld();
+const centerWorld = createCenterWorld();
 
 // Shared in-game clock & weather
 const DAY_LENGTH_SEC = 360;
@@ -572,25 +574,28 @@ wss.on('connection', (ws) => {
       const isAdminLogin = false; // 관리자는 채팅 /관리자모드 로만 전환 (2026-11-24 pbk)
 
       const id = `p${nextPlayerSeq++}`;
-      const worldMode = msg.world === 'job' ? 'job' : 'sandbox';
+      const worldMode = msg.world === 'job' ? 'job' : (msg.world === 'center' ? 'center' : 'sandbox');
+      const isStaticZone = worldMode === 'job' || worldMode === 'center';
       const color = AVATAR_COLORS[(nextPlayerSeq - 2) % AVATAR_COLORS.length];
       const defaultSkin = {
         skinColor: '#f5cfa0', hairColor: '#3b2416', shirtColor: color,
         pantsColor: '#334155', hatColor: '', eyeColor: '#0f172a', blush: true, pixelDataUrl: null
       };
 
-      const bag = worldMode === 'job' ? Array(BAG_SIZE).fill(null) : createStarterBag();
+      const bag = isStaticZone ? Array(BAG_SIZE).fill(null) : createStarterBag();
       if (isAdminLogin && worldMode === 'sandbox') {
         bag[0] = { block: 'protect_beacon', count: 16 };
         bag[1] = { block: 'stealth_beacon', count: 16 };
       }
-      const tools = worldMode === 'job' ? null : createStarterTools();
+      const tools = isStaticZone ? null : createStarterTools();
       if (tools && isAdminLogin && store.config.saboSwordEnabled) {
         tools.sword = 'sabo_sword';
       }
       let startPos;
       if (worldMode === 'job') {
         startPos = { x: jobWorld.spawn.x + (Math.random() - 0.5) * 2, y: jobWorld.spawn.y, z: jobWorld.spawn.z };
+      } else if (worldMode === 'center') {
+        startPos = { x: centerWorld.spawn.x, y: centerWorld.spawn.y, z: centerWorld.spawn.z + (Math.random() - 0.5) * 2 };
       } else {
         const sx = 0.5 + (Math.random() - 0.5) * 3;
         const sz = 0.5 + (Math.random() - 0.5) * 3;
@@ -609,7 +614,7 @@ wss.on('connection', (ws) => {
         heldItem: bag[0]?.block || null,
         x: startPos.x, y: startPos.y, z: startPos.z,
         spawn: { ...startPos },
-        yaw: 0, pitch: 0, isAdmin: isAdminLogin, bag, tools,
+        yaw: worldMode === 'center' ? -Math.PI / 2 : 0, pitch: 0, isAdmin: isAdminLogin, bag, tools,
         hp: 20, hunger: 20, lastAteAt: Date.now(),
         jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
         openChestKey: null, openFurnaceKey: null,
@@ -632,26 +637,26 @@ wss.on('connection', (ws) => {
         jobOrder: player.jobOrder,
         jobScore: player.jobScore,
         jobCompleted: player.jobCompleted,
-        worldBounds: worldMode === 'job' ? jobWorld.bounds : WORLD_BOUNDS,
-        worldRLE: worldMode === 'job' ? jobWorld.rle : null,
-        worldDeltas: worldMode === 'job' ? null : store.getDeltasObject(),
+        worldBounds: worldMode === 'job' ? jobWorld.bounds : (worldMode === 'center' ? centerWorld.bounds : WORLD_BOUNDS),
+        worldRLE: worldMode === 'job' ? jobWorld.rle : (worldMode === 'center' ? centerWorld.getRLE() : null),
+        worldDeltas: isStaticZone ? null : store.getDeltasObject(),
         worldTime,
         worldWeather,
-        animals: worldMode === 'job' ? [] : animals.serializeAll(),
-        signs: worldMode === 'job' ? jobWorld.signs : store.signs,
-        portals: worldMode === 'job' ? {} : store.portals,
-        beacons: worldMode === 'job' ? {} : store.beacons,
-        facings: worldMode === 'job' ? {} : store.facings,
+        animals: isStaticZone ? [] : animals.serializeAll(),
+        signs: worldMode === 'job' ? jobWorld.signs : (worldMode === 'center' ? centerWorld.signs : store.signs),
+        portals: isStaticZone ? {} : store.portals,
+        beacons: isStaticZone ? {} : store.beacons,
+        facings: worldMode === 'job' ? {} : (worldMode === 'center' ? centerWorld.facings : store.facings),
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
-        regions: worldMode === 'job' ? [] : store.regions,
-        blueprints: worldMode === 'job' ? [] : store.blueprints,
+        regions: isStaticZone ? [] : store.regions,
+        blueprints: isStaticZone ? [] : store.blueprints,
         skins: store.skins,
         maxPlayers: MAX_PLAYERS
       });
 
       broadcast({ type: 'player_join', player: serializePlayer(player) }, id, worldMode);
-      const modeLabel = worldMode === 'job' ? '직업 체험 마을' : 'Boxworld';
+      const modeLabel = worldMode === 'job' ? '직업 체험 마을' : (worldMode === 'center' ? '행복플러스센터' : 'Boxworld');
       broadcast({
         type: 'chat', system: true,
         text: `${isAdminLogin ? '🛡️ 관리자 ' : ''}${player.nickname}님이 ${modeLabel}에 입장했습니다.`
@@ -666,7 +671,7 @@ wss.on('connection', (ws) => {
         const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z);
         const yaw = Number(msg.yaw), pitch = Number(msg.pitch);
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
-        const b = player.world === 'job' ? jobWorld.bounds : WORLD_BOUNDS;
+        const b = player.world === 'job' ? jobWorld.bounds : (player.world === 'center' ? centerWorld.bounds : WORLD_BOUNDS);
         player.x = Math.max(b.minX - 2, Math.min(b.maxX + 2, x));
         player.y = Math.max(-5, Math.min(b.maxY + 20, y));
         player.z = Math.max(b.minZ - 2, Math.min(b.maxZ + 2, z));
@@ -836,8 +841,11 @@ wss.on('connection', (ws) => {
       }
 
       case 'block_place': {
-        if (player.world === 'job') {
-          send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 설치할 수 없습니다.' });
+        if (player.world === 'job' || player.world === 'center') {
+          const msgTxt = player.world === 'center'
+            ? '🏢 행복플러스센터 구역은 보호되어 있습니다.'
+            : '💼 직업 체험 마을에서는 블록을 설치할 수 없습니다.';
+          send(ws, { type: 'toast', level: 'warn', text: msgTxt });
           return;
         }
         const { x, y, z, slotIndex } = msg;
@@ -938,7 +946,7 @@ wss.on('connection', (ws) => {
 
       // Multi-mode Builder Brush: place up to 5x5 / wall / row / column at once!
       case 'block_place_brush': {
-        if (player.world === 'job') return;
+        if (player.world === 'job' || player.world === 'center') return;
         const { positions, slotIndex } = msg;
         if (!Array.isArray(positions) || positions.length === 0 || positions.length > 25) return;
         const idx = Number(slotIndex);
@@ -1053,8 +1061,9 @@ wss.on('connection', (ws) => {
 
       case 'toggle_door': {
         const { x, y, z } = msg;
-        if (!store.inBounds(x, y, z)) return;
-        const cur = store.getBlock(x, y, z);
+        const targetStore = player.world === 'center' ? centerWorld : (player.world === 'sandbox' ? store : null);
+        if (!targetStore || !targetStore.inBounds(x, y, z)) return;
+        const cur = targetStore.getBlock(x, y, z);
         const DOOR_PAIRS = {
           door_closed: 'door_open',
           door_open: 'door_closed',
@@ -1068,16 +1077,16 @@ wss.on('connection', (ws) => {
         const next = DOOR_PAIRS[cur];
         if (!next) return;
         const changes = [{ x, y, z, block: next }];
-        store.setBlock(x, y, z, next);
+        targetStore.setBlock(x, y, z, next);
         // Sync paired top or bottom half of 1x2 door
-        if (store.inBounds(x, y + 1, z) && store.getBlock(x, y + 1, z) === cur) {
-          store.setBlock(x, y + 1, z, next);
+        if (targetStore.inBounds(x, y + 1, z) && targetStore.getBlock(x, y + 1, z) === cur) {
+          targetStore.setBlock(x, y + 1, z, next);
           changes.push({ x, y: y + 1, z, block: next });
-        } else if (store.inBounds(x, y - 1, z) && store.getBlock(x, y - 1, z) === cur) {
-          store.setBlock(x, y - 1, z, next);
+        } else if (targetStore.inBounds(x, y - 1, z) && targetStore.getBlock(x, y - 1, z) === cur) {
+          targetStore.setBlock(x, y - 1, z, next);
           changes.push({ x, y: y - 1, z, block: next });
         }
-        broadcast({ type: 'blocks_batch', changes, by: player.nickname });
+        broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, player.world);
         break;
       }
 
@@ -1320,8 +1329,11 @@ wss.on('connection', (ws) => {
       }
 
       case 'block_break': {
-        if (player.world === 'job') {
-          send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 부술 수 없습니다.' });
+        if (player.world === 'job' || player.world === 'center') {
+          const msgTxt = player.world === 'center'
+            ? '🏢 행복플러스센터 구역은 보호되어 있습니다.'
+            : '💼 직업 체험 마을에서는 블록을 부술 수 없습니다.';
+          send(ws, { type: 'toast', level: 'warn', text: msgTxt });
           return;
         }
         const { x, y, z, slotIndex, toolType } = msg;

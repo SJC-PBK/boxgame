@@ -553,7 +553,9 @@ function handleServerMessage(msg) {
         system: true,
         text: currentWorldMode === 'job'
           ? '☕ 직업 체험 마을에 오신 것을 환영합니다! 앞쪽 카페로 들어가 바리스타 체험을 시작해 보세요!'
-          : 'Boxworld에 오신 것을 환영합니다! 화로(4,17,3) · 광산(-9,16,-9) · 밭(8,16,-2) · 시간 변경: /낮 /노을 /밤'
+          : currentWorldMode === 'center'
+            ? '🏢 서울시립장애인행복플러스센터 구역에 입장했습니다! 1층 도면 공간과 2~5층·옥상 테라스를 둘러보세요! (문 우클릭 개폐 · Space×2 비행)'
+            : 'Boxworld에 오신 것을 환영합니다! 화로(4,17,3) · 광산(-9,16,-9) · 밭(8,16,-2) · 시간 변경: /낮 /노을 /밤'
       });
       break;
     }
@@ -1374,7 +1376,7 @@ function updatePhysics(dt) {
   playerPos.x = Math.max(worldBounds.minX + 0.5, Math.min(worldBounds.maxX + 0.5, playerPos.x));
   playerPos.z = Math.max(worldBounds.minZ + 0.5, Math.min(worldBounds.maxZ + 0.5, playerPos.z));
   if (playerPos.y < -5) {
-    playerPos.set(0.5, currentWorldMode === 'job' ? 5.5 : 38, 0.5);
+    playerPos.set(currentWorldMode === 'center' ? -28.5 : 0.5, (currentWorldMode === 'job' || currentWorldMode === 'center') ? 5.5 : 38, currentWorldMode === 'center' ? -3.5 : 0.5);
     playerVel.set(0, 0, 0);
   }
   return isMoving;
@@ -1430,7 +1432,7 @@ function animate(now) {
     remotePlayers.update(dt);
     animalRenderer.update(dt);
     worldExtras.update(dt);
-    sky.update(dt, playerPos, currentWorldMode === 'job' ? 4 : 36);
+    sky.update(dt, playerPos, (currentWorldMode === 'job' || currentWorldMode === 'center') ? 4 : 36);
     sound.updateListener(playerPos, yaw);
 
     const { eyePos, lookDir } = getEyeAndLook();

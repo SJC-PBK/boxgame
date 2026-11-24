@@ -745,7 +745,7 @@ export class GameUI {
     container.innerHTML = '';
 
     // Dedicated [Q] Tool Quick-Switch slot (left of hotbar 1..9, hidden in Job Village)
-    if (this.worldMode !== 'job') {
+    if (this.worldMode !== 'job' && this.worldMode !== 'center') {
       const bestTool = this.findBestToolSlot(this.lastToolType)
         || TOOL_ORDER.map(t => this.findBestToolSlot(t)).find(Boolean);
       const qEl = this._makeSlotEl(bestTool?.slot || null, {
@@ -1396,9 +1396,10 @@ export class GameUI {
     this.jobCompleted = jobCompleted || 0;
 
     const isJob = this.worldMode === 'job';
+    const isStaticZone = this.worldMode === 'job' || this.worldMode === 'center';
     document.getElementById('job-order-hud').classList.toggle('hidden', !isJob);
     for (const id of ['btn-brush', 'btn-craft', 'btn-blueprint', 'btn-bag']) {
-      document.getElementById(id)?.classList.toggle('hidden', isJob);
+      document.getElementById(id)?.classList.toggle('hidden', isStaticZone);
     }
     if (isJob) this.renderJobHUD();
   }
