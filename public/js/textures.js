@@ -465,6 +465,99 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(5, 5, 6, 6);
         break;
       }
+      case 'furn_office_desk': {
+        fillNoise(ctx, ['#d6b07c', '#c79e68', '#b98e57'], 1011);
+        ctx.fillStyle = '#926939';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        if (face === 'side') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(2, 2, 12, 7);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(3, 3, 10, 5);
+        }
+        break;
+      }
+      case 'furn_office_chair': {
+        fillNoise(ctx, ['#1e293b', '#334155', '#0f172a'], 1012);
+        ctx.fillStyle = '#475569';
+        for (let y = 2; y < 14; y += 2) ctx.fillRect(2, y, 12, 1);
+        break;
+      }
+      case 'furn_white_table': {
+        fillNoise(ctx, ['#f8fafc', '#f1f5f9', '#e2e8f0'], 1013);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        break;
+      }
+      case 'furn_partition': {
+        fillNoise(ctx, ['#cbd5e1', '#b8c4d4', '#a8b5c7'], 1014);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 0, 16, 2); ctx.fillRect(0, 14, 16, 2);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        break;
+      }
+      case 'furn_cabinet': {
+        fillNoise(ctx, ['#c99e63', '#b88b50', '#a67b42'], 1015);
+        ctx.fillStyle = '#7c582b';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(7, 1, 2, 14);
+        if (face === 'side') {
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillRect(5, 6, 1, 4); ctx.fillRect(10, 6, 1, 4);
+        }
+        break;
+      }
+      case 'furn_potted_plant': {
+        if (face === 'top') {
+          fillNoise(ctx, ['#22c55e', '#16a34a', '#15803d', '#4ade80'], 1016);
+        } else {
+          fillNoise(ctx, ['#f8fafc', '#f1f5f9', '#e2e8f0'], 1017);
+          ctx.fillStyle = '#16a34a';
+          ctx.fillRect(0, 0, 16, 7);
+          ctx.fillStyle = '#4ade80';
+          ctx.fillRect(2, 1, 5, 4); ctx.fillRect(9, 2, 5, 4);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(0, 7, 16, 1);
+        }
+        break;
+      }
+      case 'furn_cafe_table': {
+        fillNoise(ctx, ['#c28d53', '#b07b42', '#9e6c37'], 1018);
+        ctx.fillStyle = '#784e24';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        break;
+      }
+      case 'furn_sofa': {
+        fillNoise(ctx, ['#d6cfc2', '#c8bfb0', '#bab0a0'], 1019);
+        ctx.fillStyle = '#9e9484';
+        ctx.fillRect(0, 8, 16, 1);
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        break;
+      }
+      case 'furn_tv_screen': {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(1, 2, 14, 12);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(2, 3, 12, 10);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(3, 5, 5, 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(3, 8, 9, 1); ctx.fillRect(3, 10, 7, 1);
+        break;
+      }
+      case 'furn_ceiling_ac': {
+        fillNoise(ctx, ['#f8fafc', '#f1f5f9', '#e2e8f0'], 1020);
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(2, 2, 12, 1); ctx.fillRect(2, 13, 12, 1);
+        ctx.fillRect(2, 2, 1, 12); ctx.fillRect(13, 2, 1, 12);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(5, 5, 6, 6);
+        break;
+      }
       case 'ladder': {
         ctx.fillStyle = '#9a6534';
         ctx.fillRect(2, 0, 2, 16);

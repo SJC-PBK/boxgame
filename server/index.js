@@ -7,7 +7,8 @@ import { WebSocketServer } from 'ws';
 import {
   BLOCKS, ITEMS, CATALOG, RECIPES, CAFE_RECIPES, CAFE_FRIDGE_ITEMS,
   SMELT_MAP, FUEL_POWER, TIER_NAMES, WORLD_BOUNDS,
-  BAG_SIZE, CHEST_SIZE, createStarterBag, createStarterTools
+  BAG_SIZE, CHEST_SIZE, createStarterBag, createStarterTools,
+  CENTER_FURNITURE_IDS, createCenterFurnitureBag
 } from './blocks.js';
 import { WorldStore } from './worldStore.js';
 import { AnimalManager } from './animals.js';
@@ -56,6 +57,13 @@ for (const [k, txt] of Object.entries(store.signOverrides || {})) {
   } else if (k.startsWith('job:')) {
     const coord = k.slice(4);
     if (jobWorld.signs[coord]) jobWorld.signs[coord].text = txt;
+  }
+}
+// Restore persisted center-exclusive furniture placements
+for (const f of Object.values(store.centerFurn || {})) {
+  if (f && f.block && CENTER_FURNITURE_IDS.includes(f.block) && centerWorld.inBounds(f.x, f.y, f.z)) {
+    centerWorld.setBlock(f.x, f.y, f.z, f.block);
+    centerWorld.facings[`${f.x},${f.y},${f.z}`] = Number(f.facing) & 3;
   }
 }
 
@@ -692,7 +700,9 @@ wss.on('connection', (ws) => {
         pantsColor: '#334155', hatColor: '', eyeColor: '#0f172a', blush: true, pixelDataUrl: null
       };
 
-      const bag = isStaticZone ? Array(BAG_SIZE).fill(null) : createStarterBag();
+      const bag = worldMode === 'job'
+        ? Array(BAG_SIZE).fill(null)
+        : (worldMode === 'center' ? createCenterFurnitureBag() : createStarterBag());
       if (isAdminLogin && worldMode === 'sandbox') {
         bag[0] = { block: 'protect_beacon', count: 16 };
         bag[1] = { block: 'stealth_beacon', count: 16 };
@@ -952,14 +962,31 @@ wss.on('connection', (ws) => {
       }
 
       case 'block_place': {
-        if (player.world === 'job' || player.world === 'center') {
-          const msgTxt = player.world === 'center'
-            ? '🏢 행복플러스센터 구역은 보호되어 있습니다.'
-            : '💼 직업 체험 마을에서는 블록을 설치할 수 없습니다.';
-          send(ws, { type: 'toast', level: 'warn', text: msgTxt });
+        if (player.world === 'job') {
+          send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 설치할 수 없습니다.' });
           return;
         }
+        if (player.world === 'center') {
+          const { x, y, z, slotIndex } = msg;
+          const idx = Number(slotIndex);
+          const slot = (idx >= 0 && idx < BAG_SIZE) ? player.bag[idx] : null;
+          if (!slot || !CENTER_FURNITURE_IDS.includes(slot.block)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 행복플러스센터에서는 전용 카페·사무실 가구만 배치할 수 있습니다.' });
+            return;
+          }
+          if (!centerWorld.inBounds(x, y, z) || centerWorld.getBlock(x, y, z) !== null) return;
+          const fDir = Number(msg.facing) & 3;
+          centerWorld.setBlock(x, y, z, slot.block);
+          centerWorld.facings[`${x},${y},${z}`] = fDir;
+          store.setCenterFurn(x, y, z, slot.block, fDir);
+          broadcast({ type: 'block_update', x, y, z, block: slot.block, facing: fDir, by: player.nickname }, null, 'center');
+          break;
+        }
         const { x, y, z, slotIndex } = msg;
+        if (player.bag[Number(slotIndex)]?.block?.startsWith('furn_')) {
+          send(ws, { type: 'toast', level: 'warn', text: '🏢 카페·사무실 가구는 행복플러스센터 구역에서만 사용할 수 있습니다.' });
+          return;
+        }
         if (!store.inBounds(x, y, z)) {
           send(ws, { type: 'toast', level: 'warn', text: '월드 경계 밖에는 설치할 수 없습니다.' });
           return;
@@ -1520,12 +1547,23 @@ wss.on('connection', (ws) => {
       }
 
       case 'block_break': {
-        if (player.world === 'job' || player.world === 'center') {
-          const msgTxt = player.world === 'center'
-            ? '🏢 행복플러스센터 구역은 보호되어 있습니다.'
-            : '💼 직업 체험 마을에서는 블록을 부술 수 없습니다.';
-          send(ws, { type: 'toast', level: 'warn', text: msgTxt });
+        if (player.world === 'job') {
+          send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을에서는 블록을 부술 수 없습니다.' });
           return;
+        }
+        if (player.world === 'center') {
+          const { x, y, z } = msg;
+          if (!centerWorld.inBounds(x, y, z)) return;
+          const cur = centerWorld.getBlock(x, y, z);
+          if (!cur || !CENTER_FURNITURE_IDS.includes(cur)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 건물 구조는 보호되어 있습니다. (배치한 가구만 철거 가능)' });
+            return;
+          }
+          centerWorld.setBlock(x, y, z, null);
+          delete centerWorld.facings[`${x},${y},${z}`];
+          store.setCenterFurn(x, y, z, null);
+          broadcast({ type: 'block_update', x, y, z, block: null, by: player.nickname }, null, 'center');
+          break;
         }
         const { x, y, z, slotIndex, toolType } = msg;
         if (!store.inBounds(x, y, z)) return;

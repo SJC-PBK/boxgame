@@ -49,6 +49,7 @@ export class WorldStore {
       signs: path.join(this.dataDir, 'signs.json'),
       signPosts: path.join(this.dataDir, 'sign_posts.json'),
       signOverrides: path.join(this.dataDir, 'sign_overrides.json'),
+      centerFurn: path.join(this.dataDir, 'center_furn.json'),
       portals: path.join(this.dataDir, 'portals.json'),
       beacons: path.join(this.dataDir, 'beacons.json'),
       facings: path.join(this.dataDir, 'facings.json'),
@@ -66,6 +67,7 @@ export class WorldStore {
     this.signs = {};
     this.signPosts = {};
     this.signOverrides = {};
+    this.centerFurn = {};
     this.portals = {};
     this.beacons = {};
     this.facings = {};
@@ -110,6 +112,7 @@ export class WorldStore {
       else if (kind === 'signs') this._writeJsonAtomic(this.files.signs, this.signs);
       else if (kind === 'signPosts') this._writeJsonAtomic(this.files.signPosts, this.signPosts);
       else if (kind === 'signOverrides') this._writeJsonAtomic(this.files.signOverrides, this.signOverrides);
+      else if (kind === 'centerFurn') this._writeJsonAtomic(this.files.centerFurn, this.centerFurn);
       else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
       else if (kind === 'beacons') this._writeJsonAtomic(this.files.beacons, this.beacons);
       else if (kind === 'facings') this._writeJsonAtomic(this.files.facings, this.facings);
@@ -139,6 +142,8 @@ export class WorldStore {
     this.signPosts = (savedSignPosts && typeof savedSignPosts === 'object') ? savedSignPosts : {};
     const savedSignOverrides = this._readJson(this.files.signOverrides);
     this.signOverrides = (savedSignOverrides && typeof savedSignOverrides === 'object') ? savedSignOverrides : {};
+    const savedCenterFurn = this._readJson(this.files.centerFurn);
+    this.centerFurn = (savedCenterFurn && typeof savedCenterFurn === 'object') ? savedCenterFurn : {};
     const savedPortals = this._readJson(this.files.portals);
     const savedBeacons = this._readJson(this.files.beacons);
     const savedFacings = this._readJson(this.files.facings);
@@ -506,6 +511,13 @@ export class WorldStore {
     this.signOverrides[key] = String(text || '').trim().slice(0, 60) || '표지판';
     this._scheduleSave('signOverrides', 100);
     return this.signOverrides[key];
+  }
+
+  setCenterFurn(x, y, z, blockId, facing = 0) {
+    const k = keyOf(x, y, z);
+    if (!blockId) delete this.centerFurn[k];
+    else this.centerFurn[k] = { x, y, z, block: blockId, facing: Number(facing) & 3 };
+    this._scheduleSave('centerFurn', 150);
   }
 
   getSignPosts(boardKey) {

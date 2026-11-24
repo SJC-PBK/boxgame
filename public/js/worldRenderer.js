@@ -874,6 +874,69 @@ export class WorldRenderer {
             continue;
           }
 
+          if (blockId.startsWith('furn_') && blockId !== 'furn_cabinet') {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            const fDir = this.facings.get(`${x},${y},${z}`) || 0;
+            if (blockId === 'furn_office_desk') {
+              // Wooden desk top + 2 side panels + dual monitor on back edge
+              pushSubBox(blockId, x, y, z, 0.02, 0.68, 0.02, 0.98, 0.78, 0.98, lr, lg, lb, 0.06);
+              pushSubBox(blockId, x, y, z, 0.04, 0, 0.08, 0.14, 0.68, 0.92, lr, lg, lb, 0.10);
+              pushSubBox(blockId, x, y, z, 0.86, 0, 0.08, 0.96, 0.68, 0.92, lr, lg, lb, 0.10);
+              if (fDir === 0) pushSubBox('furn_tv_screen', x, y, z, 0.12, 0.78, 0.08, 0.88, 1.24, 0.18, lr, lg, lb, 0.04);
+              else if (fDir === 1) pushSubBox('furn_tv_screen', x, y, z, 0.82, 0.78, 0.12, 0.92, 1.24, 0.88, lr, lg, lb, 0.04);
+              else if (fDir === 2) pushSubBox('furn_tv_screen', x, y, z, 0.12, 0.78, 0.82, 0.88, 1.24, 0.92, lr, lg, lb, 0.04);
+              else pushSubBox('furn_tv_screen', x, y, z, 0.08, 0.78, 0.12, 0.18, 1.24, 0.88, lr, lg, lb, 0.04);
+            } else if (blockId === 'furn_office_chair') {
+              // Wheeled base + stem + seat cushion + 4-way backrest
+              pushSubBox(blockId, x, y, z, 0.28, 0, 0.28, 0.72, 0.08, 0.72, lr, lg, lb, 0.12);
+              pushSubBox(blockId, x, y, z, 0.44, 0.08, 0.44, 0.56, 0.40, 0.56, lr, lg, lb, 0.10);
+              pushSubBox(blockId, x, y, z, 0.18, 0.40, 0.18, 0.82, 0.50, 0.82, lr, lg, lb, 0.08);
+              if (fDir === 0) pushSubBox(blockId, x, y, z, 0.18, 0.50, 0.70, 0.82, 0.96, 0.82, lr, lg, lb, 0.06);
+              else if (fDir === 1) pushSubBox(blockId, x, y, z, 0.18, 0.50, 0.18, 0.30, 0.96, 0.82, lr, lg, lb, 0.06);
+              else if (fDir === 2) pushSubBox(blockId, x, y, z, 0.18, 0.50, 0.18, 0.82, 0.96, 0.30, lr, lg, lb, 0.06);
+              else pushSubBox(blockId, x, y, z, 0.70, 0.50, 0.18, 0.82, 0.96, 0.82, lr, lg, lb, 0.06);
+            } else if (blockId === 'furn_white_table') {
+              // Crisp white meeting/training table + 4 slim silver legs
+              pushSubBox(blockId, x, y, z, 0.02, 0.70, 0.02, 0.98, 0.80, 0.98, lr, lg, lb, 0.05);
+              pushSubBox('stone', x, y, z, 0.08, 0, 0.08, 0.16, 0.70, 0.16, lr, lg, lb, 0.10);
+              pushSubBox('stone', x, y, z, 0.84, 0, 0.08, 0.92, 0.70, 0.16, lr, lg, lb, 0.10);
+              pushSubBox('stone', x, y, z, 0.08, 0, 0.84, 0.16, 0.70, 0.92, lr, lg, lb, 0.10);
+              pushSubBox('stone', x, y, z, 0.84, 0, 0.84, 0.92, 0.70, 0.92, lr, lg, lb, 0.10);
+            } else if (blockId === 'furn_partition') {
+              // Thin modern gray office desk partition panel (4-way)
+              if (fDir === 0 || fDir === 2) pushSubBox(blockId, x, y, z, 0, 0, 0.42, 1, 1.15, 0.58, lr, lg, lb, 0.06);
+              else pushSubBox(blockId, x, y, z, 0.42, 0, 0, 0.58, 1.15, 1, lr, lg, lb, 0.06);
+            } else if (blockId === 'furn_potted_plant') {
+              // White ceramic planter pot + lush green foliage bush
+              pushSubBox('wool_white', x, y, z, 0.24, 0, 0.24, 0.76, 0.42, 0.76, lr, lg, lb, 0.08);
+              pushSubBox('leaves', x, y, z, 0.14, 0.42, 0.14, 0.86, 0.96, 0.86, lr, lg, lb, 0.06);
+            } else if (blockId === 'furn_cafe_table') {
+              // Warm wood cafe tabletop + center pedestal & base
+              pushSubBox(blockId, x, y, z, 0.06, 0.72, 0.06, 0.94, 0.82, 0.94, lr, lg, lb, 0.06);
+              pushSubBox('furn_office_chair', x, y, z, 0.43, 0.06, 0.43, 0.57, 0.72, 0.57, lr, lg, lb, 0.10);
+              pushSubBox('furn_office_chair', x, y, z, 0.24, 0, 0.24, 0.76, 0.06, 0.76, lr, lg, lb, 0.12);
+            } else if (blockId === 'furn_sofa') {
+              // Cozy lounge sofa seat + 4-way cushioned backrest & side arms
+              pushSubBox(blockId, x, y, z, 0.04, 0, 0.04, 0.96, 0.44, 0.96, lr, lg, lb, 0.08);
+              if (fDir === 0) pushSubBox(blockId, x, y, z, 0.04, 0.44, 0.72, 0.96, 0.92, 0.96, lr, lg, lb, 0.06);
+              else if (fDir === 1) pushSubBox(blockId, x, y, z, 0.04, 0.44, 0.04, 0.28, 0.92, 0.96, lr, lg, lb, 0.06);
+              else if (fDir === 2) pushSubBox(blockId, x, y, z, 0.04, 0.44, 0.04, 0.96, 0.92, 0.28, lr, lg, lb, 0.06);
+              else pushSubBox(blockId, x, y, z, 0.72, 0.44, 0.04, 0.96, 0.92, 0.96, lr, lg, lb, 0.06);
+            } else if (blockId === 'furn_tv_screen') {
+              // Sleek wide dark display board / electronic whiteboard (4-way)
+              if (fDir === 0 || fDir === 2) pushSubBox(blockId, x, y, z, 0.02, 0.12, 0.42, 0.98, 0.96, 0.58, lr, lg, lb, 0.04);
+              else pushSubBox(blockId, x, y, z, 0.42, 0.12, 0.02, 0.58, 0.96, 0.98, lr, lg, lb, 0.04);
+            } else if (blockId === 'furn_ceiling_ac') {
+              // Slim 4-way ceiling cassette air conditioner unit
+              pushSubBox(blockId, x, y, z, 0.06, 0.78, 0.06, 0.94, 0.99, 0.94, lr, lg, lb, 0.04);
+            }
+            continue;
+          }
+
           if (num === this.fuseNum || num === this.wireNum) {
             // Flat ground-hugging gunpowder fuse cord / redstone wire
             const buf = getBucket(blockId, 'top');

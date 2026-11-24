@@ -1419,11 +1419,12 @@ export class GameUI {
     this.jobCompleted = jobCompleted || 0;
 
     const isJob = this.worldMode === 'job';
-    const isStaticZone = this.worldMode === 'job' || this.worldMode === 'center';
+    const isCenter = this.worldMode === 'center';
     document.getElementById('job-order-hud').classList.toggle('hidden', !isJob);
-    for (const id of ['btn-brush', 'btn-craft', 'btn-blueprint', 'btn-bag']) {
-      document.getElementById(id)?.classList.toggle('hidden', isStaticZone);
+    for (const id of ['btn-brush', 'btn-craft', 'btn-blueprint']) {
+      document.getElementById(id)?.classList.toggle('hidden', isJob || isCenter);
     }
+    document.getElementById('btn-bag')?.classList.toggle('hidden', isJob);
     if (isJob) this.renderJobHUD();
   }
 

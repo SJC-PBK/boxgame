@@ -89,8 +89,32 @@ export const BLOCKS = {
   lever_on:          { numId: 63, id: 'lever_on',          name: '🔴 스위치 (켜짐)',transparent: true,  solid: false, hardness: 0.3, preferredTool: null,      minTier: 0, drop: 'lever_off',         sound: 'stone', stackable: 16, category: '특수' },
   pressure_plate:    { numId: 64, id: 'pressure_plate',    name: '🦶 압력판',       transparent: true,  solid: false, hardness: 0.3, preferredTool: null,      minTier: 0, drop: 'pressure_plate',    sound: 'wood',  stackable: 16, category: '특수' },
   redstone_lamp_off: { numId: 65, id: 'redstone_lamp_off', name: '💡 스위치 조명',  transparent: false, solid: true,  hardness: 0.5, preferredTool: null,      minTier: 0, drop: 'redstone_lamp_off', sound: 'glass', stackable: 32, category: '특수' },
-  redstone_lamp_on:  { numId: 66, id: 'redstone_lamp_on',  name: '🌟 스위치 조명(ON)',transparent: false, solid: true, hardness: 0.5, preferredTool: null,     minTier: 0, drop: 'redstone_lamp_off', sound: 'glass', stackable: 32, category: '특수' }
+  redstone_lamp_on:  { numId: 66, id: 'redstone_lamp_on',  name: '🌟 스위치 조명(ON)',transparent: false, solid: true, hardness: 0.5, preferredTool: null,     minTier: 0, drop: 'redstone_lamp_off', sound: 'glass', stackable: 32, category: '특수' },
+  // Happiness Plus Center Exclusive Cafe & Office Furniture (numId 67..76)
+  furn_office_desk:  { numId: 67, id: 'furn_office_desk',  name: '🖥️ 사무실 PC 책상',   transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_office_desk',  sound: 'wood',  stackable: 64, category: '센터가구', centerOnly: true },
+  furn_office_chair: { numId: 68, id: 'furn_office_chair', name: '💺 사무실 회전의자',   transparent: true,  solid: true,  hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'furn_office_chair', sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true },
+  furn_white_table:  { numId: 69, id: 'furn_white_table',  name: '📋 화이트 교육테이블', transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_white_table',  sound: 'wood',  stackable: 64, category: '센터가구', centerOnly: true },
+  furn_partition:    { numId: 70, id: 'furn_partition',    name: '🧱 사무실 파티션',     transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_partition',    sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true },
+  furn_cabinet:      { numId: 71, id: 'furn_cabinet',      name: '🗄️ 서류 캐비닛',       transparent: false, solid: true,  hardness: 0.4,  preferredTool: null, minTier: 0, drop: 'furn_cabinet',      sound: 'wood',  stackable: 64, category: '센터가구', centerOnly: true },
+  furn_potted_plant: { numId: 72, id: 'furn_potted_plant', name: '🪴 화이트 실내화분',   transparent: true,  solid: false, hardness: 0.2,  preferredTool: null, minTier: 0, drop: 'furn_potted_plant', sound: 'dirt',  stackable: 64, category: '센터가구', centerOnly: true },
+  furn_cafe_table:   { numId: 73, id: 'furn_cafe_table',   name: '☕ 카페 우드테이블',   transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_cafe_table',   sound: 'wood',  stackable: 64, category: '센터가구', centerOnly: true },
+  furn_sofa:         { numId: 74, id: 'furn_sofa',         name: '🛋️ 라운지 소파',       transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_sofa',         sound: 'dirt',  stackable: 64, category: '센터가구', centerOnly: true },
+  furn_tv_screen:    { numId: 75, id: 'furn_tv_screen',    name: '📺 대형 전자칠판',     transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_tv_screen',    sound: 'glass', stackable: 64, category: '센터가구', centerOnly: true },
+  furn_ceiling_ac:   { numId: 76, id: 'furn_ceiling_ac',   name: '❄️ 천장 시스템에어컨', transparent: true,  solid: false, hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'furn_ceiling_ac',   sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true }
 };
+
+export const CENTER_FURNITURE_IDS = [
+  'furn_office_desk', 'furn_office_chair', 'furn_white_table', 'furn_partition', 'furn_cabinet',
+  'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac'
+];
+
+export function createCenterFurnitureBag() {
+  const bag = Array(BAG_SIZE).fill(null);
+  CENTER_FURNITURE_IDS.forEach((id, i) => {
+    bag[i] = { block: id, count: 64 };
+  });
+  return bag;
+}
 
 export const NUM_TO_BLOCK = {};
 for (const b of Object.values(BLOCKS)) {

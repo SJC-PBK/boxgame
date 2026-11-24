@@ -490,6 +490,7 @@ function handleServerMessage(msg) {
       worldExtras.syncPortals(currentPortals);
       worldExtras.syncBeacons(msg.beacons || {});
       worldExtras.syncElevator(msg.elevator || null);
+      worldExtras.syncCenterPylon(currentWorldMode === 'center');
 
       playerPos.set(selfPlayer.x, selfPlayer.y, selfPlayer.z);
       playerVel.set(0, 0, 0);

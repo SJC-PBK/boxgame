@@ -711,4 +711,161 @@ export class WorldExtras {
     return pos.x >= c.minX - 1.5 && pos.x <= c.maxX + 1.5 &&
            pos.z >= c.minZ - 0.2 && pos.z <= c.maxZ + 2.5;
   }
+
+  // ---- Iconic Navy-Blue Freestanding Pylon Sign (1F Entrance, Photo 6!) ----
+  syncCenterPylon(show) {
+    if (!show) {
+      if (this._pylonGroup) {
+        this.scene.remove(this._pylonGroup);
+        this._pylonGroup = null;
+      }
+      return;
+    }
+    if (this._pylonGroup) return;
+
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 1400;
+    const ctx = c.getContext('2d');
+
+    // Deep navy body background
+    ctx.fillStyle = '#1b2a4a';
+    ctx.fillRect(0, 0, 512, 1400);
+
+    // Top circular white medallion ("행복플러스")
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(256, 175, 92, 0, Math.PI * 2);
+    ctx.fill();
+    // Colorful ribbon accent
+    ctx.strokeStyle = '#e11d48';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(278, 152, 22, 0.2, Math.PI * 1.4);
+    ctx.stroke();
+    ctx.strokeStyle = '#0ea5e9';
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.arc(245, 160, 20, Math.PI * 0.9, Math.PI * 2.1);
+    ctx.stroke();
+    ctx.fillStyle = '#0f3b7a';
+    ctx.font = 'bold 42px Pretendard, Malgun Gothic, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('행복플러스', 256, 198);
+
+    // Rounded white directory board
+    ctx.fillStyle = '#f8fafc';
+    ctx.beginPath();
+    ctx.roundRect(42, 315, 428, 760, 26);
+    ctx.fill();
+
+    const drawBadge = (x, y, w, h, color, lines) => {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 14);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 30px Pretendard, Malgun Gothic, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const step = h / (lines.length + 1);
+      lines.forEach((ln, i) => ctx.fillText(ln, x + w / 2, y + step * (i + 1)));
+    };
+
+    const drawDivider = (y) => {
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(64, y);
+      ctx.lineTo(448, y);
+      ctx.stroke();
+    };
+
+    // 6F
+    drawBadge(66, 355, 76, 95, '#1b7a78', ['6F']);
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 20px Pretendard, Malgun Gothic, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('서울특별시', 162, 386);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 30px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('장애인권익옹호기관', 162, 424);
+    drawDivider(478);
+
+    // 5F / 4F / 3F
+    drawBadge(66, 505, 76, 155, '#5d7b3a', ['5F', '4F', '3F']);
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 20px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('서울특별시', 162, 566);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 32px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('장애인일자리센터', 162, 606);
+    drawDivider(690);
+
+    // 2F
+    drawBadge(66, 718, 76, 130, '#7c5295', ['2F']);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 28px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('서울시그룹홈지원센터', 162, 748);
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 17px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('서울시장애인생산품판매시설', 162, 792);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 28px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('경영지원센터', 162, 826);
+    drawDivider(878);
+
+    // 1F
+    drawBadge(66, 908, 76, 118, '#d95b5b', ['1F']);
+    ctx.fillStyle = '#475569';
+    ctx.font = 'bold 20px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('서울특별시  IL-RO(일로)', 162, 948);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 32px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('장애인일자리센터', 162, 990);
+
+    // Bottom footer on navy base
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(82, 1152, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f43f5e';
+    ctx.beginPath();
+    ctx.arc(98, 1142, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 28px Pretendard, Malgun Gothic, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('서울시립장애인행복플러스센터', 120, 1152);
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+
+    const navyMat = new THREE.MeshStandardMaterial({ color: 0x1b2a4a, roughness: 0.45, metalness: 0.25 });
+    const faceMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35, metalness: 0.1 });
+
+    // BoxGeometry material order: +X, -X, +Y, -Y, +Z, -Z
+    // Front face faces -X (toward entering player & street), back face faces +X
+    const pylon = new THREE.Mesh(
+      new THREE.BoxGeometry(0.46, 4.1, 1.42),
+      [faceMat, faceMat, navyMat, navyMat, navyMat, navyMat]
+    );
+    pylon.position.set(0, 2.05, 0);
+
+    // Sleek concrete base plinth
+    const basePlinth = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.22, 1.58),
+      new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 })
+    );
+    basePlinth.position.set(0, 0.11, 0);
+
+    const group = new THREE.Group();
+    group.add(pylon, basePlinth);
+    // Positioned right next to the 1F entrance walkway & tactile paving!
+    group.position.set(-25.2, 5.0, -0.5);
+    this.scene.add(group);
+    this._pylonGroup = group;
+  }
 }

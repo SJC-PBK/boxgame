@@ -422,6 +422,11 @@ export function createCenterWorld() {
   addSign(bx(-1), Y1 + 8, bz(8), '☕ 행복플러스 카페\n(1F 바리스타 교육장)');
   // Small yellow awning over secondary right-side entry (Photo 2 detail!)
   fill(bx(-2), Y1 + 4, bz(12), bx(0), Y1 + 4, bz(14), 'wool_yellow');
+  // Lush green entrance shrubbery right beside the freestanding navy pylon sign (Photo 6!)
+  set(bx(-4), Y1 + 1, bz(11), 'leaves');
+  set(bx(-4), Y1 + 2, bz(11), 'leaves');
+  set(bx(-4), Y1 + 1, bz(12), 'leaves');
+  set(bx(-3), Y1 + 1, bz(11), 'leaves');
 
   // 3b. Curved Cream-Tile Walkway in front of Restrooms toward MDF (dx = 24..35, dz = 6..8)
   fill(bx(24), Y1, bz(6), bx(35), Y1, bz(8), 'sand');
