@@ -432,6 +432,29 @@ export class GameUI {
       });
     });
 
+    // In-game Sign & Guestbook Board controls
+    const signPostInput = document.getElementById('sign-post-input');
+    const signPostCount = document.getElementById('sign-post-count');
+    signPostInput?.addEventListener('input', () => {
+      if (signPostCount) signPostCount.textContent = `${signPostInput.value.length}/200`;
+    });
+    document.getElementById('btn-sign-text-save')?.addEventListener('click', () => {
+      if (!this.currentSignBoard) return;
+      const text = document.getElementById('sign-text-input')?.value || '';
+      const { x, y, z } = this.currentSignBoard;
+      this.cb.send({ type: 'sign_update', x, y, z, text });
+      document.getElementById('sign-board-title').textContent = `🪧 ${text.trim() || '표지판'}`;
+    });
+    document.getElementById('btn-sign-post-submit')?.addEventListener('click', () => {
+      if (!this.currentSignBoard || !signPostInput) return;
+      const text = signPostInput.value.trim();
+      if (!text) return;
+      const { x, y, z } = this.currentSignBoard;
+      this.cb.send({ type: 'sign_post_add', x, y, z, text });
+      signPostInput.value = '';
+      if (signPostCount) signPostCount.textContent = '0/200';
+    });
+
     // Blueprint controls
     document.getElementById('bp-move-xm').addEventListener('click', () => this.cb.projector.nudge(-1, 0, 0));
     document.getElementById('bp-move-xp').addEventListener('click', () => this.cb.projector.nudge(1, 0, 0));
@@ -1621,6 +1644,98 @@ export class GameUI {
     this.cb.onApplySkin(skin);
     this.cb.send({ type: 'skin_publish', name: suggestedName, skin });
     if (afterClear) afterClear();
+  }
+
+  openSignBoard(data) {
+    this.currentSignBoard = {
+      x: data.x, y: data.y, z: data.z,
+      text: data.text || '표지판',
+      canEdit: !!data.canEdit,
+      posts: Array.isArray(data.posts) ? data.posts : [],
+      page: 1
+    };
+    document.getElementById('sign-board-title').textContent = `🪧 ${this.currentSignBoard.text}`;
+    document.getElementById('sign-board-subtitle').textContent =
+      `위치 (${data.x}, ${data.y}, ${data.z}) · 누구나 방명록과 메모를 남길 수 있어요`;
+    const editSec = document.getElementById('sign-edit-section');
+    const textInp = document.getElementById('sign-text-input');
+    if (editSec) editSec.classList.toggle('hidden', !this.currentSignBoard.canEdit);
+    if (textInp) textInp.value = this.currentSignBoard.text;
+    const postInp = document.getElementById('sign-post-input');
+    const postCnt = document.getElementById('sign-post-count');
+    if (postInp) postInp.value = '';
+    if (postCnt) postCnt.textContent = '0/200';
+    this._renderSignBoardPosts();
+    this.openModal('modal-sign');
+  }
+
+  updateSignBoardPosts(x, y, z, posts) {
+    if (!this.currentSignBoard) return;
+    if (this.currentSignBoard.x !== x || this.currentSignBoard.y !== y || this.currentSignBoard.z !== z) return;
+    this.currentSignBoard.posts = Array.isArray(posts) ? posts : [];
+    const perPage = 4;
+    const totalPages = Math.max(1, Math.ceil(this.currentSignBoard.posts.length / perPage));
+    if (this.currentSignBoard.page > totalPages) this.currentSignBoard.page = totalPages;
+    this._renderSignBoardPosts();
+  }
+
+  _renderSignBoardPosts() {
+    const listEl = document.getElementById('sign-post-list');
+    const pagerEl = document.getElementById('sign-post-pager');
+    if (!listEl || !pagerEl || !this.currentSignBoard) return;
+    const posts = this.currentSignBoard.posts;
+    const perPage = 4;
+    const totalPages = Math.max(1, Math.ceil(posts.length / perPage));
+    const page = Math.max(1, Math.min(totalPages, this.currentSignBoard.page));
+    this.currentSignBoard.page = page;
+
+    if (posts.length === 0) {
+      listEl.innerHTML = '<div class="sign-empty">아직 남겨진 글이 없어요. 첫 번째 방명록을 남겨 보세요! ✨</div>';
+    } else {
+      const slice = posts.slice((page - 1) * perPage, page * perPage);
+      listEl.innerHTML = slice.map((p) => {
+        const dt = p.createdAt ? new Date(p.createdAt).toLocaleString('ko-KR') : '';
+        const canDel = this.isAdmin || p.author === this.selfNick;
+        return `
+          <div class="sign-post-card">
+            <div class="sign-post-meta">
+              <span class="sign-post-author">${this._esc(p.author)}</span>
+              <div class="sign-post-right">
+                <span class="sign-post-date">${this._esc(dt)}</span>
+                ${canDel ? `<button type="button" class="sign-post-del" data-delpost="${this._esc(p.id)}">삭제</button>` : ''}
+              </div>
+            </div>
+            <div class="sign-post-text">${this._esc(p.text)}</div>
+          </div>
+        `;
+      }).join('');
+      listEl.querySelectorAll('[data-delpost]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const { x, y, z } = this.currentSignBoard;
+          this.cb.send({ type: 'sign_post_delete', x, y, z, postId: btn.dataset.delpost });
+        });
+      });
+    }
+
+    // Pagination (< 1 2 3 >)
+    pagerEl.innerHTML = '';
+    if (totalPages > 1) {
+      const addBtn = (label, targetPage, active = false, disabled = false) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sign-page-btn' + (active ? ' active' : '');
+        b.textContent = label;
+        b.disabled = disabled;
+        b.addEventListener('click', () => {
+          this.currentSignBoard.page = targetPage;
+          this._renderSignBoardPosts();
+        });
+        pagerEl.appendChild(b);
+      };
+      addBtn('‹', page - 1, false, page <= 1);
+      for (let i = 1; i <= totalPages; i++) addBtn(String(i), i, i === page, false);
+      addBtn('›', page + 1, false, page >= totalPages);
+    }
   }
 
   _esc(s) {

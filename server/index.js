@@ -1257,16 +1257,70 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'sign_board_open': {
+        const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+        const k = `${x},${y},${z}`;
+        const signsMap = player.world === 'job' ? jobWorld.signs : (player.world === 'center' ? centerWorld.signs : store.signs);
+        const s = signsMap[k];
+        const canEdit = player.world === 'sandbox'
+          ? (player.isAdmin || !store.findProtectingRegion(x, y, z))
+          : !!player.isAdmin;
+        const boardKey = `${player.world}:${k}`;
+        send(ws, {
+          type: 'sign_board_data',
+          x, y, z,
+          text: s?.text || '표지판',
+          canEdit,
+          posts: store.getSignPosts(boardKey)
+        });
+        break;
+      }
+
+      case 'sign_post_add': {
+        const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+        const boardKey = `${player.world}:${x},${y},${z}`;
+        const posts = store.addSignPost(boardKey, player.nickname, msg.text);
+        if (!posts) return;
+        broadcast({ type: 'sign_board_posts', x, y, z, posts }, null, player.world);
+        send(ws, { type: 'toast', level: 'success', text: '📝 방명록 글이 등록되었습니다!' });
+        break;
+      }
+
+      case 'sign_post_delete': {
+        const x = Number(msg.x), y = Number(msg.y), z = Number(msg.z);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+        const boardKey = `${player.world}:${x},${y},${z}`;
+        const posts = store.deleteSignPost(boardKey, String(msg.postId || ''), player.nickname, player.isAdmin);
+        if (!posts) return;
+        broadcast({ type: 'sign_board_posts', x, y, z, posts }, null, player.world);
+        send(ws, { type: 'toast', level: 'info', text: '🗑️ 게시글을 삭제했습니다.' });
+        break;
+      }
+
       case 'sign_update': {
         const { x, y, z, text } = msg;
-        if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
-          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 표지판은 수정할 수 없습니다.' });
-          return;
-        }
-        const s = store.setSignText(x, y, z, text, player.nickname);
-        if (s) {
-          broadcast({ type: 'signs_update', signs: store.signs });
-          send(ws, { type: 'toast', level: 'success', text: '🪧 표지판 문구가 저장되었습니다!' });
+        if (player.world === 'sandbox') {
+          if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역의 표지판은 수정할 수 없습니다.' });
+            return;
+          }
+          const s = store.setSignText(x, y, z, text, player.nickname);
+          if (s) {
+            broadcast({ type: 'signs_update', signs: store.signs }, null, 'sandbox');
+            send(ws, { type: 'toast', level: 'success', text: '🪧 표지판 문구가 저장되었습니다!' });
+          }
+        } else if (player.isAdmin) {
+          const signsMap = player.world === 'job' ? jobWorld.signs : centerWorld.signs;
+          const k = `${x},${y},${z}`;
+          if (signsMap[k]) {
+            signsMap[k].text = String(text || '').trim().slice(0, 60) || '표지판';
+            broadcast({ type: 'signs_update', signs: signsMap }, null, player.world);
+            send(ws, { type: 'toast', level: 'success', text: '🪧 표지판 문구가 저장되었습니다!' });
+          }
+        } else {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 이 구역의 표지판 제목은 관리자만 수정할 수 있습니다. (방명록 글쓰기는 누구나 가능!)' });
         }
         break;
       }

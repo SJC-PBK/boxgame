@@ -586,6 +586,14 @@ function handleServerMessage(msg) {
       worldExtras.syncSigns(currentSigns);
       break;
 
+    case 'sign_board_data':
+      ui.openSignBoard(msg);
+      break;
+
+    case 'sign_board_posts':
+      ui.updateSignBoardPosts(msg.x, msg.y, msg.z, msg.posts);
+      break;
+
     case 'portals_update':
       currentPortals = msg.portals || {};
       worldExtras.syncPortals(currentPortals);
@@ -967,12 +975,9 @@ function handleRightClickOrInteract(interactOnly = false) {
     }
     if (currentHit.block === 'sign') {
       if (document.pointerLockElement) document.exitPointerLock();
-      const k = `${currentHit.x},${currentHit.y},${currentHit.z}`;
-      const curText = currentSigns[k]?.text || '';
-      const nextText = prompt('🪧 표지판에 적을 문구를 입력하세요 (줄바꿈은 \\n):', curText.replace(/\n/g, '\\n'));
-      if (nextText !== null) {
-        send({ type: 'sign_update', x: currentHit.x, y: currentHit.y, z: currentHit.z, text: nextText.replace(/\\n/g, '\n') });
-      }
+      fpHand?.triggerSwing();
+      sound.playOpen();
+      send({ type: 'sign_board_open', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
     if (currentHit.block === 'portal') {

@@ -570,3 +570,101 @@ input[type="text"], input[type="password"] {
 .elev-btn:hover { border-color: #38bdf8; background: rgba(2, 132, 199, 0.3); }
 .elev-btn.active { background: #0284c7; border-color: #7dd3fc; color: #fff; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
 .elev-hud-tip { font-size: 11px; color: #94a3b8; text-align: center; }
+
+/* In-Game Sign & Guestbook Notice Board Modal */
+.sign-board-box {
+  width: min(580px, 94vw) !important;
+  max-height: 88vh;
+  background: rgba(24, 29, 40, 0.96) !important;
+  border: 1px solid rgba(148, 163, 184, 0.25) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.sign-board-header {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+.sign-board-header h2 {
+  margin: 0; font-size: 18px; font-weight: 800; color: #f8fafc;
+  white-space: pre-line; line-height: 1.35;
+}
+.sign-board-sub { margin-top: 4px; font-size: 12px; color: #94a3b8; }
+.sign-close-btn {
+  padding: 7px 12px; border-radius: 9px; cursor: pointer; flex-shrink: 0;
+  background: rgba(30, 41, 59, 0.9); color: #f8fafc;
+  border: 2px solid #eab308; font-weight: 700; font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.sign-close-btn kbd {
+  padding: 1px 5px; border-radius: 4px; background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.35); font-size: 11px; color: #cbd5e1;
+}
+.sign-close-btn:hover { background: rgba(234, 179, 8, 0.18); }
+.sign-board-body { padding: 16px 20px 18px !important; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.sign-sec-label { font-size: 13.5px; font-weight: 800; color: #f1f5f9; margin-bottom: 7px; }
+.sign-edit-section {
+  padding: 10px 12px; border-radius: 10px;
+  background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(148, 163, 184, 0.18);
+}
+.sign-edit-row { display: flex; gap: 8px; align-items: stretch; }
+.sign-edit-row textarea {
+  flex: 1; resize: none; border-radius: 8px; padding: 8px 10px;
+  background: #fffbeb; color: #1e293b; border: 1px solid #cbd5e1;
+  font-family: inherit; font-size: 13px; line-height: 1.4;
+}
+.sign-save-btn {
+  padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
+  background: #0284c7; color: #fff; font-weight: 700; font-size: 12.5px; white-space: nowrap;
+}
+.sign-save-btn:hover { background: #0369a1; }
+.sign-composer textarea {
+  width: 100%; box-sizing: border-box; resize: none;
+  border-radius: 8px; padding: 11px 13px;
+  background: #fffdf5; color: #1e293b; border: 1px solid #cbd5e1;
+  font-family: inherit; font-size: 14px; line-height: 1.5;
+}
+.sign-composer textarea::placeholder { color: #94a3b8; }
+.sign-composer-foot {
+  display: flex; justify-content: space-between; align-items: center; margin-top: 8px;
+}
+.sign-char-count { font-size: 12px; color: #94a3b8; font-family: Consolas, monospace; }
+.sign-submit-btn {
+  padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(217, 119, 6, 0.55);
+  background: linear-gradient(180deg, #b48a4e, #8c6a3a); color: #fefce8;
+  font-weight: 800; font-size: 13px; cursor: pointer;
+}
+.sign-submit-btn:hover { filter: brightness(1.12); }
+.sign-post-list { display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
+.sign-post-card {
+  padding: 13px 15px; border-radius: 10px;
+  background: rgba(30, 36, 50, 0.85); border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.sign-post-meta {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.sign-post-author { font-size: 14px; font-weight: 800; color: #f8fafc; }
+.sign-post-right { display: flex; align-items: center; gap: 8px; }
+.sign-post-date { font-size: 11.5px; color: #94a3b8; }
+.sign-post-del {
+  background: transparent; border: none; color: #f87171; cursor: pointer; font-size: 11.5px; padding: 2px 5px;
+}
+.sign-post-del:hover { text-decoration: underline; }
+.sign-post-text {
+  font-size: 13.5px; color: #e2e8f0; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+}
+.sign-empty {
+  text-align: center; padding: 26px 12px; color: #94a3b8; font-size: 13px;
+  border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 10px;
+}
+.sign-post-pager { display: flex; justify-content: center; gap: 6px; padding-top: 4px; }
+.sign-page-btn {
+  min-width: 32px; height: 32px; border-radius: 7px; cursor: pointer;
+  background: rgba(30, 41, 59, 0.85); color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.25); font-weight: 700; font-size: 12.5px;
+}
+.sign-page-btn.active {
+  background: #c89b54; color: #111827; border-color: #eab308;
+}
+.sign-page-btn:disabled { opacity: 0.4; cursor: default; }
