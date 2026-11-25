@@ -753,10 +753,10 @@ export class WorldExtras {
     ctx.arc(245, 160, 20, Math.PI * 0.9, Math.PI * 2.1);
     ctx.stroke();
     ctx.fillStyle = '#0f3b7a';
-    ctx.font = 'bold 42px Pretendard, Malgun Gothic, sans-serif';
+    ctx.font = 'bold 32px Pretendard, Malgun Gothic, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('행복플러스', 256, 198);
+    ctx.fillText('행복플러스', 256, 202);
 
     // Rounded white directory board
     ctx.fillStyle = '#f8fafc';
@@ -799,49 +799,52 @@ export class WorldExtras {
 
     // 5F / 4F / 3F
     drawBadge(66, 505, 76, 155, '#5d7b3a', ['5F', '4F', '3F']);
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#475569';
     ctx.font = 'bold 20px Pretendard, Malgun Gothic, sans-serif';
-    ctx.fillText('서울특별시', 162, 566);
+    ctx.fillText('서울특별시', 162, 562);
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 32px Pretendard, Malgun Gothic, sans-serif';
-    ctx.fillText('장애인일자리센터', 162, 606);
+    ctx.font = 'bold 31px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('장애인일자리센터', 162, 604);
     drawDivider(690);
 
     // 2F
     drawBadge(66, 718, 76, 130, '#7c5295', ['2F']);
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 28px Pretendard, Malgun Gothic, sans-serif';
+    ctx.font = 'bold 27px Pretendard, Malgun Gothic, sans-serif';
     ctx.fillText('서울시그룹홈지원센터', 162, 748);
     ctx.fillStyle = '#475569';
     ctx.font = 'bold 17px Pretendard, Malgun Gothic, sans-serif';
-    ctx.fillText('서울시장애인생산품판매시설', 162, 792);
+    ctx.fillText('서울시장애인생산품판매시설', 162, 790);
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 28px Pretendard, Malgun Gothic, sans-serif';
-    ctx.fillText('경영지원센터', 162, 826);
+    ctx.font = 'bold 27px Pretendard, Malgun Gothic, sans-serif';
+    ctx.fillText('경영지원센터', 162, 824);
     drawDivider(878);
 
     // 1F
     drawBadge(66, 908, 76, 118, '#d95b5b', ['1F']);
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#475569';
     ctx.font = 'bold 20px Pretendard, Malgun Gothic, sans-serif';
     ctx.fillText('서울특별시  IL-RO(일로)', 162, 948);
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 32px Pretendard, Malgun Gothic, sans-serif';
+    ctx.font = 'bold 31px Pretendard, Malgun Gothic, sans-serif';
     ctx.fillText('장애인일자리센터', 162, 990);
 
     // Bottom footer on navy base
     ctx.fillStyle = '#38bdf8';
     ctx.beginPath();
-    ctx.arc(82, 1152, 14, 0, Math.PI * 2);
+    ctx.arc(68, 1152, 13, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#f43f5e';
     ctx.beginPath();
-    ctx.arc(98, 1142, 10, 0, Math.PI * 2);
+    ctx.arc(83, 1143, 9, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px Pretendard, Malgun Gothic, sans-serif';
+    ctx.font = 'bold 24px Pretendard, Malgun Gothic, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('서울시립장애인행복플러스센터', 120, 1152);
+    ctx.fillText('서울시립장애인행복플러스센터', 106, 1152);
 
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
