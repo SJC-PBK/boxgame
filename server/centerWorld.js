@@ -1206,9 +1206,10 @@ export function createCenterWorld() {
   fill(bx(0), ROOF_Y, bz(0), bx(BW - 1), ROOF_Y, bz(BD - 1), 'cobble');
   // Left Wood-Decked Lounge Terrace (dx = 1..16, dz = 8..18) matching Image 2 & 3!
   fill(bx(1), ROOF_Y, bz(8), bx(16), ROOF_Y, bz(18), 'planks');
-  // Cut stairwell opening at top of 6F stairs (preserve top step dx=12,dz=1..2!)
+  // Cut stairwell & elevator shaft openings on 7F rooftop slab!
   fill(bx(12), ROOF_Y, bz(3), bx(17), ROOF_Y, bz(4), null);
   fill(bx(13), ROOF_Y, bz(1), bx(17), ROOF_Y, bz(2), null);
+  fill(bx(6), ROOF_Y, bz(1), bx(7), ROOF_Y, bz(3), null);
   // Stairwell + ELEV Rooftop Penthouse Hall (dx = 5..18, dz = 0..8) with double glass exit onto wood deck!
   for (let y = ROOF_Y + 1; y <= ROOF_Y + 4; y++) {
     for (let dx = 5; dx <= 18; dx++) {
@@ -1219,8 +1220,17 @@ export function createCenterWorld() {
       set(bx(5), y, bz(dz), 'stone');
       set(bx(18), y, bz(dz), 'stone');
     }
+    // 7F Elevator shaft inner walls (dx = 5..8, dz = 1..4)
+    for (let dz = 1; dz <= 4; dz++) set(bx(8), y, bz(dz), 'stone');
+    for (let dx = 5; dx <= 8; dx++) set(bx(dx), y, bz(4), 'stone');
   }
   fill(bx(5), ROOF_Y + 5, bz(0), bx(18), ROOF_Y + 5, bz(8), 'stone');
+  // 7F Elevator doors, call button & sign
+  setDoor(bx(6), ROOF_Y + 1, bz(4), 'door_iron_closed', 2);
+  setDoor(bx(7), ROOF_Y + 1, bz(4), 'door_iron_closed', 2);
+  set(bx(5), ROOF_Y + 3, bz(2), 'lamp');
+  set(bx(8), ROOF_Y + 2, bz(5), 'lever_off');
+  addSign(bx(5), ROOF_Y + 2, bz(5), '🛗 엘리베이터 (7F 옥상)\n문·버튼 우클릭: 호출\n탑승 후 [1~7]층 선택');
   setDoor(bx(13), ROOF_Y + 1, bz(8), 'door_glass_closed', 2);
   setDoor(bx(14), ROOF_Y + 1, bz(8), 'door_glass_closed', 2);
   set(bx(14), ROOF_Y + 4, bz(2), 'lamp');
@@ -1330,7 +1340,8 @@ export function createCenterWorld() {
         { floor: 3, label: '3F', y: GROUND + 2 * FLOOR_H },
         { floor: 4, label: '4F', y: GROUND + 3 * FLOOR_H },
         { floor: 5, label: '5F', y: GROUND + 4 * FLOOR_H },
-        { floor: 6, label: '6F', y: GROUND + 5 * FLOOR_H }
+        { floor: 6, label: '6F', y: GROUND + 5 * FLOOR_H },
+        { floor: 7, label: '7F', y: GROUND + 6 * FLOOR_H }
       ]
     },
     // Spawn on the sidewalk in front of the left main entrance, facing the building!
