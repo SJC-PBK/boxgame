@@ -898,7 +898,12 @@ export class GameUI {
     const supplyAllow = showFull
       ? [
           ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
-          'planks', 'cobble', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
+          ...(this.worldMode === 'center' ? [
+            'furn_office_desk', 'furn_office_chair', 'furn_white_table', 'furn_partition', 'furn_cabinet',
+            'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac'
+          ] : []),
+          'stone', 'cobble', 'planks', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
+          'slab_metal', 'slab_wood', 'slab_stone', 'slab_white', 'slab_carpet',
           'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
           'bed', 'door_closed', 'door_stone_closed', 'door_iron_closed', 'door_glass_closed',
           'stairs_wood', 'stairs_cobble', 'stairs_brick', 'stairs_stone', 'torch',

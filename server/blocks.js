@@ -100,7 +100,13 @@ export const BLOCKS = {
   furn_cafe_table:   { numId: 73, id: 'furn_cafe_table',   name: '☕ 카페 우드테이블',   transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_cafe_table',   sound: 'wood',  stackable: 64, category: '센터가구', centerOnly: true },
   furn_sofa:         { numId: 74, id: 'furn_sofa',         name: '🛋️ 라운지 소파',       transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_sofa',         sound: 'dirt',  stackable: 64, category: '센터가구', centerOnly: true },
   furn_tv_screen:    { numId: 75, id: 'furn_tv_screen',    name: '📺 대형 전자칠판',     transparent: true,  solid: true,  hardness: 0.35, preferredTool: null, minTier: 0, drop: 'furn_tv_screen',    sound: 'glass', stackable: 64, category: '센터가구', centerOnly: true },
-  furn_ceiling_ac:   { numId: 76, id: 'furn_ceiling_ac',   name: '❄️ 천장 시스템에어컨', transparent: true,  solid: false, hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'furn_ceiling_ac',   sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true }
+  furn_ceiling_ac:   { numId: 76, id: 'furn_ceiling_ac',   name: '❄️ 천장 시스템에어컨', transparent: true,  solid: false, hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'furn_ceiling_ac',   sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true },
+  // Thin Floor Slabs / Panels (0.18-tall sleek floor tiles & rugs, numId 77..81)
+  slab_metal:        { numId: 77, id: 'slab_metal',        name: '⬜ 메탈 얇은 바닥판',  transparent: true,  solid: false, hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'slab_metal',        sound: 'stone', stackable: 64, category: '건축' },
+  slab_wood:         { numId: 78, id: 'slab_wood',         name: '🟫 우드 얇은 바닥판',  transparent: true,  solid: false, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'slab_wood',         sound: 'wood',  stackable: 64, category: '건축' },
+  slab_stone:        { numId: 79, id: 'slab_stone',        name: '⬛ 돌 얇은 바닥판',    transparent: true,  solid: false, hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'slab_stone',        sound: 'stone', stackable: 64, category: '건축' },
+  slab_white:        { numId: 80, id: 'slab_white',        name: '⬜ 화이트 타일판',     transparent: true,  solid: false, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'slab_white',        sound: 'stone', stackable: 64, category: '건축' },
+  slab_carpet:       { numId: 81, id: 'slab_carpet',       name: '🟦 블루 카펫 타일',    transparent: true,  solid: false, hardness: 0.2,  preferredTool: null, minTier: 0, drop: 'slab_carpet',       sound: 'dirt',  stackable: 64, category: '건축' }
 };
 
 export const CENTER_FURNITURE_IDS = [

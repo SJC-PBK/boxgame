@@ -558,6 +558,39 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(5, 5, 6, 6);
         break;
       }
+      case 'slab_metal': {
+        fillNoise(ctx, ['#94a3b8', '#a3b1c2', '#8695a8'], 1021);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        break;
+      }
+      case 'slab_wood': {
+        fillNoise(ctx, ['#c69255', '#b88248', '#d4a36a'], 1022);
+        ctx.fillStyle = '#8c5d2c';
+        ctx.fillRect(0, 4, 16, 1); ctx.fillRect(0, 11, 16, 1);
+        break;
+      }
+      case 'slab_stone': {
+        fillNoise(ctx, ['#8e949c', '#7d838b', '#9aa0a8'], 1023);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        break;
+      }
+      case 'slab_white': {
+        fillNoise(ctx, ['#f8fafc', '#f1f5f9', '#e8eef5'], 1024);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        break;
+      }
+      case 'slab_carpet': {
+        fillNoise(ctx, ['#1e3a8a', '#1d4ed8', '#2563eb'], 1025);
+        ctx.fillStyle = '#172554';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        break;
+      }
       case 'ladder': {
         ctx.fillStyle = '#9a6534';
         ctx.fillRect(2, 0, 2, 16);
@@ -1094,6 +1127,20 @@ export class TextureLibrary {
             ctx.fillRect(0, 15, 2, 17);   // lower left edge
             ctx.fillRect(0, 15, 17, 2);   // lower tread edge
             ctx.fillRect(15, 0, 2, 17);   // vertical riser edge
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+        } else if (def.id.startsWith('slab_')) {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            // Thin floor-panel silhouette on bottom third of 32x32 icon!
+            ctx.drawImage(sideC, 0, 0, 16, 16, 2, 18, 28, 11);
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.fillRect(2, 18, 28, 3);
+            ctx.fillStyle = 'rgba(15,23,42,0.85)';
+            ctx.fillRect(1, 17, 30, 2);
+            ctx.fillRect(1, 28, 30, 2);
+            ctx.fillRect(1, 17, 2, 13);
+            ctx.fillRect(29, 17, 2, 13);
           }, 32);
           this.icons[def.id] = ic.toDataURL();
         } else {

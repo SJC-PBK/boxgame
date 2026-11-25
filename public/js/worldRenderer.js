@@ -874,6 +874,17 @@ export class WorldRenderer {
             continue;
           }
 
+          if (blockId.startsWith('slab_')) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            // Thin 0.18-block floor tile / metal plate / carpet panel!
+            pushSubBox(blockId, x, y, z, 0, 0, 0, 1, 0.18, 1, lr, lg, lb, 0.04);
+            continue;
+          }
+
           if (blockId.startsWith('furn_') && blockId !== 'furn_cabinet') {
             let lr = 0, lg = 0, lb = 0;
             if (hasLight) {
