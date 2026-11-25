@@ -1977,7 +1977,13 @@ wss.on('connection', (ws) => {
           return;
         }
         const bDef = BLOCKS[existing];
-        if (!bDef || !Number.isFinite(bDef.hardness)) {
+        const idx = Number(slotIndex);
+        const heldId = (toolType && player.tools?.[toolType])
+          ? player.tools[toolType]
+          : ((Number.isInteger(idx) && idx >= 0 && idx < BAG_SIZE) ? player.bag[idx]?.block : null);
+        const heldDef = heldId ? ITEMS[heldId] : null;
+        const isSaboSword = heldId === 'sabo_sword' && player.isAdmin && store.config.saboSwordEnabled;
+        if (!bDef || (!Number.isFinite(bDef.hardness) && !(isSaboSword && existing !== 'bedrock'))) {
           send(ws, { type: 'toast', level: 'warn', text: '이 블록은 부술 수 없습니다.' });
           return;
         }
@@ -1995,12 +2001,6 @@ wss.on('connection', (ws) => {
           return;
         }
 
-        const idx = Number(slotIndex);
-        const heldId = (toolType && player.tools?.[toolType])
-          ? player.tools[toolType]
-          : ((Number.isInteger(idx) && idx >= 0 && idx < BAG_SIZE) ? player.bag[idx]?.block : null);
-        const heldDef = heldId ? ITEMS[heldId] : null;
-        const isSaboSword = heldId === 'sabo_sword' && player.isAdmin && store.config.saboSwordEnabled;
         const toolTier = isSaboSword
           ? 99
           : ((heldDef && heldDef.toolType === bDef.preferredTool) ? (heldDef.tier || 0) : 0);

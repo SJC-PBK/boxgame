@@ -1092,7 +1092,7 @@ export class WorldRenderer {
     this.worldGroup.add(group);
   }
 
-  raycast(origin, direction, maxDist = 7) {
+  raycast(origin, direction, maxDist = 7, includeWater = false) {
     let x = Math.floor(origin.x), y = Math.floor(origin.y), z = Math.floor(origin.z);
     const stepX = direction.x > 0 ? 1 : (direction.x < 0 ? -1 : 0);
     const stepY = direction.y > 0 ? 1 : (direction.y < 0 ? -1 : 0);
@@ -1109,7 +1109,7 @@ export class WorldRenderer {
 
     while (dist <= maxDist) {
       const num = this.getNum(x, y, z);
-      if (num !== 0 && num !== waterNum && !(num === this.stealthBeaconNum && !this.showAdminBlocks)) {
+      if (num !== 0 && (includeWater || num !== waterNum) && !(num === this.stealthBeaconNum && !this.showAdminBlocks)) {
         return { x, y, z, block: this.numToId[num], placeX: x + nx, placeY: y + ny, placeZ: z + nz };
       }
       if (tMaxX < tMaxY && tMaxX < tMaxZ) {

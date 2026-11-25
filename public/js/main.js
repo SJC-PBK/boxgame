@@ -931,9 +931,9 @@ function handleServerMessage(msg) {
 
 function computeMiningTime(blockId) {
   const bDef = catalog[blockId];
-  if (!bDef || !Number.isFinite(bDef.hardness)) return Infinity;
   const heldId = ui.getActiveItemId();
-  if (heldId === 'sabo_sword') return 0.04;
+  if (heldId === 'sabo_sword' && blockId && blockId !== 'bedrock') return 0.04;
+  if (!bDef || !Number.isFinite(bDef.hardness)) return Infinity;
   if (selfPlayer?.isAdmin && currentWorldMode === 'center' && blockId !== 'bedrock') return 0.14;
   const heldDef = heldId ? catalog[heldId] : null;
   const isPreferred = heldDef && heldDef.kind === 'tool' && heldDef.toolType === bDef.preferredTool;
@@ -1708,7 +1708,7 @@ function animate(now) {
 
     if (worldRenderer) {
       worldRenderer.updateStreaming(playerPos);
-      currentHit = worldRenderer.raycast(eyePos, lookDir, 7);
+      currentHit = worldRenderer.raycast(eyePos, lookDir, 7, ui.getActiveItemId() === 'sabo_sword');
       updateMining(dt);
       const ratio = miningTargetKey && Number.isFinite(miningDuration) ? Math.min(1, miningElapsed / miningDuration) : 0;
       worldRenderer.updateHighlight(currentHit, ratio);
