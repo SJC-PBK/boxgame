@@ -1730,6 +1730,43 @@ wss.on('connection', (ws) => {
 
       case 'fill_bomb_ignite': {
         const { x, y, z } = msg;
+        if (player.world === 'center') {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 행복플러스센터에서는 /관리자 모드에서만 채움 폭탄을 사용할 수 있습니다.' });
+            return;
+          }
+          if (!centerWorld.inBounds(x, y, z) || centerWorld.getBlock(x, y, z) !== 'fill_bomb') return;
+          const ck = `center:${x},${y},${z}`;
+          if (ignitedTnts.has(ck)) return;
+          ignitedTnts.add(ck);
+          broadcast({ type: 'fill_bomb_ignited', x, y, z, durationMs: 2200 }, null, 'center');
+          setTimeout(() => {
+            ignitedTnts.delete(ck);
+            if (centerWorld.getBlock(x, y, z) !== 'fill_bomb') return;
+            const below = centerWorld.inBounds(x, y - 1, z) ? centerWorld.getBlock(x, y - 1, z) : null;
+            const fillId = (below && below !== 'bedrock' && below !== 'fill_bomb' && !below.startsWith('door_') && !below.startsWith('furn_')) ? below : 'dirt';
+            const changes = [];
+            const r = 4;
+            for (let dx = -r; dx <= r; dx++) {
+              for (let dy = -r; dy <= r; dy++) {
+                for (let dz = -r; dz <= r; dz++) {
+                  if (dx * dx + dy * dy + dz * dz > r * r + 1) continue;
+                  const nx = x + dx, ny = y + dy, nz = z + dz;
+                  if (!centerWorld.inBounds(nx, ny, nz)) continue;
+                  const cur = centerWorld.getBlock(nx, ny, nz);
+                  if (cur === null || (nx === x && ny === y && nz === z)) {
+                    centerWorld.setBlock(nx, ny, nz, fillId);
+                    store.setCenterFurn(nx, ny, nz, fillId, 0);
+                    changes.push({ x: nx, y: ny, z: nz, block: fillId });
+                  }
+                }
+              }
+            }
+            broadcast({ type: 'fill_bomb_explode', x, y, z, filledBlock: fillId }, null, 'center');
+            if (changes.length > 0) broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, 'center');
+          }, 2200);
+          break;
+        }
         if (!store.inBounds(x, y, z) || store.getBlock(x, y, z) !== 'fill_bomb') return;
         if (!player.isAdmin && store.findProtectingRegion(x, y, z)) {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 구역에서는 흙 채움 폭탄을 작동할 수 없습니다.' });
@@ -2426,7 +2463,7 @@ wss.on('connection', (ws) => {
       case 'chat': {
         const text = String(msg.text || '').trim().slice(0, 200);
         if (!text) return;
-        if (text === '/관리자모드') {
+        if (text === '/관리자' || text === '/관리자모드') {
           // 비밀번호 없이 누구나 관리자 전환 (2026-11-24 pbk 결정 — 게임 데이터 가치 낮음)
           player.isAdmin = true;
           send(ws, { type: 'admin_status', isAdmin: true });

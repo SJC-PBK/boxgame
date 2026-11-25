@@ -509,13 +509,8 @@ export class GameUI {
       const text = chatInput.value.trim();
       chatInput.value = '';
       this.closeChat();
-      if (text === '/관리자') {
-        this.openModal('modal-admin');
-        return;
-      }
-      if (text === '/관리자모드') {
+      if (text === '/관리자' || text === '/관리자모드') {
         this.cb.send({ type: 'chat', text });
-        this.openModal('modal-admin');
         return;
       }
       if (text) this.cb.send({ type: 'chat', text });
