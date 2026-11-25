@@ -380,8 +380,8 @@ export function createCenterWorld() {
       }
     }
 
-    // 2e. Upper Floor (2F, 4F) Open-Space Sign (rest of floor intentionally kept empty!)
-    if (f === 1 || f === 3) {
+    // 2e. Upper Floor (2F) Open-Space Sign (rest of 2F intentionally kept empty!)
+    if (f === 1) {
       addSign(bx(15), baseY + 2, bz(6), `🏢 ${f + 1}층 오픈 공간\n(화장실·계단·ELV 외 빈 공간)`);
     }
   }
@@ -693,6 +693,137 @@ export function createCenterWorld() {
   // 3.3g. 천장 4방향 시스템 에어컨 배치 (y = Y3 + 5)
   for (const [ax, az] of [[7, 15], [18, 13], [24, 13], [30, 13], [36, 13]]) {
     set(bx(ax), Y3 + 5, bz(az), 'furn_ceiling_ac');
+  }
+
+  // 3.4. 4F Detailed Interior (Matches 4F Floor Plan: 센터장실, 경영지원팀/행사홍보팀, 교육장 2·1 + 전자칠판, 여직원휴게실!)
+  const Y4 = GROUND + 3 * FLOOR_H; // floor slab y = 22, interior y = 23..27
+
+  // Clean bright office/classroom floor across 4F
+  fill(bx(1), Y4, bz(6), bx(40), Y4, bz(18), 'sand');
+
+  // 3.4a. Corridor Partition Wall (dz = 9, dx = 1..40) — lower stone + upper glass office wall
+  for (let dx = 1; dx <= 40; dx++) {
+    if (dx === 7 || dx === 12 || dx === 23 || dx === 33) {
+      set(bx(dx), Y4 + 3, bz(9), 'glass');
+      set(bx(dx), Y4 + 4, bz(9), 'glass');
+      set(bx(dx), Y4 + 5, bz(9), 'stone');
+      continue;
+    }
+    set(bx(dx), Y4 + 1, bz(9), 'stone');
+    set(bx(dx), Y4 + 2, bz(9), 'stone');
+    set(bx(dx), Y4 + 3, bz(9), 'glass');
+    set(bx(dx), Y4 + 4, bz(9), 'glass');
+    set(bx(dx), Y4 + 5, bz(9), 'stone');
+  }
+  setDoor(bx(7), Y4 + 1, bz(9), 'door_glass_closed', 2);   // 센터장실 출입문
+  setDoor(bx(12), Y4 + 1, bz(9), 'door_glass_closed', 2);  // 경영지원팀 출입문
+  setDoor(bx(23), Y4 + 1, bz(9), 'door_glass_closed', 2);  // 교육장 2 출입문
+  setDoor(bx(33), Y4 + 1, bz(9), 'door_glass_closed', 2);  // 교육장 1 출입문
+
+  // 3.4b. 여직원휴게실 (4F top-right, dx = 36..40, dz = 1..8)
+  fill(bx(36), Y4, bz(1), bx(40), Y4, bz(8), 'planks');
+  for (let y = Y4 + 1; y <= Y4 + 5; y++) {
+    for (let dz = 6; dz <= 8; dz++) set(bx(35), y, bz(dz), 'stone');
+  }
+  setDoor(bx(35), Y4 + 1, bz(7), 'door_closed', 3);
+  // 싱크대, 수납장, 침대, 소파
+  set(bx(36), Y4 + 1, bz(1), 'cobble');
+  set(bx(36), Y4 + 1, bz(2), 'water');
+  set(bx(36), Y4 + 1, bz(3), 'furn_cabinet');
+  set(bx(39), Y4 + 1, bz(1), 'bed');
+  set(bx(39), Y4 + 1, bz(2), 'bed');
+  set(bx(40), Y4 + 1, bz(6), 'furn_sofa', 3);
+  set(bx(40), Y4 + 1, bz(7), 'furn_sofa', 3);
+  set(bx(37), Y4 + 1, bz(8), 'furn_cabinet');
+  set(bx(38), Y4 + 1, bz(8), 'furn_cabinet');
+  addSign(bx(34), Y4 + 2, bz(7), '🛋️ 여직원휴게실 (4F)\n싱크대·침대·소파');
+
+  // 3.4c. 센터장실 (4F bottom-left, dx = 1..8, dz = 10..18)
+  for (let dz = 10; dz <= 18; dz++) {
+    set(bx(8), Y4 + 1, bz(dz), 'stone');
+    set(bx(8), Y4 + 2, bz(dz), 'stone');
+    set(bx(8), Y4 + 3, bz(dz), 'glass');
+    set(bx(8), Y4 + 4, bz(dz), 'glass');
+    set(bx(8), Y4 + 5, bz(dz), 'stone');
+  }
+  setDoor(bx(8), Y4 + 1, bz(11), 'door_closed', 1); // 경영지원팀 연결문
+  // 6인 회의 테이블 (상단)
+  for (let dx = 2; dx <= 4; dx++) {
+    set(bx(dx), Y4 + 1, bz(12), 'furn_white_table');
+    set(bx(dx), Y4 + 1, bz(11), 'furn_office_chair', 2);
+    set(bx(dx), Y4 + 1, bz(13), 'furn_office_chair', 0);
+  }
+  // 센터장 책상 & 보조 테이블 (하단)
+  set(bx(4), Y4 + 1, bz(16), 'furn_office_desk', 0);
+  set(bx(5), Y4 + 1, bz(16), 'furn_office_desk', 0);
+  set(bx(5), Y4 + 1, bz(17), 'furn_office_chair', 0);
+  set(bx(3), Y4 + 1, bz(16), 'furn_white_table');
+  set(bx(1), Y4 + 1, bz(16), 'job_fridge');  // 냉장고
+  set(bx(1), Y4 + 1, bz(18), 'iron_ore');    // 인터넷 분배기
+  set(bx(6), Y4 + 1, bz(18), 'furn_potted_plant');
+  addSign(bx(6), Y4 + 2, bz(8), '👔 센터장실 (4F)');
+
+  // 3.4d. 경영지원팀 / 행사홍보팀 (4F center-left, dx = 9..20, dz = 10..18)
+  for (let dz = 10; dz <= 18; dz++) {
+    set(bx(20), Y4 + 1, bz(dz), 'stone');
+    set(bx(20), Y4 + 2, bz(dz), 'stone');
+    set(bx(20), Y4 + 3, bz(dz), 'glass');
+    set(bx(20), Y4 + 4, bz(dz), 'glass');
+    set(bx(20), Y4 + 5, bz(dz), 'stone');
+  }
+  // 좌측 경영지원팀 데스크 클러스터
+  set(bx(11), Y4 + 1, bz(12), 'furn_office_desk', 2);
+  set(bx(11), Y4 + 1, bz(11), 'furn_office_chair', 2);
+  set(bx(11), Y4 + 1, bz(14), 'furn_office_desk', 1);
+  set(bx(10), Y4 + 1, bz(14), 'furn_office_chair', 1);
+  set(bx(12), Y4 + 1, bz(14), 'furn_cabinet'); // 복합기/서랍
+  set(bx(11), Y4 + 1, bz(16), 'furn_office_desk', 0);
+  set(bx(12), Y4 + 1, bz(16), 'furn_office_desk', 0);
+  set(bx(11), Y4 + 1, bz(17), 'furn_office_chair', 0);
+  set(bx(10), Y4 + 1, bz(16), 'furn_white_table');
+  // 우측 행사홍보팀 4인 마주보는 워크스테이션 + 하단 팀장석
+  for (const dz of [12, 14]) {
+    set(bx(16), Y4 + 1, bz(dz), 'furn_office_desk', 1);
+    set(bx(15), Y4 + 1, bz(dz), 'furn_office_chair', 1);
+    set(bx(17), Y4 + 1, bz(dz), 'furn_office_desk', 3);
+    set(bx(18), Y4 + 1, bz(dz), 'furn_office_chair', 3);
+  }
+  set(bx(16), Y4 + 1, bz(13), 'furn_partition', 0);
+  set(bx(17), Y4 + 1, bz(13), 'furn_partition', 0);
+  set(bx(16), Y4 + 1, bz(16), 'furn_office_desk', 0);
+  set(bx(17), Y4 + 1, bz(16), 'furn_office_desk', 0);
+  set(bx(16), Y4 + 1, bz(17), 'furn_office_chair', 0);
+  // 우측 벽 전체 문서 캐비닛 열 (dx = 19, dz = 10..18)
+  for (let dz = 10; dz <= 18; dz++) {
+    set(bx(19), Y4 + 1, bz(dz), 'furn_cabinet');
+  }
+  addSign(bx(13), Y4 + 2, bz(8), '💼 경영지원팀 · 행사홍보팀');
+
+  // 3.4e. 교육장 2 & 교육장 1 (4F center-right, dx = 21..40, dz = 10..18) — 6열 화이트 교육테이블 + 우측 전자칠판!
+  const trainCols = [23, 26, 29, 32, 35, 38];
+  for (const cx of trainCols) {
+    // Upper bank (dz = 12..13) facing East (+X, facing 1) toward electronic whiteboard
+    set(bx(cx), Y4 + 1, bz(12), 'furn_white_table');
+    set(bx(cx), Y4 + 1, bz(13), 'furn_white_table');
+    set(bx(cx - 1), Y4 + 1, bz(12), 'furn_office_chair', 1);
+    set(bx(cx - 1), Y4 + 1, bz(13), 'furn_office_chair', 1);
+    // Lower bank (dz = 16..17) facing East (+X, facing 1)
+    set(bx(cx), Y4 + 1, bz(16), 'furn_white_table');
+    set(bx(cx), Y4 + 1, bz(17), 'furn_white_table');
+    set(bx(cx - 1), Y4 + 1, bz(16), 'furn_office_chair', 1);
+    set(bx(cx - 1), Y4 + 1, bz(17), 'furn_office_chair', 1);
+  }
+  // 우측 벽 대형 전자칠판 (dx = 40, dz = 13..16)
+  for (let dz = 13; dz <= 16; dz++) {
+    set(bx(40), Y4 + 2, bz(dz), 'furn_tv_screen', 3);
+  }
+  addSign(bx(40), Y4 + 1, bz(14), '📺 전자칠판');
+  addSign(bx(24), Y4 + 2, bz(8), '🎓 교육장 2 (4F)');
+  addSign(bx(34), Y4 + 2, bz(8), '🎓 교육장 1 (4F)');
+
+  // 3.4f. 천장 4방향 시스템 에어컨 배치 (y = Y4 + 5)
+  for (const [ax, az] of [[4, 14], [14, 14], [26, 14], [34, 14]]) {
+    set(bx(ax), Y4 + 5, bz(az), 'furn_ceiling_ac');
   }
 
   // 3.5. 5F Detailed Interior (Matches 5F Floor Plan: 카운터·휴게라운지(16)·탕비장·교육장(36)·문서고·대기공간!)
