@@ -48,28 +48,30 @@ const DATA_DIR = path.resolve(ROOT_DIR, process.env.DATA_DIR || './data');
 const store = new WorldStore(DATA_DIR);
 const animals = new AnimalManager(store);
 const jobWorld = createJobVillageWorld();
-const centerWorld = createCenterWorld();
-// Restore persisted sign text overrides for center & job worlds
-for (const [k, txt] of Object.entries(store.signOverrides || {})) {
-  if (k.startsWith('center:')) {
-    const coord = k.slice(7);
-    if (centerWorld.signs[coord]) centerWorld.signs[coord].text = txt;
-  } else if (k.startsWith('job:')) {
-    const coord = k.slice(4);
-    if (jobWorld.signs[coord]) jobWorld.signs[coord].text = txt;
+let centerWorld = createCenterWorld();
+
+function applyPersistedCenterState() {
+  for (const [k, txt] of Object.entries(store.signOverrides || {})) {
+    if (k.startsWith('center:')) {
+      const coord = k.slice(7);
+      if (centerWorld.signs[coord]) centerWorld.signs[coord].text = txt;
+    } else if (k.startsWith('job:')) {
+      const coord = k.slice(4);
+      if (jobWorld.signs[coord]) jobWorld.signs[coord].text = txt;
+    }
+  }
+  for (const f of Object.values(store.centerFurn || {})) {
+    if (!f || !centerWorld.inBounds(f.x, f.y, f.z)) continue;
+    if (f.block === null) {
+      centerWorld.setBlock(f.x, f.y, f.z, null);
+      delete centerWorld.facings[`${f.x},${f.y},${f.z}`];
+    } else if (BLOCKS[f.block]) {
+      centerWorld.setBlock(f.x, f.y, f.z, f.block);
+      centerWorld.facings[`${f.x},${f.y},${f.z}`] = Number(f.facing) & 3;
+    }
   }
 }
-// Restore persisted center-exclusive furniture & admin building edits
-for (const f of Object.values(store.centerFurn || {})) {
-  if (!f || !centerWorld.inBounds(f.x, f.y, f.z)) continue;
-  if (f.block === null) {
-    centerWorld.setBlock(f.x, f.y, f.z, null);
-    delete centerWorld.facings[`${f.x},${f.y},${f.z}`];
-  } else if (BLOCKS[f.block]) {
-    centerWorld.setBlock(f.x, f.y, f.z, f.block);
-    centerWorld.facings[`${f.x},${f.y},${f.z}`] = Number(f.facing) & 3;
-  }
-}
+applyPersistedCenterState();
 
 // Real-time moving elevator state machine for Happiness Plus Center (1F~5F)
 const centerElevator = {
@@ -2113,6 +2115,88 @@ wss.on('connection', (ws) => {
             type: 'chat', system: true,
             text: `🎁 관리자(${player.nickname})님이 가방 아이템 보급함을 ${updated.supplyEnabled ? '켰습니다 (ON)' : '껐습니다 (OFF)'}.`
           });
+          return;
+        }
+        if (text === '/저장' || text.startsWith('/저장 ')) {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /저장 명령어는 관리자(/관리자모드)만 사용할 수 있습니다.' });
+            return;
+          }
+          if (player.world === 'job') {
+            send(ws, { type: 'toast', level: 'warn', text: '💼 직업 체험 마을은 저장할 수 없습니다.' });
+            return;
+          }
+          const rawName = text.slice(3).trim();
+          const { number, entry } = store.saveSnapshot(player.world, rawName, player.nickname);
+          const worldTag = player.world === 'center' ? '행복플러스센터' : '자유월드';
+          send(ws, { type: 'toast', level: 'success', text: `💾 [${number}번] "${entry.name}" 저장 완료!` });
+          broadcast({
+            type: 'chat', system: true,
+            text: `💾 [${worldTag}] #${number} "${entry.name}" 구조가 저장되었습니다. (/구조 로 목록 확인)`
+          }, null, player.world);
+          return;
+        }
+        if (text === '/구조') {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /구조 명령어는 관리자(/관리자모드)만 사용할 수 있습니다.' });
+            return;
+          }
+          const list = store.listSnapshots();
+          if (list.length === 0) {
+            send(ws, { type: 'chat', system: true, text: '📂 저장된 구조가 없습니다. "/저장 이름" 으로 먼저 저장해 보세요!' });
+            return;
+          }
+          send(ws, { type: 'chat', system: true, text: '📂 저장된 구조 목록 ("/복구 번호" 로 복원):' });
+          list.forEach((s, i) => {
+            const tag = s.world === 'center' ? '센터' : '자유';
+            send(ws, { type: 'chat', system: true, text: `  ${i + 1}. [${tag}] ${s.name} (저장: ${s.author})` });
+          });
+          return;
+        }
+        if (text.startsWith('/복구 ')) {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /복구 명령어는 관리자(/관리자모드)만 사용할 수 있습니다.' });
+            return;
+          }
+          const num = Number(text.slice(4).trim());
+          const snap = store.loadSnapshot(num);
+          if (!snap) {
+            send(ws, { type: 'toast', level: 'warn', text: '❌ 해당 번호의 저장 구조를 찾을 수 없습니다. (/구조 로 번호 확인)' });
+            return;
+          }
+          if (snap.entry.world !== player.world) {
+            const needLabel = snap.entry.world === 'center' ? '행복플러스센터' : '자유 건축 월드';
+            send(ws, { type: 'toast', level: 'warn', text: `⚠️ ${num}번 구조는 "${needLabel}" 구역용입니다. 해당 구역에서 /복구 해주세요.` });
+            return;
+          }
+          if (player.world === 'center') {
+            store.restoreCenterSnapshot(snap.data);
+            centerWorld = createCenterWorld();
+            applyPersistedCenterState();
+            broadcast({
+              type: 'world_reload',
+              worldRLE: centerWorld.getRLE(),
+              signs: centerWorld.signs,
+              facings: centerWorld.facings,
+              centerPylon: store.centerPylon
+            }, null, 'center');
+          } else {
+            store.restoreSandboxSnapshot(snap.data);
+            broadcast({
+              type: 'world_reload',
+              worldDeltas: store.getDeltasObject(),
+              signs: store.signs,
+              portals: store.portals,
+              beacons: store.beacons,
+              facings: store.facings,
+              regions: store.regions
+            }, null, 'sandbox');
+          }
+          send(ws, { type: 'toast', level: 'success', text: `♻️ [${num}번] "${snap.entry.name}" 복원 완료!` });
+          broadcast({
+            type: 'chat', system: true,
+            text: `♻️ 관리자(${player.nickname})님이 #${num} "${snap.entry.name}" 구조로 복원했습니다!`
+          }, null, player.world);
           return;
         }
         if (text === '/간판이동' || text === '/간판회전') {

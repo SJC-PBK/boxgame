@@ -540,6 +540,113 @@ export class WorldStore {
     return this.centerPylon;
   }
 
+  // ---- Named World Snapshots (/저장, /구조, /복구) ----
+  _ensureSnapshotsDir() {
+    const dir = path.join(this.dataDir, 'snapshots');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  listSnapshots() {
+    const dir = this._ensureSnapshotsDir();
+    const idxFile = path.join(dir, 'index.json');
+    const arr = this._readJson(idxFile);
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  saveSnapshot(worldMode, rawName, author) {
+    const dir = this._ensureSnapshotsDir();
+    const kst = new Date(Date.now() + 9 * 3600 * 1000);
+    const yy = String(kst.getUTCFullYear()).slice(-2);
+    const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(kst.getUTCDate()).padStart(2, '0');
+    const yymmdd = `${yy}${mm}${dd}`;
+    const baseName = String(rawName || '').trim().slice(0, 40) || '스냅샷';
+    const fullName = `${baseName}(${yymmdd})`;
+
+    const ts = Date.now();
+    const file = `snap-${ts}-${Math.random().toString(36).slice(2, 6)}.json`;
+    const payload = worldMode === 'center'
+      ? {
+          world: 'center',
+          centerFurn: this.centerFurn,
+          centerPylon: this.centerPylon,
+          signOverrides: Object.fromEntries(
+            Object.entries(this.signOverrides || {}).filter(([k]) => k.startsWith('center:'))
+          )
+        }
+      : {
+          world: 'sandbox',
+          deltas: Object.fromEntries(this.deltas),
+          facings: this.facings,
+          signs: this.signs,
+          portals: this.portals,
+          beacons: this.beacons,
+          regions: this.regions,
+          chests: this.chests,
+          furnaces: this.furnaces
+        };
+
+    this._writeJsonAtomic(path.join(dir, file), payload);
+    const list = this.listSnapshots();
+    const entry = {
+      id: `snap-${ts}`,
+      name: fullName,
+      world: worldMode,
+      author: String(author || '관리자').slice(0, 20),
+      createdAt: ts,
+      file
+    };
+    list.push(entry);
+    this._writeJsonAtomic(path.join(dir, 'index.json'), list);
+    return { number: list.length, entry };
+  }
+
+  loadSnapshot(num1Based) {
+    const list = this.listSnapshots();
+    const idx = Number(num1Based) - 1;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= list.length) return null;
+    const entry = list[idx];
+    const dir = this._ensureSnapshotsDir();
+    const data = this._readJson(path.join(dir, entry.file));
+    if (!data) return null;
+    return { entry, data };
+  }
+
+  restoreCenterSnapshot(data) {
+    this.centerFurn = (data.centerFurn && typeof data.centerFurn === 'object') ? data.centerFurn : {};
+    if (data.centerPylon && typeof data.centerPylon.x === 'number') {
+      this.centerPylon = data.centerPylon;
+    }
+    // Replace center: sign overrides while keeping any other worlds intact
+    for (const k of Object.keys(this.signOverrides || {})) {
+      if (k.startsWith('center:')) delete this.signOverrides[k];
+    }
+    if (data.signOverrides && typeof data.signOverrides === 'object') {
+      Object.assign(this.signOverrides, data.signOverrides);
+    }
+    this.saveNow('centerFurn');
+    this.saveNow('centerPylon');
+    this.saveNow('signOverrides');
+  }
+
+  restoreSandboxSnapshot(data) {
+    this.deltas.clear();
+    if (data.deltas && typeof data.deltas === 'object') {
+      for (const [k, v] of Object.entries(data.deltas)) this.deltas.set(k, v);
+    }
+    this.facings = (data.facings && typeof data.facings === 'object') ? data.facings : {};
+    this.signs = (data.signs && typeof data.signs === 'object') ? data.signs : {};
+    this.portals = (data.portals && typeof data.portals === 'object') ? data.portals : {};
+    this.beacons = (data.beacons && typeof data.beacons === 'object') ? data.beacons : {};
+    this.regions = Array.isArray(data.regions) ? data.regions : [];
+    this.chests = (data.chests && typeof data.chests === 'object') ? data.chests : {};
+    this.furnaces = (data.furnaces && typeof data.furnaces === 'object') ? data.furnaces : {};
+    for (const k of ['world', 'facings', 'signs', 'portals', 'beacons', 'regions', 'chests', 'furnaces']) {
+      this.saveNow(k);
+    }
+  }
+
   getSignPosts(boardKey) {
     return Array.isArray(this.signPosts[boardKey]) ? this.signPosts[boardKey] : [];
   }

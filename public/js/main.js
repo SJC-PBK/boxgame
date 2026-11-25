@@ -735,6 +735,19 @@ function handleServerMessage(msg) {
       worldExtras.syncCenterPylon(msg.centerPylon);
       break;
 
+    case 'world_reload':
+      if (worldRenderer) {
+        worldRenderer.setFacings(msg.facings || {});
+        if (msg.worldRLE) worldRenderer.loadFromRLE(msg.worldRLE);
+        else if (msg.worldDeltas) worldRenderer.loadStreaming(msg.worldDeltas, playerPos);
+      }
+      if (msg.signs) { currentSigns = msg.signs; worldExtras.syncSigns(currentSigns); }
+      if (msg.portals) { currentPortals = msg.portals; worldExtras.syncPortals(currentPortals); }
+      if (msg.beacons) worldExtras.syncBeacons(msg.beacons);
+      if (msg.centerPylon) worldExtras.syncCenterPylon(msg.centerPylon);
+      if (msg.regions) regionVis.setRegions(msg.regions);
+      break;
+
     case 'warp_to':
       warpPlayer(msg.x, msg.y, msg.z, msg.label);
       break;
