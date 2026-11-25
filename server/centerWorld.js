@@ -546,133 +546,168 @@ export function createCenterWorld() {
     set(bx(ax), Y1 + 5, bz(az), 'furn_ceiling_ac');
   }
 
-  // 3.2. 2F Interior (Center Mechanical Elevator Parking Bay + Rear 2F Entrance & Iconic Charcoal Parking Tower!)
+  // 3.2. 2F Interior (Matches 지상2층 평면도: 경영지원센터, 중앙 회의실, 그룹 홈, 우측 상단 2F 후문 출입구 & 우측 기계식 주차타워!)
   const Y2 = GROUND + 1 * FLOOR_H; // floor slab y = 10, interior y = 11..15
 
-  // Clean bright 2F lobby & office floor
+  // Clean bright 2F floor
   fill(bx(1), Y2, bz(6), bx(40), Y2, bz(18), 'sand');
+  fill(bx(36), Y2, bz(1), bx(40), Y2, bz(5), 'sand'); // 2F rear vestibule next to men's restroom
 
-  // 3.2a. 2F Center Mechanical Elevator Parking Bay (dx = 16..24, dz = 10..17)
-  // Enclosed steel/stone parking lift core right in the center of 2F with glass viewing window & car lift deck!
-  for (let y = Y2 + 1; y <= Y2 + 5; y++) {
-    for (let dx = 16; dx <= 24; dx++) {
-      set(bx(dx), y, bz(10), (y === Y2 + 2 || y === Y2 + 3) && dx >= 18 && dx <= 22 ? 'glass' : 'stone');
-      set(bx(dx), y, bz(17), 'stone');
+  // 3.2a. 2F Corridor Glass/Stone Partition Wall (dz = 9, dx = 1..40)
+  for (let dx = 1; dx <= 40; dx++) {
+    if (dx === 14 || dx === 27) {
+      set(bx(dx), Y2 + 3, bz(9), 'glass');
+      set(bx(dx), Y2 + 4, bz(9), 'glass');
+      set(bx(dx), Y2 + 5, bz(9), 'stone');
+      continue;
     }
-    for (let dz = 10; dz <= 17; dz++) {
-      set(bx(16), y, bz(dz), 'stone');
-      set(bx(24), y, bz(dz), 'stone');
-    }
+    set(bx(dx), Y2 + 1, bz(9), 'stone');
+    set(bx(dx), Y2 + 2, bz(9), 'stone');
+    set(bx(dx), Y2 + 3, bz(9), 'glass');
+    set(bx(dx), Y2 + 4, bz(9), 'glass');
+    set(bx(dx), Y2 + 5, bz(9), 'stone');
   }
-  // Open vehicle entry doorway on East side of center bay (dx = 24, dz = 12..15)
-  for (let y = Y2 + 1; y <= Y2 + 3; y++) {
-    for (let dz = 12; dz <= 15; dz++) set(bx(24), y, bz(dz), null);
-  }
-  // Yellow-black safety hazard frame around center parking lift entry
-  for (let y = Y2 + 1; y <= Y2 + 3; y++) {
-    const stripe = (y % 2 === 1) ? 'wool_yellow' : 'coal_ore';
-    set(bx(24), y, bz(11), stripe);
-    set(bx(24), y, bz(16), stripe);
-  }
-  // Metallic elevator-parking lift platform & yellow wheel tracks inside 2F center bay
-  fill(bx(17), Y2, bz(11), bx(23), Y2, bz(16), 'stone');
-  for (let dx = 17; dx <= 23; dx++) {
-    for (let dz = 11; dz <= 16; dz++) {
-      const isRail = (dz === 12 || dz === 15);
-      set(bx(dx), Y2 + 1, bz(dz), isRail ? 'wool_yellow' : 'slab_metal');
-    }
-  }
-  set(bx(20), Y2 + 5, bz(13), 'lamp');
-  set(bx(20), Y2 + 5, bz(14), 'lamp');
-  set(bx(25), Y2 + 3, bz(11), 'redstone_lamp_on');
-  addSign(bx(20), Y2 + 2, bz(9), '🚗 2F 엘리베이터식 주차장\n(기계식 차량 리프트)');
+  setDoor(bx(14), Y2 + 1, bz(9), 'door_glass_closed', 2); // 경영지원센터 출입문
+  setDoor(bx(27), Y2 + 1, bz(9), 'door_glass_closed', 2); // 그룹 홈 출입문
 
-  // 2F Ceiling AC units in left & right open wings
-  for (const [ax, az] of [[7, 14], [12, 14], [30, 14], [36, 14]]) {
+  // Room divider walls matching 지상2층 평면도: dx = 18 (경영지원센터 | 중앙실) & dx = 25 (중앙실 | 그룹 홈)
+  for (let dz = 10; dz <= 18; dz++) {
+    for (const wx of [18, 25]) {
+      set(bx(wx), Y2 + 1, bz(dz), 'stone');
+      set(bx(wx), Y2 + 2, bz(dz), 'stone');
+      set(bx(wx), Y2 + 3, bz(dz), 'glass');
+      set(bx(wx), Y2 + 4, bz(dz), 'glass');
+      set(bx(wx), Y2 + 5, bz(dz), 'stone');
+    }
+  }
+  // Connecting door between 중앙실 and 그룹 홈 (dx = 25, dz = 11) + inner divider wall inside 중앙실 (dz = 14)
+  setDoor(bx(25), Y2 + 1, bz(11), 'door_closed', 1);
+  for (let dx = 19; dx <= 24; dx++) {
+    if (dx === 22) continue;
+    set(bx(dx), Y2 + 1, bz(14), 'furn_partition', 0);
+  }
+
+  // 3.2b. 좌측 — 경영지원센터 (dx = 1..17, dz = 10..18)
+  for (let dz = 11; dz <= 17; dz++) set(bx(1), Y2 + 1, bz(dz), 'furn_cabinet');
+  // 2 rows of office desks & chairs
+  for (const dz of [12, 16]) {
+    for (const dx of [5, 7, 10, 12]) {
+      set(bx(dx), Y2 + 1, bz(dz), 'furn_office_desk', 0);
+      set(bx(dx), Y2 + 1, bz(dz + 1), 'furn_office_chair', 0);
+    }
+  }
+  set(bx(15), Y2 + 1, bz(14), 'furn_white_table');
+  set(bx(16), Y2 + 1, bz(14), 'furn_white_table');
+  set(bx(15), Y2 + 1, bz(13), 'furn_office_chair', 2);
+  set(bx(16), Y2 + 1, bz(15), 'furn_office_chair', 0);
+  set(bx(3), Y2 + 1, bz(18), 'furn_potted_plant');
+  addSign(bx(13), Y2 + 2, bz(8), '🏢 경영지원센터 (2F)\n장애인생산품판매시설');
+
+  // 3.2c. 중앙 회의/공유실 (dx = 19..24, dz = 10..18)
+  set(bx(21), Y2 + 1, bz(12), 'furn_white_table');
+  set(bx(22), Y2 + 1, bz(12), 'furn_white_table');
+  set(bx(21), Y2 + 1, bz(11), 'furn_office_chair', 2);
+  set(bx(22), Y2 + 1, bz(11), 'furn_office_chair', 2);
+  set(bx(20), Y2 + 1, bz(16), 'furn_sofa', 2);
+  set(bx(21), Y2 + 1, bz(16), 'furn_sofa', 2);
+  set(bx(23), Y2 + 1, bz(16), 'furn_cafe_table');
+
+  // 3.2d. 우측 — 그룹 홈 (서울시그룹홈지원센터, dx = 26..40, dz = 10..18)
+  for (let dz = 11; dz <= 17; dz++) set(bx(40), Y2 + 1, bz(dz), 'furn_cabinet');
+  for (const dz of [12, 16]) {
+    for (const dx of [29, 31, 35, 37]) {
+      set(bx(dx), Y2 + 1, bz(dz), 'furn_office_desk', 0);
+      set(bx(dx), Y2 + 1, bz(dz + 1), 'furn_office_chair', 0);
+    }
+  }
+  set(bx(29), Y2 + 1, bz(14), 'furn_partition', 0);
+  set(bx(31), Y2 + 1, bz(14), 'furn_partition', 0);
+  set(bx(35), Y2 + 1, bz(14), 'furn_partition', 0);
+  set(bx(37), Y2 + 1, bz(14), 'furn_partition', 0);
+  set(bx(27), Y2 + 1, bz(18), 'furn_potted_plant');
+  addSign(bx(28), Y2 + 2, bz(8), '🏠 그룹 홈 (2F)\n서울시그룹홈지원센터');
+
+  // 2F Ceiling 4-way cassette AC units
+  for (const [ax, az] of [[8, 14], [15, 14], [22, 14], [33, 14]]) {
     set(bx(ax), Y2 + 5, bz(az), 'furn_ceiling_ac');
   }
 
-  // 3.2b. 2F Rear Entrance (East wall dx = 41, dz = 13..16) — connects directly to rear 2F parking yard!
+  // 3.2e. 2F Rear Entrance (East wall top-right: dx = 41, dz = 2..4 -> RIGHT side when facing parking entrance!)
   for (let y = Y2 + 1; y <= Y2 + 3; y++) {
-    for (let dz = 13; dz <= 16; dz++) set(bx(41), y, bz(dz), null);
+    for (let dz = 2; dz <= 4; dz++) set(bx(41), y, bz(dz), null);
   }
-  setDoor(bx(41), Y2 + 1, bz(14), 'door_glass_closed', 1);
-  setDoor(bx(41), Y2 + 1, bz(15), 'door_glass_closed', 1);
-  // Exterior 2F rear entrance canopy & blue sign (matching left side of uploaded photo!)
-  fill(bx(42), Y2 + 4, bz(12), bx(44), Y2 + 4, bz(17), 'stone');
-  fill(bx(44), Y2 + 5, bz(12), bx(44), Y2 + 5, bz(17), 'wool_blue');
-  set(bx(43), Y2 + 4, bz(14), 'lamp');
-  set(bx(43), Y2 + 4, bz(15), 'lamp');
-  addSign(bx(45), Y2 + 5, bz(14), '🏢 2F 후문 출입구\n서울시립장애인행복플러스센터');
+  setDoor(bx(41), Y2 + 1, bz(2), 'door_glass_closed', 1);
+  setDoor(bx(41), Y2 + 1, bz(3), 'door_glass_closed', 1);
+  // Exterior 2F rear entrance canopy & blue sign right beside the parking tower!
+  fill(bx(42), Y2 + 4, bz(1), bx(45), Y2 + 4, bz(5), 'stone');
+  fill(bx(45), Y2 + 5, bz(1), bx(45), Y2 + 5, bz(5), 'wool_blue');
+  set(bx(43), Y2 + 4, bz(2), 'lamp');
+  set(bx(43), Y2 + 4, bz(4), 'lamp');
+  addSign(bx(46), Y2 + 5, bz(3), '🏢 2F 후문 출입구\n서울시립장애인행복플러스센터');
 
-  // 3.2c. Elevated Rear 2F Parking Lot (East side behind building: X = 21..38, Z = -14..13, Y = 4..10)
-  // Retaining wall & solid earth/stone terrace bringing rear ground smoothly up to 2F level (Y2 = 10)!
+  // 3.2f. Elevated Rear 2F Parking Yard (East side behind building: dx = 42..maxX, Y = 4..10)
   fill(bx(42), GROUND + 1, bz(-4), CENTER_BOUNDS.maxX - 1, Y2 - 1, bz(22), 'stone');
   fill(bx(42), Y2, bz(-4), CENTER_BOUNDS.maxX - 1, Y2, bz(22), 'cobble');
-  // Smooth stone parking lot surface & white parking stall markings
   for (let x = bx(43); x <= CENTER_BOUNDS.maxX - 2; x++) {
-    for (let z = bz(-2); z <= bz(20); z++) {
-      set(x, Y2, z, 'stone');
-    }
+    for (let z = bz(-2); z <= bz(20); z++) set(x, Y2, z, 'stone');
   }
-  for (let z = bz(14); z <= bz(19); z += 3) {
-    fill(bx(48), Y2, z, bx(53), Y2, z, 'wool_white');
+  // White parking stall lines in front of the parking tower
+  for (let z = bz(1); z <= bz(19); z += 4) {
+    fill(bx(54), Y2, z, bx(58), Y2, z, 'wool_white');
   }
-  // Disabled parking sign (bottom-right of photo!)
-  set(bx(52), Y2 + 1, bz(0), 'stone');
-  set(bx(52), Y2 + 2, bz(0), 'wool_blue');
-  addSign(bx(52), Y2 + 3, bz(0), '♿ 장애인 전용 주차구역\n(2F 후면 주차장)');
+  // Disabled parking sign
+  set(bx(54), Y2 + 1, bz(0), 'stone');
+  set(bx(54), Y2 + 2, bz(0), 'wool_blue');
+  addSign(bx(54), Y2 + 3, bz(0), '♿ 장애인 전용 주차구역\n(2F 후면 주차장)');
 
   // Walkable stone stairs connecting 1F sidewalk (Z = 13, Y = 4) up to Rear 2F Parking Yard (Y = 10)
   for (let step = 0; step < 6; step++) {
     const sy = GROUND + 1 + step;
     const sx = bx(42 + step);
     fill(sx, GROUND + 1, bz(23), sx, sy - 1, bz(25), 'stone');
-    for (let dz = 23; dz <= 25; dz++) {
-      set(sx, sy, bz(dz), 'stairs_stone', 1);
-    }
+    for (let dz = 23; dz <= 25; dz++) set(sx, sy, bz(dz), 'stairs_stone', 1);
   }
 
-  // 3.2d. Iconic Tall Dark-Charcoal Mechanical Parking Tower on Rear Center (Matches Photo!)
-  // Protruding rear tower at dx = 42..49 (X: 21..28), dz = 3..11 (Z: -7..+1), rising from 2F (y=10) to y=38!
-  const PT_X1 = bx(42), PT_X2 = bx(49);
-  const PT_Z1 = bz(3), PT_Z2 = bz(11);
+  // 3.2g. Iconic Tall Dark-Charcoal Mechanical Elevator Parking Tower (Exact Blueprint Position: dx = 42..51, dz = 6..18!)
+  // Right to the LEFT of the 2F rear entrance when facing the back of the building!
+  const PT_X1 = bx(42), PT_X2 = bx(51);
+  const PT_Z1 = bz(6), PT_Z2 = bz(18);
   const PT_TOP = GROUND + NUM_FLOORS * FLOOR_H + 4; // y = 38 (tall monolithic charcoal tower!)
   for (let y = Y2 + 1; y <= PT_TOP; y++) {
     for (let x = PT_X1; x <= PT_X2; x++) {
       for (let z = PT_Z1; z <= PT_Z2; z++) {
         const edge = x === PT_X1 || x === PT_X2 || z === PT_Z1 || z === PT_Z2 || y === PT_TOP;
         if (!edge) { set(x, y, z, null); continue; }
-        // Dark charcoal ribbed cladding (coal_ore + stone vertical ribs) above entry, light gray lower frame
         const mat = (y <= Y2 + 4) ? 'cobble' : ((z + x) % 2 === 0 ? 'coal_ore' : 'stone');
         set(x, y, z, mat);
       }
     }
   }
   // Iconic blue horizontal signboard "서울시립장애인행복플러스센터" above the parking bay!
-  for (let z = PT_Z1 + 1; z <= PT_Z2 - 1; z++) {
+  for (let z = PT_Z1 + 2; z <= PT_Z2 - 2; z++) {
     set(PT_X2 + 1, Y2 + 5, z, 'wool_blue');
   }
-  addSign(PT_X2 + 2, Y2 + 5, bz(7), '🏢 서울시립장애인행복플러스센터\n(기계식 주차타워 입구)');
-  // Car entry opening on East face (PT_X2, dz = 5..9, y = Y2+1..Y2+3) with yellow-black hazard pillars!
+  addSign(PT_X2 + 2, Y2 + 5, bz(12), '🚗 엘리베이터식 기계식 주차장\n서울시립장애인행복플러스센터');
+  // Car entry opening on East face (PT_X2, dz = 10..14, y = Y2+1..Y2+3) with yellow-black hazard pillars!
   for (let y = Y2 + 1; y <= Y2 + 3; y++) {
-    for (let dz = 5; dz <= 9; dz++) set(PT_X2, y, bz(dz), null);
+    for (let dz = 10; dz <= 14; dz++) set(PT_X2, y, bz(dz), null);
     const stripe = (y % 2 === 1) ? 'wool_yellow' : 'coal_ore';
-    set(PT_X2, y, bz(5), stripe);
     set(PT_X2, y, bz(9), stripe);
+    set(PT_X2, y, bz(15), stripe);
   }
-  // White side utility door right next to car bay (photo right side!)
-  setDoor(PT_X2, Y2 + 1, bz(4), 'door_iron_closed', 1);
-  // Metal lift platform & yellow wheel guide rails inside the tower bay!
+  // White side utility doors on north & south of the car bay (exact blueprint detail!)
+  setDoor(PT_X2, Y2 + 1, bz(8), 'door_iron_closed', 1);
+  setDoor(PT_X2, Y2 + 1, bz(16), 'door_iron_closed', 1);
+  // Metal elevator-parking lift deck & yellow wheel guide rails inside the tower bay!
   for (let x = PT_X1 + 1; x <= PT_X2; x++) {
-    for (let dz = 6; dz <= 8; dz++) {
-      set(x, Y2 + 1, bz(dz), (dz === 6 || dz === 8) ? 'wool_yellow' : 'slab_metal');
+    for (let dz = 10; dz <= 14; dz++) {
+      set(x, Y2 + 1, bz(dz), (dz === 11 || dz === 13) ? 'wool_yellow' : 'slab_metal');
     }
   }
-  set(PT_X1 + 3, Y2 + 4, bz(7), 'lamp');
-  set(PT_X2 - 1, Y2 + 4, bz(7), 'lamp');
-  // Lush green trees flanking the rear parking tower (matching left & right trees in photo!)
-  for (const [tx, tz] of [[bx(46), bz(18)], [bx(46), bz(0)], [bx(54), bz(1)]]) {
+  set(PT_X1 + 4, Y2 + 4, bz(12), 'lamp');
+  set(PT_X2 - 1, Y2 + 4, bz(12), 'lamp');
+  // Lush green trees flanking the rear yard
+  for (const [tx, tz] of [[bx(49), bz(0)], [bx(55), bz(20)], [bx(46), bz(20)]]) {
     set(tx, Y2, tz, 'dirt');
     for (let dy = 1; dy <= 4; dy++) set(tx, Y2 + dy, tz, 'wood');
     for (let dx = -2; dx <= 2; dx++) {
