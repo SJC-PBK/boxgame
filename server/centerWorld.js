@@ -379,11 +379,6 @@ export function createCenterWorld() {
         }
       }
     }
-
-    // 2e. Upper Floor (2F) Open-Space Sign (rest of 2F intentionally kept empty!)
-    if (f === 1) {
-      addSign(bx(15), baseY + 2, bz(6), `🏢 ${f + 1}층 오픈 공간\n(화장실·계단·ELV 외 빈 공간)`);
-    }
   }
 
   // 3. 1F Detailed Interior (Matches Image 1 Floor Plan!)
@@ -549,6 +544,146 @@ export function createCenterWorld() {
   // 1F Ceiling 4-way cassette AC units
   for (const [ax, az] of [[10, 15], [20, 14], [30, 14], [38, 14]]) {
     set(bx(ax), Y1 + 5, bz(az), 'furn_ceiling_ac');
+  }
+
+  // 3.2. 2F Interior (Center Mechanical Elevator Parking Bay + Rear 2F Entrance & Iconic Charcoal Parking Tower!)
+  const Y2 = GROUND + 1 * FLOOR_H; // floor slab y = 10, interior y = 11..15
+
+  // Clean bright 2F lobby & office floor
+  fill(bx(1), Y2, bz(6), bx(40), Y2, bz(18), 'sand');
+
+  // 3.2a. 2F Center Mechanical Elevator Parking Bay (dx = 16..24, dz = 10..17)
+  // Enclosed steel/stone parking lift core right in the center of 2F with glass viewing window & car lift deck!
+  for (let y = Y2 + 1; y <= Y2 + 5; y++) {
+    for (let dx = 16; dx <= 24; dx++) {
+      set(bx(dx), y, bz(10), (y === Y2 + 2 || y === Y2 + 3) && dx >= 18 && dx <= 22 ? 'glass' : 'stone');
+      set(bx(dx), y, bz(17), 'stone');
+    }
+    for (let dz = 10; dz <= 17; dz++) {
+      set(bx(16), y, bz(dz), 'stone');
+      set(bx(24), y, bz(dz), 'stone');
+    }
+  }
+  // Open vehicle entry doorway on East side of center bay (dx = 24, dz = 12..15)
+  for (let y = Y2 + 1; y <= Y2 + 3; y++) {
+    for (let dz = 12; dz <= 15; dz++) set(bx(24), y, bz(dz), null);
+  }
+  // Yellow-black safety hazard frame around center parking lift entry
+  for (let y = Y2 + 1; y <= Y2 + 3; y++) {
+    const stripe = (y % 2 === 1) ? 'wool_yellow' : 'coal_ore';
+    set(bx(24), y, bz(11), stripe);
+    set(bx(24), y, bz(16), stripe);
+  }
+  // Metallic elevator-parking lift platform & yellow wheel tracks inside 2F center bay
+  fill(bx(17), Y2, bz(11), bx(23), Y2, bz(16), 'stone');
+  for (let dx = 17; dx <= 23; dx++) {
+    for (let dz = 11; dz <= 16; dz++) {
+      const isRail = (dz === 12 || dz === 15);
+      set(bx(dx), Y2 + 1, bz(dz), isRail ? 'wool_yellow' : 'slab_metal');
+    }
+  }
+  set(bx(20), Y2 + 5, bz(13), 'lamp');
+  set(bx(20), Y2 + 5, bz(14), 'lamp');
+  set(bx(25), Y2 + 3, bz(11), 'redstone_lamp_on');
+  addSign(bx(20), Y2 + 2, bz(9), '🚗 2F 엘리베이터식 주차장\n(기계식 차량 리프트)');
+
+  // 2F Ceiling AC units in left & right open wings
+  for (const [ax, az] of [[7, 14], [12, 14], [30, 14], [36, 14]]) {
+    set(bx(ax), Y2 + 5, bz(az), 'furn_ceiling_ac');
+  }
+
+  // 3.2b. 2F Rear Entrance (East wall dx = 41, dz = 13..16) — connects directly to rear 2F parking yard!
+  for (let y = Y2 + 1; y <= Y2 + 3; y++) {
+    for (let dz = 13; dz <= 16; dz++) set(bx(41), y, bz(dz), null);
+  }
+  setDoor(bx(41), Y2 + 1, bz(14), 'door_glass_closed', 1);
+  setDoor(bx(41), Y2 + 1, bz(15), 'door_glass_closed', 1);
+  // Exterior 2F rear entrance canopy & blue sign (matching left side of uploaded photo!)
+  fill(bx(42), Y2 + 4, bz(12), bx(44), Y2 + 4, bz(17), 'stone');
+  fill(bx(44), Y2 + 5, bz(12), bx(44), Y2 + 5, bz(17), 'wool_blue');
+  set(bx(43), Y2 + 4, bz(14), 'lamp');
+  set(bx(43), Y2 + 4, bz(15), 'lamp');
+  addSign(bx(45), Y2 + 5, bz(14), '🏢 2F 후문 출입구\n서울시립장애인행복플러스센터');
+
+  // 3.2c. Elevated Rear 2F Parking Lot (East side behind building: X = 21..38, Z = -14..13, Y = 4..10)
+  // Retaining wall & solid earth/stone terrace bringing rear ground smoothly up to 2F level (Y2 = 10)!
+  fill(bx(42), GROUND + 1, bz(-4), CENTER_BOUNDS.maxX - 1, Y2 - 1, bz(22), 'stone');
+  fill(bx(42), Y2, bz(-4), CENTER_BOUNDS.maxX - 1, Y2, bz(22), 'cobble');
+  // Smooth stone parking lot surface & white parking stall markings
+  for (let x = bx(43); x <= CENTER_BOUNDS.maxX - 2; x++) {
+    for (let z = bz(-2); z <= bz(20); z++) {
+      set(x, Y2, z, 'stone');
+    }
+  }
+  for (let z = bz(14); z <= bz(19); z += 3) {
+    fill(bx(48), Y2, z, bx(53), Y2, z, 'wool_white');
+  }
+  // Disabled parking sign (bottom-right of photo!)
+  set(bx(52), Y2 + 1, bz(0), 'stone');
+  set(bx(52), Y2 + 2, bz(0), 'wool_blue');
+  addSign(bx(52), Y2 + 3, bz(0), '♿ 장애인 전용 주차구역\n(2F 후면 주차장)');
+
+  // Walkable stone stairs connecting 1F sidewalk (Z = 13, Y = 4) up to Rear 2F Parking Yard (Y = 10)
+  for (let step = 0; step < 6; step++) {
+    const sy = GROUND + 1 + step;
+    const sx = bx(42 + step);
+    fill(sx, GROUND + 1, bz(23), sx, sy - 1, bz(25), 'stone');
+    for (let dz = 23; dz <= 25; dz++) {
+      set(sx, sy, bz(dz), 'stairs_stone', 1);
+    }
+  }
+
+  // 3.2d. Iconic Tall Dark-Charcoal Mechanical Parking Tower on Rear Center (Matches Photo!)
+  // Protruding rear tower at dx = 42..49 (X: 21..28), dz = 3..11 (Z: -7..+1), rising from 2F (y=10) to y=38!
+  const PT_X1 = bx(42), PT_X2 = bx(49);
+  const PT_Z1 = bz(3), PT_Z2 = bz(11);
+  const PT_TOP = GROUND + NUM_FLOORS * FLOOR_H + 4; // y = 38 (tall monolithic charcoal tower!)
+  for (let y = Y2 + 1; y <= PT_TOP; y++) {
+    for (let x = PT_X1; x <= PT_X2; x++) {
+      for (let z = PT_Z1; z <= PT_Z2; z++) {
+        const edge = x === PT_X1 || x === PT_X2 || z === PT_Z1 || z === PT_Z2 || y === PT_TOP;
+        if (!edge) { set(x, y, z, null); continue; }
+        // Dark charcoal ribbed cladding (coal_ore + stone vertical ribs) above entry, light gray lower frame
+        const mat = (y <= Y2 + 4) ? 'cobble' : ((z + x) % 2 === 0 ? 'coal_ore' : 'stone');
+        set(x, y, z, mat);
+      }
+    }
+  }
+  // Iconic blue horizontal signboard "서울시립장애인행복플러스센터" above the parking bay!
+  for (let z = PT_Z1 + 1; z <= PT_Z2 - 1; z++) {
+    set(PT_X2 + 1, Y2 + 5, z, 'wool_blue');
+  }
+  addSign(PT_X2 + 2, Y2 + 5, bz(7), '🏢 서울시립장애인행복플러스센터\n(기계식 주차타워 입구)');
+  // Car entry opening on East face (PT_X2, dz = 5..9, y = Y2+1..Y2+3) with yellow-black hazard pillars!
+  for (let y = Y2 + 1; y <= Y2 + 3; y++) {
+    for (let dz = 5; dz <= 9; dz++) set(PT_X2, y, bz(dz), null);
+    const stripe = (y % 2 === 1) ? 'wool_yellow' : 'coal_ore';
+    set(PT_X2, y, bz(5), stripe);
+    set(PT_X2, y, bz(9), stripe);
+  }
+  // White side utility door right next to car bay (photo right side!)
+  setDoor(PT_X2, Y2 + 1, bz(4), 'door_iron_closed', 1);
+  // Metal lift platform & yellow wheel guide rails inside the tower bay!
+  for (let x = PT_X1 + 1; x <= PT_X2; x++) {
+    for (let dz = 6; dz <= 8; dz++) {
+      set(x, Y2 + 1, bz(dz), (dz === 6 || dz === 8) ? 'wool_yellow' : 'slab_metal');
+    }
+  }
+  set(PT_X1 + 3, Y2 + 4, bz(7), 'lamp');
+  set(PT_X2 - 1, Y2 + 4, bz(7), 'lamp');
+  // Lush green trees flanking the rear parking tower (matching left & right trees in photo!)
+  for (const [tx, tz] of [[bx(46), bz(18)], [bx(46), bz(0)], [bx(54), bz(1)]]) {
+    set(tx, Y2, tz, 'dirt');
+    for (let dy = 1; dy <= 4; dy++) set(tx, Y2 + dy, tz, 'wood');
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dy = 3; dy <= 5; dy++) {
+          if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && dy === 5) continue;
+          if (dx === 0 && dz === 0 && dy <= 4) continue;
+          set(tx + dx, Y2 + dy, tz + dz, 'leaves');
+        }
+      }
+    }
   }
 
   // 3.3. 3F Detailed Interior (Matches 3F 배치도 2안: 상담실 1·2, 국장석, 공용캐비닛, 4개 팀 데스크 클러스터, 탕비실!)
