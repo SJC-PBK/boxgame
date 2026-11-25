@@ -9,7 +9,7 @@ export const CENTER_BOUNDS = {
   minX: -40,
   maxX: 39,
   minY: 0,
-  maxY: 47,
+  maxY: 55,
   minZ: -32,
   maxZ: 31
 };
@@ -72,7 +72,7 @@ export function createCenterWorld() {
   const BD = 20; // dz: 0..19
   const GROUND = 4;
   const FLOOR_H = 6; // 1 slab + 5 blocks clear interior height
-  const NUM_FLOORS = 5; // 1F..5F + Rooftop at y = 4 + 5*6 = 34
+  const NUM_FLOORS = 6; // 1F..6F + 7F Rooftop Terrace at y = 4 + 6*6 = 40
 
   const bx = (dx) => OX + dx;
   const bz = (dz) => OZ + dz;
@@ -1117,41 +1117,156 @@ export function createCenterWorld() {
     set(bx(ax), Y5 + 5, bz(az), 'furn_ceiling_ac');
   }
 
-  // 4. Rooftop Terrace & Iconic Gray Portal Frame Roof (Photos 2 & 3!)
-  const ROOF_Y = GROUND + NUM_FLOORS * FLOOR_H; // y = 34
+  // 3.6. 6F Detailed Interior (Matches 6F Floor Plan: 서울특별시 장애인권익옹호기관 & 좌측 상담실!)
+  const Y6 = GROUND + 5 * FLOOR_H; // floor slab y = 34, interior y = 35..39
+
+  // Clean bright office floor across 6F
+  fill(bx(1), Y6, bz(6), bx(40), Y6, bz(18), 'sand');
+  fill(bx(36), Y6, bz(1), bx(40), Y6, bz(5), 'sand');
+
+  // Top-left small vestibule corner next to ELEV
+  for (let y = Y6 + 1; y <= Y6 + 5; y++) {
+    for (let dx = 1; dx <= 4; dx++) set(bx(dx), y, bz(4), 'stone');
+  }
+  setDoor(bx(2), Y6 + 1, bz(4), 'door_closed', 2);
+
+  // 3.6a. 좌측 하단 — 상담실 (dx = 1..9, dz = 10..18)
+  for (let dx = 1; dx <= 9; dx++) {
+    set(bx(dx), Y6 + 1, bz(10), 'stone');
+    set(bx(dx), Y6 + 2, bz(10), 'stone');
+    set(bx(dx), Y6 + 3, bz(10), 'glass');
+    set(bx(dx), Y6 + 4, bz(10), 'glass');
+    set(bx(dx), Y6 + 5, bz(10), 'stone');
+  }
+  for (let dz = 10; dz <= 18; dz++) {
+    set(bx(9), Y6 + 1, bz(dz), 'stone');
+    set(bx(9), Y6 + 2, bz(dz), 'stone');
+    set(bx(9), Y6 + 3, bz(dz), 'glass');
+    set(bx(9), Y6 + 4, bz(dz), 'glass');
+    set(bx(9), Y6 + 5, bz(dz), 'stone');
+  }
+  setDoor(bx(9), Y6 + 1, bz(13), 'door_glass_closed', 1);
+  // 상담실 interior: white table, chairs, sofa, plant
+  set(bx(4), Y6 + 1, bz(14), 'furn_white_table');
+  set(bx(5), Y6 + 1, bz(14), 'furn_white_table');
+  set(bx(4), Y6 + 1, bz(13), 'furn_office_chair', 2);
+  set(bx(5), Y6 + 1, bz(13), 'furn_office_chair', 2);
+  set(bx(4), Y6 + 1, bz(15), 'furn_office_chair', 0);
+  set(bx(5), Y6 + 1, bz(15), 'furn_office_chair', 0);
+  set(bx(2), Y6 + 1, bz(17), 'furn_sofa', 0);
+  set(bx(3), Y6 + 1, bz(17), 'furn_sofa', 0);
+  set(bx(1), Y6 + 1, bz(11), 'furn_potted_plant');
+  addSign(bx(8), Y6 + 2, bz(11), '💬 6F 상담실\n(권익옹호기관)');
+
+  // 3.6b. 중앙~우측 — 권익옹호기관 사무실 (dx = 10..40, dz = 6..18)
+  // Sleek reception/hallway glass partition in front of restrooms (dz = 8, dx = 10..32)
+  for (let dx = 10; dx <= 32; dx++) {
+    if (dx === 12 || dx === 13) continue; // wide office entry near stairwell
+    set(bx(dx), Y6 + 1, bz(8), 'furn_partition', 0);
+  }
+  addSign(bx(15), Y6 + 2, bz(8), '⚖️ 서울특별시 장애인권익옹호기관 (6F)');
+
+  // 3 Team Workstation Clusters inside 권익옹호기관
+  for (const cx of [14, 21, 28]) {
+    for (const dz of [12, 14]) {
+      set(bx(cx), Y6 + 1, bz(dz), 'furn_office_desk', 1);
+      set(bx(cx - 1), Y6 + 1, bz(dz), 'furn_office_chair', 1);
+      set(bx(cx + 1), Y6 + 1, bz(dz), 'furn_office_desk', 3);
+      set(bx(cx + 2), Y6 + 1, bz(dz), 'furn_office_chair', 3);
+    }
+    set(bx(cx), Y6 + 1, bz(13), 'furn_partition', 0);
+    set(bx(cx + 1), Y6 + 1, bz(13), 'furn_partition', 0);
+    set(bx(cx), Y6 + 1, bz(16), 'furn_office_desk', 0);
+    set(bx(cx + 1), Y6 + 1, bz(16), 'furn_office_desk', 0);
+    set(bx(cx), Y6 + 1, bz(17), 'furn_office_chair', 0);
+  }
+  // Right-side conference table & cabinets (dx = 34..40)
+  for (let dz = 11; dz <= 16; dz++) set(bx(40), Y6 + 1, bz(dz), 'furn_cabinet');
+  set(bx(35), Y6 + 1, bz(13), 'furn_white_table');
+  set(bx(36), Y6 + 1, bz(13), 'furn_white_table');
+  set(bx(35), Y6 + 1, bz(14), 'furn_white_table');
+  set(bx(36), Y6 + 1, bz(14), 'furn_white_table');
+  set(bx(34), Y6 + 1, bz(13), 'furn_office_chair', 1);
+  set(bx(34), Y6 + 1, bz(14), 'furn_office_chair', 1);
+  set(bx(37), Y6 + 1, bz(13), 'furn_office_chair', 3);
+  set(bx(37), Y6 + 1, bz(14), 'furn_office_chair', 3);
+  set(bx(39), Y6 + 1, bz(17), 'furn_potted_plant');
+  // Top-right small pantry corner (dx = 36..39, dz = 1..4)
+  set(bx(36), Y6 + 1, bz(1), 'cobble');
+  set(bx(36), Y6 + 1, bz(2), 'water');
+  set(bx(37), Y6 + 1, bz(1), 'job_fridge');
+  set(bx(39), Y6 + 1, bz(1), 'furn_cabinet');
+  // 6F Ceiling 4-way cassette AC units
+  for (const [ax, az] of [[5, 14], [15, 13], [22, 13], [29, 13], [36, 13]]) {
+    set(bx(ax), Y6 + 5, bz(az), 'furn_ceiling_ac');
+  }
+
+  // 4. 7F Rooftop Terrace, Wooden Deck & Iconic Wooden Gazebo (Photos 2 & 3!)
+  const ROOF_Y = GROUND + NUM_FLOORS * FLOOR_H; // y = 40 (7F 옥상!)
   fill(bx(0), ROOF_Y, bz(0), bx(BW - 1), ROOF_Y, bz(BD - 1), 'cobble');
-  // Cut stairwell opening at top of 5F stairs (preserve top step dx=12,dz=1..2!)
+  // Left Wood-Decked Lounge Terrace (dx = 1..16, dz = 8..18) matching Image 2 & 3!
+  fill(bx(1), ROOF_Y, bz(8), bx(16), ROOF_Y, bz(18), 'planks');
+  // Cut stairwell opening at top of 6F stairs (preserve top step dx=12,dz=1..2!)
   fill(bx(12), ROOF_Y, bz(3), bx(17), ROOF_Y, bz(4), null);
   fill(bx(13), ROOF_Y, bz(1), bx(17), ROOF_Y, bz(2), null);
-  // Stairwell rooftop penthouse enclosure (dx = 9..18, dz = 0..5) with exit door to rooftop terrace
+  // Stairwell + ELEV Rooftop Penthouse Hall (dx = 5..18, dz = 0..8) with double glass exit onto wood deck!
   for (let y = ROOF_Y + 1; y <= ROOF_Y + 4; y++) {
-    for (let dx = 9; dx <= 18; dx++) {
+    for (let dx = 5; dx <= 18; dx++) {
       set(bx(dx), y, bz(0), 'stone');
-      set(bx(dx), y, bz(5), 'stone');
+      set(bx(dx), y, bz(8), (dx >= 10 && dx <= 15 && y <= ROOF_Y + 3) ? 'glass' : 'stone');
     }
-    for (let dz = 0; dz <= 5; dz++) {
-      set(bx(9), y, bz(dz), 'stone');
+    for (let dz = 0; dz <= 8; dz++) {
+      set(bx(5), y, bz(dz), 'stone');
       set(bx(18), y, bz(dz), 'stone');
     }
   }
-  fill(bx(9), ROOF_Y + 5, bz(0), bx(18), ROOF_Y + 5, bz(5), 'stone');
-  setDoor(bx(10), ROOF_Y + 1, bz(5), 'door_iron_closed', 2);
+  fill(bx(5), ROOF_Y + 5, bz(0), bx(18), ROOF_Y + 5, bz(8), 'stone');
+  setDoor(bx(13), ROOF_Y + 1, bz(8), 'door_glass_closed', 2);
+  setDoor(bx(14), ROOF_Y + 1, bz(8), 'door_glass_closed', 2);
   set(bx(14), ROOF_Y + 4, bz(2), 'lamp');
-  addSign(bx(12), ROOF_Y + 2, bz(6), '🌿 옥상 테라스\n(서울시립장애인행복플러스센터)');
+  set(bx(11), ROOF_Y + 4, bz(6), 'lamp');
+  addSign(bx(12), ROOF_Y + 2, bz(9), '🌿 7F 옥상 테라스 · 나무 정자\n(서울시립장애인행복플러스센터)');
+
+  // Iconic Wooden Gazebo / Pergola ("나무 정자") on Left Wood Deck (dx = 3..10, dz = 11..17) — Exact Photo 2!
+  const GZ_X1 = bx(3), GZ_X2 = bx(10);
+  const GZ_Z1 = bz(11), GZ_Z2 = bz(17);
+  // 4 sturdy square wooden corner posts rising 4 blocks high
+  for (let dy = 1; dy <= 4; dy++) {
+    set(GZ_X1, ROOF_Y + dy, GZ_Z1, 'wood');
+    set(GZ_X2, ROOF_Y + dy, GZ_Z1, 'wood');
+    set(GZ_X1, ROOF_Y + dy, GZ_Z2, 'wood');
+    set(GZ_X2, ROOF_Y + dy, GZ_Z2, 'wood');
+  }
+  // U-shaped wrap-around wooden bench seating on West, South & East sides (open entry on North facing penthouse!)
+  for (let dz = 12; dz <= 16; dz++) {
+    set(GZ_X1, ROOF_Y + 1, bz(dz), 'stairs_wood', 3); // West bench facing East
+    set(GZ_X2, ROOF_Y + 1, bz(dz), 'stairs_wood', 1); // East bench facing West
+  }
+  for (let dx = 4; dx <= 9; dx++) {
+    set(bx(dx), ROOF_Y + 1, GZ_Z2, 'stairs_wood', 2); // South bench facing North
+  }
+  // Overhanging pitched wooden gazebo roof (extends 1 block past posts like eaves in Photo 2!)
+  fill(GZ_X1 - 1, ROOF_Y + 4, GZ_Z1 - 1, GZ_X2 + 1, ROOF_Y + 4, GZ_Z2 + 1, 'planks');
+  fill(GZ_X1, ROOF_Y + 5, GZ_Z1, GZ_X2, ROOF_Y + 5, GZ_Z2, 'wood');
+  set(bx(6), ROOF_Y + 4, bz(14), 'lamp');
+  set(bx(7), ROOF_Y + 4, bz(14), 'lamp');
+  // Potted plants around gazebo corners
+  set(bx(2), ROOF_Y + 1, bz(10), 'furn_potted_plant');
+  set(bx(11), ROOF_Y + 1, bz(17), 'furn_potted_plant');
+  set(bx(20), ROOF_Y + 1, bz(17), 'furn_potted_plant');
 
   // Rooftop safety glass parapet railing around perimeter
   for (let dx = 0; dx < BW; dx++) {
     set(bx(dx), ROOF_Y + 1, bz(BD - 1), 'glass');
-    if (dx < 9 || dx > 18) set(bx(dx), ROOF_Y + 1, bz(0), 'glass');
+    if (dx < 5 || dx > 18) set(bx(dx), ROOF_Y + 1, bz(0), 'glass');
   }
   for (let dz = 0; dz < BD; dz++) {
     set(bx(0), ROOF_Y + 1, bz(dz), 'glass');
     set(bx(BW - 1), ROOF_Y + 1, bz(dz), 'glass');
   }
 
-  // Iconic Photo 2 & 3 Gray Outer Portal Frame Overhang & Pergola Slats (y = 35..41)!
-  const TOP_Y = ROOF_Y + 6; // y = 40
-  // Left & Right thick gray portal walls rising up to TOP_Y
+  // Iconic Photo 2 & 3 Gray Outer Portal Frame Overhang & Pergola Slats above 7F (y = 41..47)!
+  const TOP_Y = ROOF_Y + 6; // y = 46
   for (let y = ROOF_Y + 1; y <= TOP_Y; y++) {
     for (let dz = 0; dz < BD; dz++) {
       set(bx(0), y, bz(dz), 'stone');
@@ -1160,16 +1275,13 @@ export function createCenterWorld() {
       set(bx(BW - 2), y, bz(dz), 'stone');
     }
   }
-  // Top horizontal portal frame beam along South (front) & North edges
   fill(bx(0), TOP_Y, bz(BD - 2), bx(BW - 1), TOP_Y + 1, bz(BD - 1), 'stone');
   fill(bx(0), TOP_Y, bz(0), bx(BW - 1), TOP_Y + 1, bz(1), 'stone');
-  // Left half covered roof slab + Right half open pergola louver slats (exact Photo 2 detail!)
   fill(bx(2), TOP_Y, bz(2), bx(20), TOP_Y, bz(BD - 3), 'stone');
   for (let dx = 22; dx <= BW - 3; dx += 2) {
     fill(bx(dx), TOP_Y, bz(2), bx(dx), TOP_Y, bz(BD - 3), 'cobble');
   }
-  // Rooftop warm lights
-  for (const [lx, lz] of [[5, 10], [22, 10], [34, 10], [22, 16], [34, 16]]) {
+  for (const [lx, lz] of [[15, 10], [24, 10], [34, 10], [24, 16], [34, 16]]) {
     set(bx(lx), ROOF_Y + 1, bz(lz), 'lamp');
   }
 
@@ -1217,7 +1329,8 @@ export function createCenterWorld() {
         { floor: 2, label: '2F', y: GROUND + 1 * FLOOR_H },
         { floor: 3, label: '3F', y: GROUND + 2 * FLOOR_H },
         { floor: 4, label: '4F', y: GROUND + 3 * FLOOR_H },
-        { floor: 5, label: '5F', y: GROUND + 4 * FLOOR_H }
+        { floor: 5, label: '5F', y: GROUND + 4 * FLOOR_H },
+        { floor: 6, label: '6F', y: GROUND + 5 * FLOOR_H }
       ]
     },
     // Spawn on the sidewalk in front of the left main entrance, facing the building!

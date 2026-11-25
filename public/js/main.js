@@ -475,7 +475,7 @@ document.querySelectorAll('#elev-floor-btns .elev-btn').forEach((btn) => {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const floor = Number(btn.dataset.floor);
-    if (floor >= 1 && floor <= 5) send({ type: 'elevator_call', floor });
+    if (floor >= 1 && floor <= 6) send({ type: 'elevator_call', floor });
   });
 });
 
@@ -1292,7 +1292,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.code.startsWith('Digit') || e.code.startsWith('Numpad')) {
     const n = Number(e.code.replace(/^(Digit|Numpad)/, ''));
-    if (currentWorldMode === 'center' && (worldExtras.isInsideElevator(playerPos) || worldExtras.isNearElevator(playerPos)) && n >= 1 && n <= 5) {
+    if (currentWorldMode === 'center' && (worldExtras.isInsideElevator(playerPos) || worldExtras.isNearElevator(playerPos)) && n >= 1 && n <= 6) {
       send({ type: 'elevator_call', floor: n });
       return;
     }

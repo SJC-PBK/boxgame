@@ -1612,7 +1612,7 @@ wss.on('connection', (ws) => {
       case 'elevator_call': {
         if (player.world !== 'center') return;
         const floor = Number(msg.floor);
-        if (!Number.isInteger(floor) || floor < 1 || floor > 5) return;
+        if (!Number.isInteger(floor) || floor < 1 || floor > 6) return;
         callCenterElevator(floor, player.nickname, ws);
         break;
       }
