@@ -284,7 +284,21 @@ const touchControls = new TouchControls(canvas, {
   onToolSwitch: () => { if (joined) ui.pressToolSwitchQ(); },
   onChat: () => { if (joined) ui.openChat(); },
   onViewToggle: () => { if (joined) toggleCameraView(); },
-  onUndo: () => { if (joined) send({ type: 'block_undo_brush' }); }
+  onUndo: () => { if (joined) send({ type: 'block_undo_edit' }); }
+});
+
+let eyedropperMode = false;
+function setEyedropperMode(on) {
+  eyedropperMode = !!on;
+  const btn = document.getElementById('btn-eyedropper');
+  if (btn) btn.classList.toggle('active-tool', eyedropperMode);
+  if (eyedropperMode) ui.toast('💧 스포이드 활성화! 복사할 블록을 클릭하세요. (X로 취소)', 'info');
+}
+document.getElementById('btn-undo-edit')?.addEventListener('click', () => {
+  if (joined) send({ type: 'block_undo_edit' });
+});
+document.getElementById('btn-eyedropper')?.addEventListener('click', () => {
+  if (joined) setEyedropperMode(!eyedropperMode);
 });
 
 function applyGameSettings(s) {
@@ -737,6 +751,10 @@ function handleServerMessage(msg) {
       worldExtras.syncCenterPylon(msg.centerPylon);
       break;
 
+    case 'pick_select_slot':
+      if (typeof msg.slotIndex === 'number') ui.setActiveSlot(msg.slotIndex);
+      break;
+
     case 'world_reload':
       if (worldRenderer) {
         worldRenderer.setFacings(msg.facings || {});
@@ -1120,6 +1138,11 @@ canvas.addEventListener('mousedown', (e) => {
   if (!joined || ui.openModalId || ui.chatOpen) return;
   if (!pointerLocked && !remoteLook) return;
   if (e.button === 0) {
+    if (eyedropperMode && currentHit) {
+      send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+      setEyedropperMode(false);
+      return;
+    }
     // Check if clicking an animal first
     const { eyePos, lookDir } = getEyeAndLook();
     const animalHit = animalRenderer.raycast(eyePos, lookDir, 4.8);
@@ -1133,6 +1156,11 @@ canvas.addEventListener('mousedown', (e) => {
     fpHand?.triggerSwing();
   } else if (e.button === 2) {
     e.preventDefault();
+    if (eyedropperMode && currentHit) {
+      send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+      setEyedropperMode(false);
+      return;
+    }
     if (remoteLook) {
       isRightDragging = true;
       dragMovedDist = 0;
@@ -1140,6 +1168,11 @@ canvas.addEventListener('mousedown', (e) => {
       lastDragY = e.clientY;
     } else {
       handleRightClickOrInteract(false);
+    }
+  } else if (e.button === 1 && !remoteLook) {
+    e.preventDefault();
+    if (currentHit) {
+      send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
     }
   } else if (e.button === 1 && remoteLook) {
     e.preventDefault();
@@ -1188,9 +1221,14 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'PageUp') { e.preventDefault(); toggleBrushMode(1); return; }
   if (e.code === 'PageDown') { e.preventDefault(); toggleBrushMode(-1); return; }
   if (e.code === 'End') { e.preventDefault(); setBrushMode(0); return; }
-  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+  if (e.code === 'KeyZ') {
     e.preventDefault();
-    send({ type: 'block_undo_brush' });
+    send({ type: 'block_undo_edit' });
+    return;
+  }
+  if (e.code === 'KeyX') {
+    e.preventDefault();
+    setEyedropperMode(!eyedropperMode);
     return;
   }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(true); return; }

@@ -676,3 +676,10 @@ input[type="text"], input[type="password"] {
   background: #c89b54; color: #111827; border-color: #eab308;
 }
 .sign-page-btn:disabled { opacity: 0.4; cursor: default; }
+
+.hud-btn.active-tool {
+  background: rgba(2, 132, 199, 0.85) !important;
+  border-color: #38bdf8 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.65);
+}

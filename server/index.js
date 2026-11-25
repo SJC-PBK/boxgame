@@ -744,7 +744,8 @@ wss.on('connection', (ws) => {
         hp: 20, hunger: 20, lastAteAt: Date.now(),
         jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
         openChestKey: null, openFurnaceKey: null,
-        linkedTnts: new Set()
+        linkedTnts: new Set(),
+        editUndoStack: []
       };
       players.set(id, player);
 
@@ -987,6 +988,15 @@ wss.on('connection', (ws) => {
           const isDoor = slot.block.startsWith('door_');
           if (isDoor) {
             if (!centerWorld.inBounds(x, y + 1, z) || centerWorld.getBlock(x, y + 1, z) !== null) return;
+            player.editUndoStack.push({
+              world: 'center',
+              label: CATALOG[slot.block]?.name || slot.block,
+              changes: [
+                { x, y, z, prevBlock: null, prevFacing: 0 },
+                { x, y: y + 1, z, prevBlock: null, prevFacing: 0 }
+              ]
+            });
+            if (player.editUndoStack.length > 30) player.editUndoStack.shift();
             centerWorld.setBlock(x, y, z, slot.block);
             centerWorld.setBlock(x, y + 1, z, slot.block);
             centerWorld.facings[`${x},${y},${z}`] = fDir;
@@ -1003,6 +1013,12 @@ wss.on('connection', (ws) => {
             }, null, 'center');
             break;
           }
+          player.editUndoStack.push({
+            world: 'center',
+            label: CATALOG[slot.block]?.name || slot.block,
+            changes: [{ x, y, z, prevBlock: null, prevFacing: 0 }]
+          });
+          if (player.editUndoStack.length > 30) player.editUndoStack.shift();
           centerWorld.setBlock(x, y, z, slot.block);
           centerWorld.facings[`${x},${y},${z}`] = fDir;
           store.setCenterFurn(x, y, z, slot.block, fDir);
@@ -1072,9 +1088,21 @@ wss.on('connection', (ws) => {
           if (slot.count <= 0) player.bag[idx] = null;
         }
         const facingVal = (blockId.startsWith('stairs_') || isDoorBlock) ? (Number(msg.facing || 0) & 3) : undefined;
+        const prevFacing0 = store.facings[`${x},${y},${z}`];
         store.setBlock(x, y, z, blockId, player.nickname);
         if (facingVal !== undefined) store.setFacing(x, y, z, facingVal);
         if (isDoorBlock) {
+          const prevTop = store.getBlock(x, y + 1, z);
+          const prevFacingTop = store.facings[`${x},${y + 1},${z}`];
+          player.editUndoStack.push({
+            world: 'sandbox',
+            label: CATALOG[blockId]?.name || blockId,
+            changes: [
+              { x, y, z, prevBlock: existing || null, prevFacing: prevFacing0 },
+              { x, y: y + 1, z, prevBlock: prevTop || null, prevFacing: prevFacingTop }
+            ]
+          });
+          if (player.editUndoStack.length > 30) player.editUndoStack.shift();
           store.setBlock(x, y + 1, z, blockId, player.nickname);
           store.setFacing(x, y + 1, z, facingVal);
           send(ws, { type: 'bag_update', bag: player.bag });
@@ -1088,6 +1116,12 @@ wss.on('connection', (ws) => {
           });
           break;
         }
+        player.editUndoStack.push({
+          world: 'sandbox',
+          label: CATALOG[blockId]?.name || blockId,
+          changes: [{ x, y, z, prevBlock: existing || null, prevFacing: prevFacing0 }]
+        });
+        if (player.editUndoStack.length > 30) player.editUndoStack.shift();
         send(ws, { type: 'bag_update', bag: player.bag });
         broadcast({ type: 'block_update', x, y, z, block: blockId, facing: facingVal, by: player.nickname });
 
@@ -1145,6 +1179,119 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'bag_update', bag: player.bag });
           broadcast({ type: 'blocks_batch', changes, by: player.nickname });
         }
+        break;
+      }
+
+      case 'block_undo_edit': {
+        // Pop latest matching-world edit from per-player undo stack
+        let rec = null;
+        while (player.editUndoStack.length > 0) {
+          const top = player.editUndoStack.pop();
+          if (top && top.world === player.world) { rec = top; break; }
+        }
+        if (!rec) {
+          send(ws, { type: 'toast', level: 'info', text: '↩ 되돌릴 최근 수정 내역이 없습니다.' });
+          return;
+        }
+        const applied = [];
+        let signsDirty = false;
+        for (const ch of rec.changes) {
+          if (player.world === 'center') {
+            if (!centerWorld.inBounds(ch.x, ch.y, ch.z)) continue;
+            centerWorld.setBlock(ch.x, ch.y, ch.z, ch.prevBlock || null);
+            if (ch.prevBlock) {
+              centerWorld.facings[`${ch.x},${ch.y},${ch.z}`] = Number(ch.prevFacing || 0) & 3;
+              store.setCenterFurn(ch.x, ch.y, ch.z, ch.prevBlock, ch.prevFacing || 0);
+            } else {
+              delete centerWorld.facings[`${ch.x},${ch.y},${ch.z}`];
+              store.setCenterFurn(ch.x, ch.y, ch.z, null);
+            }
+            if (ch.prevSign) {
+              centerWorld.signs[`${ch.x},${ch.y},${ch.z}`] = ch.prevSign;
+              signsDirty = true;
+            }
+            applied.push({ x: ch.x, y: ch.y, z: ch.z, block: ch.prevBlock || null, facing: ch.prevFacing });
+          } else if (player.world === 'sandbox') {
+            if (!store.inBounds(ch.x, ch.y, ch.z)) continue;
+            store.setBlock(ch.x, ch.y, ch.z, ch.prevBlock || null, player.nickname);
+            if (ch.prevBlock && ch.prevFacing !== undefined) store.setFacing(ch.x, ch.y, ch.z, ch.prevFacing);
+            if (ch.prevSign) {
+              store.signs[`${ch.x},${ch.y},${ch.z}`] = ch.prevSign;
+              store._scheduleSave('signs', 100);
+              signsDirty = true;
+            }
+            applied.push({ x: ch.x, y: ch.y, z: ch.z, block: ch.prevBlock || null, facing: ch.prevFacing });
+          }
+        }
+        if (applied.length > 0) {
+          broadcast({ type: 'blocks_batch', changes: applied, by: player.nickname }, null, player.world);
+          if (signsDirty) {
+            const sMap = player.world === 'center' ? centerWorld.signs : store.signs;
+            broadcast({ type: 'signs_update', signs: sMap }, null, player.world);
+          }
+          send(ws, { type: 'toast', level: 'success', text: `↩ 되돌리기 완료 (${rec.label}) · 남은 횟수: ${player.editUndoStack.length}` });
+        }
+        break;
+      }
+
+      case 'block_pick': {
+        const { x, y, z, slotIndex } = msg;
+        if (player.world === 'job') return;
+        const targetStore = player.world === 'center' ? centerWorld : store;
+        if (!targetStore.inBounds(x, y, z)) return;
+        let rawId = targetStore.getBlock(x, y, z);
+        if (!rawId || rawId === 'bedrock') return;
+        // Normalize interactive/open variants to their placeable item ID
+        const PICK_MAP = {
+          door_open: 'door_closed',
+          door_stone_open: 'door_stone_closed',
+          door_iron_open: 'door_iron_closed',
+          door_glass_open: 'door_glass_closed',
+          redstone_lamp_on: 'redstone_lamp_off',
+          lever_on: 'lever_off'
+        };
+        const pickId = PICK_MAP[rawId] || rawId;
+        const def = CATALOG[pickId];
+        if (!def || def.kind !== 'block') return;
+        if (player.world === 'sandbox' && pickId.startsWith('furn_')) return;
+
+        // 1. Check if player already has it in hotbar (0..8)
+        for (let i = 0; i < 9; i++) {
+          if (player.bag[i]?.block === pickId) {
+            send(ws, { type: 'pick_select_slot', slotIndex: i });
+            send(ws, { type: 'toast', level: 'info', text: `💧 [${def.name}] 선택됨 (${i + 1}번 슬롯)` });
+            return;
+          }
+        }
+        const activeIdx = Math.max(0, Math.min(8, Number(slotIndex) || 0));
+        // 2. Check if player has it in bag (9..35) -> swap into active hotbar slot
+        for (let i = 9; i < BAG_SIZE; i++) {
+          if (player.bag[i]?.block === pickId) {
+            const tmp = player.bag[activeIdx];
+            player.bag[activeIdx] = player.bag[i];
+            player.bag[i] = tmp;
+            send(ws, { type: 'bag_update', bag: player.bag });
+            send(ws, { type: 'pick_select_slot', slotIndex: activeIdx });
+            send(ws, { type: 'toast', level: 'info', text: `💧 [${def.name}] 가방에서 꺼내 들었습니다!` });
+            return;
+          }
+        }
+        // 3. Otherwise grant directly if admin, supply enabled, or center furniture in center world!
+        const canGrant = player.isAdmin || store.config.supplyEnabled || (player.world === 'center' && CENTER_FURNITURE_IDS.includes(pickId));
+        if (!canGrant) {
+          send(ws, { type: 'toast', level: 'warn', text: `💧 가방에 [${def.name}] 블록이 없습니다.` });
+          return;
+        }
+        // Move displaced hotbar item to an empty bag slot if possible so nothing is lost
+        const prevSlot = player.bag[activeIdx];
+        if (prevSlot) {
+          const emptyBag = player.bag.findIndex((s, idx) => idx >= 9 && !s);
+          if (emptyBag !== -1) player.bag[emptyBag] = prevSlot;
+        }
+        player.bag[activeIdx] = { block: pickId, count: def.stackable === 1 ? 1 : 64 };
+        send(ws, { type: 'bag_update', bag: player.bag });
+        send(ws, { type: 'pick_select_slot', slotIndex: activeIdx });
+        send(ws, { type: 'toast', level: 'success', text: `💧 스포이드: [${def.name}] 블록을 손에 들었습니다!` });
         break;
       }
 
@@ -1590,6 +1737,14 @@ wss.on('connection', (ws) => {
             return;
           }
           const persistAir = !CENTER_FURNITURE_IDS.includes(cur);
+          const prevFacing = centerWorld.facings[`${x},${y},${z}`] || 0;
+          const prevSign = cur === 'sign' && centerWorld.signs[`${x},${y},${z}`] ? { ...centerWorld.signs[`${x},${y},${z}`] } : null;
+          player.editUndoStack.push({
+            world: 'center',
+            label: CATALOG[cur]?.name || cur,
+            changes: [{ x, y, z, prevBlock: cur, prevFacing, prevSign }]
+          });
+          if (player.editUndoStack.length > 30) player.editUndoStack.shift();
           centerWorld.setBlock(x, y, z, null);
           delete centerWorld.facings[`${x},${y},${z}`];
           store.setCenterFurn(x, y, z, null, 0, persistAir);
@@ -1662,18 +1817,25 @@ wss.on('connection', (ws) => {
           }
         }
 
+        const prevFacingMain = store.facings[`${x},${y},${z}`];
+        const prevSignMain = existing === 'sign' && store.signs[`${x},${y},${z}`] ? { ...store.signs[`${x},${y},${z}`] } : null;
         store.setBlock(x, y, z, null);
         // Remove paired top or bottom half when breaking a 1x2 door
         let doorPairCoord = null;
+        const undoChanges = [{ x, y, z, prevBlock: existing, prevFacing: prevFacingMain, prevSign: prevSignMain }];
         if (existing.startsWith('door_')) {
           if (store.inBounds(x, y + 1, z) && store.getBlock(x, y + 1, z) === existing) {
+            undoChanges.push({ x, y: y + 1, z, prevBlock: existing, prevFacing: store.facings[`${x},${y + 1},${z}`] });
             store.setBlock(x, y + 1, z, null);
             doorPairCoord = { x, y: y + 1, z };
           } else if (store.inBounds(x, y - 1, z) && store.getBlock(x, y - 1, z) === existing) {
+            undoChanges.push({ x, y: y - 1, z, prevBlock: existing, prevFacing: store.facings[`${x},${y - 1},${z}`] });
             store.setBlock(x, y - 1, z, null);
             doorPairCoord = { x, y: y - 1, z };
           }
         }
+        player.editUndoStack.push({ world: 'sandbox', label: CATALOG[existing]?.name || existing, changes: undoChanges });
+        if (player.editUndoStack.length > 30) player.editUndoStack.shift();
 
         // Ripe wheat harvest bonus
         if (existing === 'wheat_3') {
