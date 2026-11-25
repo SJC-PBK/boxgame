@@ -56,6 +56,17 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
   }
 
   if (def.kind === 'block') {
+    // Render custom silhouette items (furniture, stairs, thin slabs) using their crisp transparent sprite!
+    if (itemId.startsWith('furn_') || itemId.startsWith('stairs_') || itemId.startsWith('slab_')) {
+      const customTex = textures.getItemTexture(itemId);
+      if (customTex) {
+        const mat = new THREE.MeshBasicMaterial({ map: customTex, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide });
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.32), mat);
+        plane.position.set(0, 0.16, -0.05);
+        plane.rotation.y = Math.PI / 5;
+        return plane;
+      }
+    }
     const mats = textures.getBoxMaterials(itemId);
     if (!mats) return null;
     const cube = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), mats);

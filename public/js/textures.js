@@ -1129,6 +1129,7 @@ export class TextureLibrary {
             ctx.fillRect(15, 0, 2, 17);   // vertical riser edge
           }, 32);
           this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
         } else if (def.id.startsWith('slab_')) {
           const ic = makeCanvas((ctx) => {
             ctx.imageSmoothingEnabled = false;
@@ -1143,6 +1144,137 @@ export class TextureLibrary {
             ctx.fillRect(29, 17, 2, 13);
           }, 32);
           this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id.startsWith('furn_')) {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            const outline = '#0f172a';
+            if (def.id === 'furn_office_chair') {
+              // Crisp ergonomic office chair silhouette (backrest + armrests + cushion + stem + wheels)
+              ctx.fillStyle = '#334155';
+              ctx.fillRect(7, 3, 18, 12); // backrest
+              ctx.fillStyle = '#475569';
+              ctx.fillRect(9, 5, 14, 8);  // mesh highlight
+              ctx.fillStyle = '#1e293b';
+              ctx.fillRect(6, 15, 20, 4); // seat cushion
+              ctx.fillRect(5, 11, 2, 7);  // left armrest
+              ctx.fillRect(25, 11, 2, 7); // right armrest
+              ctx.fillStyle = '#64748b';
+              ctx.fillRect(14, 19, 4, 7); // center pneumatic stem
+              ctx.fillRect(8, 26, 16, 2); // 5-star base bar
+              ctx.fillStyle = outline;
+              ctx.fillRect(7, 28, 3, 2); ctx.fillRect(14, 28, 4, 2); ctx.fillRect(22, 28, 3, 2); // wheels
+              ctx.strokeStyle = outline; ctx.lineWidth = 1.5;
+              ctx.strokeRect(7, 3, 18, 12);
+            } else if (def.id === 'furn_office_desk') {
+              // Dual monitor on warm wooden office desk with legs
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(5, 4, 10, 8); ctx.fillRect(17, 4, 10, 8); // dual monitors
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillRect(6, 5, 8, 6); ctx.fillRect(18, 5, 8, 6);   // glowing blue screens
+              ctx.fillStyle = '#475569';
+              ctx.fillRect(9, 12, 2, 3); ctx.fillRect(21, 12, 2, 3); // monitor stands
+              ctx.fillStyle = '#c79e68';
+              ctx.fillRect(2, 15, 28, 4); // wooden desktop
+              ctx.fillStyle = '#926939';
+              ctx.fillRect(3, 19, 4, 11); ctx.fillRect(25, 19, 4, 11); // desk legs
+              ctx.fillStyle = '#d6b07c';
+              ctx.fillRect(20, 19, 6, 9); // drawer unit
+              ctx.fillStyle = '#e2e8f0';
+              ctx.fillRect(22, 21, 2, 1); ctx.fillRect(22, 25, 2, 1);
+            } else if (def.id === 'furn_white_table') {
+              // Clean white folding training table + slim silver legs
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(2, 11, 28, 5);
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(2, 15, 28, 2);
+              ctx.fillStyle = '#64748b';
+              ctx.fillRect(4, 17, 3, 12); ctx.fillRect(25, 17, 3, 12);
+              ctx.fillRect(4, 24, 24, 2); // crossbar
+              ctx.strokeStyle = '#334155'; ctx.lineWidth = 1;
+              ctx.strokeRect(2, 11, 28, 5);
+            } else if (def.id === 'furn_partition') {
+              // Modern office gray fabric divider panel with dark frame & feet
+              ctx.fillStyle = '#64748b';
+              ctx.fillRect(4, 4, 24, 22);
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(6, 6, 20, 18);
+              ctx.fillStyle = '#94a3b8';
+              ctx.fillRect(6, 14, 20, 2); // mid trim bar
+              ctx.fillStyle = '#334155';
+              ctx.fillRect(5, 26, 6, 3); ctx.fillRect(21, 26, 6, 3); // stand feet
+            } else if (def.id === 'furn_cabinet') {
+              // Warm oak 2-door office filing cabinet with handles
+              ctx.fillStyle = '#7c582b';
+              ctx.fillRect(4, 3, 24, 26);
+              ctx.fillStyle = '#c99e63';
+              ctx.fillRect(6, 5, 9, 22); ctx.fillRect(17, 5, 9, 22);
+              ctx.fillStyle = '#f1f5f9';
+              ctx.fillRect(13, 13, 1, 6); ctx.fillRect(18, 13, 1, 6); // metallic handles
+            } else if (def.id === 'furn_potted_plant') {
+              // White ceramic pot with lush green leaves
+              ctx.fillStyle = '#15803d';
+              ctx.fillRect(9, 4, 14, 12);
+              ctx.fillStyle = '#22c55e';
+              ctx.fillRect(6, 7, 20, 9);
+              ctx.fillStyle = '#4ade80';
+              ctx.fillRect(11, 5, 5, 5); ctx.fillRect(18, 8, 5, 4);
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(9, 17, 14, 12);
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(8, 16, 16, 3);
+              ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1;
+              ctx.strokeRect(9, 17, 14, 12);
+            } else if (def.id === 'furn_cafe_table') {
+              // Warm wood cafe tabletop + center pedestal & base
+              ctx.fillStyle = '#c28d53';
+              ctx.fillRect(3, 10, 26, 5);
+              ctx.fillStyle = '#784e24';
+              ctx.fillRect(3, 14, 26, 2);
+              ctx.fillStyle = '#334155';
+              ctx.fillRect(14, 16, 4, 11); // center pedestal
+              ctx.fillRect(8, 27, 16, 3);  // heavy base
+            } else if (def.id === 'furn_sofa') {
+              // Cozy beige lounge sofa with backrest, seat & armrests
+              ctx.fillStyle = '#b5ab9b';
+              ctx.fillRect(5, 7, 22, 10); // backrest
+              ctx.fillStyle = '#d6cfc2';
+              ctx.fillRect(3, 14, 26, 10); // seat & arms
+              ctx.fillStyle = '#c2b8a8';
+              ctx.fillRect(3, 12, 4, 12); ctx.fillRect(25, 12, 4, 12); // armrests
+              ctx.fillStyle = '#784e24';
+              ctx.fillRect(5, 24, 3, 4); ctx.fillRect(24, 24, 3, 4); // wooden legs
+              ctx.strokeStyle = '#64748b'; ctx.lineWidth = 1;
+              ctx.strokeRect(5, 7, 22, 10);
+            } else if (def.id === 'furn_tv_screen') {
+              // Sleek wide electronic whiteboard / TV display on stand
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(2, 5, 28, 17);
+              ctx.fillStyle = '#1e293b';
+              ctx.fillRect(4, 7, 24, 13);
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillRect(6, 9, 10, 3);
+              ctx.fillStyle = '#94a3b8';
+              ctx.fillRect(6, 14, 18, 2); ctx.fillRect(6, 17, 13, 2);
+              ctx.fillStyle = '#475569';
+              ctx.fillRect(13, 22, 6, 4); ctx.fillRect(9, 26, 14, 2); // stand
+            } else if (def.id === 'furn_ceiling_ac') {
+              // 4-way ceiling cassette air conditioner unit
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(3, 6, 26, 20);
+              ctx.strokeStyle = '#64748b'; ctx.lineWidth = 2;
+              ctx.strokeRect(3, 6, 26, 20);
+              ctx.fillStyle = '#334155';
+              ctx.fillRect(7, 8, 18, 2); ctx.fillRect(7, 22, 18, 2); // top/bottom vents
+              ctx.fillRect(5, 10, 2, 12); ctx.fillRect(25, 10, 2, 12); // left/right vents
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(10, 12, 12, 8); // center grille
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillRect(22, 19, 2, 2); // power LED
+            }
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
         } else {
           this.icons[def.id] = sideC.toDataURL();
         }
