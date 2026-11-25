@@ -150,8 +150,10 @@ const _right = new THREE.Vector3();
 const _move = new THREE.Vector3();
 const _loginSkyOrigin = new THREE.Vector3(0, 20, 0);
 const elHudCoords = document.getElementById('hud-coords');
+const elHudTargetBlock = document.getElementById('hud-target-block');
 const elHudTime = document.getElementById('hud-time');
 let lastCoordsStr = '';
+let lastTargetBlockStr = '';
 let lastTimeStr = '';
 let lastSentPose = '';
 
@@ -1642,6 +1644,19 @@ function animate(now) {
     const biomePrefix = currentWorldMode === 'sandbox' ? `${getBiomeLabel(getBiomeAt(bx, bz))} ` : '';
     const coordsStr = `${biomePrefix}XYZ: ${bx}, ${by}, ${bz}`;
     if (coordsStr !== lastCoordsStr) { lastCoordsStr = coordsStr; elHudCoords.textContent = coordsStr; }
+    if (elHudTargetBlock) {
+      const showTarget = !!selfPlayer?.isAdmin;
+      elHudTargetBlock.classList.toggle('hidden', !showTarget);
+      if (showTarget) {
+        const targetStr = currentHit
+          ? `🎯 ${catalog[currentHit.block]?.name || currentHit.block} (${currentHit.block})`
+          : '🎯 대상 없음';
+        if (targetStr !== lastTargetBlockStr) {
+          lastTargetBlockStr = targetStr;
+          elHudTargetBlock.textContent = targetStr;
+        }
+      }
+    }
     const timeStr = sky.getTimeLabel();
     if (timeStr !== lastTimeStr) { lastTimeStr = timeStr; elHudTime.textContent = timeStr; }
 

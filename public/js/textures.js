@@ -1073,7 +1073,32 @@ export class TextureLibrary {
         const sideC = drawBlockFace(def.id, 'side');
         const botC = drawBlockFace(def.id, 'bottom');
 
-        this.icons[def.id] = sideC.toDataURL();
+        if (def.id.startsWith('stairs_')) {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(sideC, 0, 0, 32, 32);
+            // Cut out top-left quadrant to form unmistakable L-shaped 2-step stair icon!
+            ctx.clearRect(0, 0, 16, 16);
+            // Bright top-tread highlights on both steps
+            ctx.fillStyle = 'rgba(255,255,255,0.42)';
+            ctx.fillRect(16, 1, 15, 3);
+            ctx.fillRect(1, 16, 15, 3);
+            // Subtle shadow under riser
+            ctx.fillStyle = 'rgba(0,0,0,0.28)';
+            ctx.fillRect(16, 4, 2, 13);
+            // Crisp dark outline around stair silhouette
+            ctx.fillStyle = 'rgba(15,23,42,0.85)';
+            ctx.fillRect(15, 0, 17, 2);   // upper top edge
+            ctx.fillRect(30, 0, 2, 32);   // right edge
+            ctx.fillRect(0, 30, 32, 2);   // bottom edge
+            ctx.fillRect(0, 15, 2, 17);   // lower left edge
+            ctx.fillRect(0, 15, 17, 2);   // lower tread edge
+            ctx.fillRect(15, 0, 2, 17);   // vertical riser edge
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+        } else {
+          this.icons[def.id] = sideC.toDataURL();
+        }
 
         const isTransparent = !!def.transparent;
         const isCross = def.id === 'sapling' || def.id.startsWith('wheat_') || def.id === 'ladder' || def.id === 'sign' || def.id === 'fuse' || def.id === 'redstone_wire';
