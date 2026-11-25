@@ -380,8 +380,8 @@ export function createCenterWorld() {
       }
     }
 
-    // 2e. Upper Floor (2F~4F) Open-Space Sign (rest of floor intentionally kept empty!)
-    if (f >= 1 && f <= 3) {
+    // 2e. Upper Floor (2F, 4F) Open-Space Sign (rest of floor intentionally kept empty!)
+    if (f === 1 || f === 3) {
       addSign(bx(15), baseY + 2, bz(6), `🏢 ${f + 1}층 오픈 공간\n(화장실·계단·ELV 외 빈 공간)`);
     }
   }
@@ -551,6 +551,149 @@ export function createCenterWorld() {
   set(bx(38), Y1 + 1, bz(17), 'stairs_wood', 0);
   set(bx(39), Y1 + 1, bz(17), 'stairs_wood', 0);
   addSign(bx(35), Y1 + 2, bz(15), '📋 미팅실 #2');
+
+  // 3.3. 3F Detailed Interior (Matches 3F 배치도 2안: 상담실 1·2, 국장석, 공용캐비닛, 4개 팀 데스크 클러스터, 탕비실!)
+  const Y3 = GROUND + 2 * FLOOR_H; // floor slab y = 16, interior y = 17..21
+
+  // Light modern office floor across 3F
+  fill(bx(1), Y3, bz(6), bx(40), Y3, bz(18), 'sand');
+
+  // 3.3a. Corridor Partition Wall (dz = 9, dx = 1..34) — sleek office wall (lower stone + upper glass!)
+  for (let dx = 1; dx <= 34; dx++) {
+    // Open left passage to consulting rooms (dx = 2..4) & main office doorway (dx = 29..30)
+    if ((dx >= 2 && dx <= 4) || dx === 29 || dx === 30) {
+      set(bx(dx), Y3 + 3, bz(9), 'glass');
+      set(bx(dx), Y3 + 4, bz(9), 'glass');
+      set(bx(dx), Y3 + 5, bz(9), 'stone');
+      continue;
+    }
+    set(bx(dx), Y3 + 1, bz(9), 'stone');
+    set(bx(dx), Y3 + 2, bz(9), 'stone');
+    set(bx(dx), Y3 + 3, bz(9), 'glass');
+    set(bx(dx), Y3 + 4, bz(9), 'glass');
+    set(bx(dx), Y3 + 5, bz(9), 'stone');
+  }
+  setDoor(bx(29), Y3 + 1, bz(9), 'door_glass_closed', 2);
+  setDoor(bx(30), Y3 + 1, bz(9), 'door_glass_closed', 2);
+  // Right vertical corridor wall at dx = 34, dz = 6..8
+  for (let dz = 6; dz <= 8; dz++) {
+    set(bx(34), Y3 + 1, bz(dz), 'stone');
+    set(bx(34), Y3 + 2, bz(dz), 'stone');
+    set(bx(34), Y3 + 3, bz(dz), 'glass');
+    set(bx(34), Y3 + 4, bz(dz), 'glass');
+    set(bx(34), Y3 + 5, bz(dz), 'stone');
+  }
+  addSign(bx(28), Y3 + 2, bz(8), '💼 3F 장애인일자리센터\n사무실 · 상담실 · 탕비실');
+
+  // 3.3b. 탕비실 (3F top-right, dx = 35..40, dz = 1..6)
+  fill(bx(35), Y3, bz(1), bx(40), Y3, bz(6), 'wool_white');
+  for (let y = Y3 + 1; y <= Y3 + 5; y++) {
+    for (let dx = 35; dx <= 40; dx++) set(bx(dx), y, bz(6), 'stone');
+  }
+  setDoor(bx(37), Y3 + 1, bz(6), 'door_closed', 2);
+  // 싱크대, 냉장고, 정수기, 선반
+  set(bx(36), Y3 + 1, bz(1), 'cobble');
+  set(bx(36), Y3 + 1, bz(2), 'water');
+  set(bx(36), Y3 + 1, bz(3), 'job_fridge');
+  set(bx(38), Y3 + 1, bz(1), 'wool_white');
+  set(bx(38), Y3 + 2, bz(1), 'glass'); // 정수기
+  set(bx(39), Y3 + 1, bz(5), 'furn_cabinet');
+  addSign(bx(38), Y3 + 2, bz(7), '☕ 3F 탕비실\n싱크대·냉장고·정수기');
+
+  // 3.3c. 상담실 1 & 상담실 2 (3F bottom-left, dx = 1..10, dz = 12..18)
+  for (let dx = 1; dx <= 10; dx++) {
+    set(bx(dx), Y3 + 1, bz(12), 'stone');
+    set(bx(dx), Y3 + 2, bz(12), 'stone');
+    set(bx(dx), Y3 + 3, bz(12), 'glass');
+    set(bx(dx), Y3 + 4, bz(12), 'glass');
+    set(bx(dx), Y3 + 5, bz(12), 'stone');
+  }
+  for (let dz = 10; dz <= 18; dz++) {
+    // Divider between 상담실 2 and office (dx = 10)
+    set(bx(10), Y3 + 1, bz(dz), 'stone');
+    set(bx(10), Y3 + 2, bz(dz), 'stone');
+    set(bx(10), Y3 + 3, bz(dz), 'glass');
+    set(bx(10), Y3 + 4, bz(dz), 'glass');
+    set(bx(10), Y3 + 5, bz(dz), 'stone');
+    // Divider between 상담실 1 and 2 (dx = 5, dz >= 12)
+    if (dz >= 12) {
+      set(bx(5), Y3 + 1, bz(dz), 'stone');
+      set(bx(5), Y3 + 2, bz(dz), 'stone');
+      set(bx(5), Y3 + 3, bz(dz), 'glass');
+      set(bx(5), Y3 + 4, bz(dz), 'glass');
+      set(bx(5), Y3 + 5, bz(dz), 'stone');
+    }
+  }
+  // 상담실 1 door & furniture
+  setDoor(bx(3), Y3 + 1, bz(12), 'door_glass_closed', 2);
+  set(bx(2), Y3 + 1, bz(15), 'furn_white_table');
+  set(bx(3), Y3 + 1, bz(15), 'furn_white_table');
+  set(bx(2), Y3 + 1, bz(14), 'furn_office_chair', 2);
+  set(bx(3), Y3 + 1, bz(16), 'furn_office_chair', 0);
+  addSign(bx(2), Y3 + 2, bz(11), '💬 상담실 1');
+  // 상담실 2 door & furniture
+  setDoor(bx(8), Y3 + 1, bz(12), 'door_glass_closed', 2);
+  set(bx(7), Y3 + 1, bz(15), 'furn_white_table');
+  set(bx(8), Y3 + 1, bz(15), 'furn_white_table');
+  set(bx(7), Y3 + 1, bz(14), 'furn_office_chair', 2);
+  set(bx(8), Y3 + 1, bz(16), 'furn_office_chair', 0);
+  addSign(bx(7), Y3 + 2, bz(11), '💬 상담실 2');
+
+  // 3.3d. 국장석 + 원형 미팅 테이블 + 공용 캐비닛 열 (dx = 11..14, dz = 10..17)
+  set(bx(12), Y3 + 1, bz(11), 'furn_cafe_table');
+  set(bx(11), Y3 + 1, bz(11), 'furn_office_chair', 1);
+  set(bx(13), Y3 + 1, bz(11), 'furn_office_chair', 3);
+  // 국장님 데스크 (1600x800) + 의자 + 보조 서랍
+  set(bx(12), Y3 + 1, bz(14), 'furn_office_desk', 1);
+  set(bx(12), Y3 + 1, bz(15), 'furn_office_desk', 1);
+  set(bx(11), Y3 + 1, bz(15), 'furn_office_chair', 1);
+  set(bx(12), Y3 + 1, bz(17), 'furn_cabinet');
+  addSign(bx(11), Y3 + 2, bz(13), '👔 국장석');
+  // 공용 캐비닛 열 (dx = 14, dz = 12..17)
+  for (let dz = 12; dz <= 17; dz++) {
+    set(bx(14), Y3 + 1, bz(dz), 'furn_cabinet');
+  }
+  set(bx(14), Y3 + 2, bz(12), 'furn_potted_plant');
+  addSign(bx(14), Y3 + 2, bz(11), '🗄️ 공용 캐비닛');
+
+  // 3.3e. 4개 팀 데스크 클러스터 (T-자형: 마주보는 4인 워크스테이션 + 하단 팀장석!)
+  const placeTeamIsland = (cx, includeLeftCol = true) => {
+    // 2 rows of facing desks at dz = 12 & dz = 14
+    for (const dz of [12, 14]) {
+      if (includeLeftCol) {
+        set(bx(cx), Y3 + 1, bz(dz), 'furn_office_desk', 1);
+        set(bx(cx - 1), Y3 + 1, bz(dz), 'furn_office_chair', 1);
+      }
+      set(bx(cx + 1), Y3 + 1, bz(dz), 'furn_office_desk', 3);
+      set(bx(cx + 2), Y3 + 1, bz(dz), 'furn_office_chair', 3);
+    }
+    // Partition dividers between front/back pairs at dz = 13
+    set(bx(cx), Y3 + 1, bz(13), 'furn_partition', 0);
+    set(bx(cx + 1), Y3 + 1, bz(13), 'furn_partition', 0);
+    // Bottom team-lead horizontal desk at dz = 16 + chair at dz = 17
+    set(bx(cx), Y3 + 1, bz(16), 'furn_office_desk', 0);
+    set(bx(cx + 1), Y3 + 1, bz(16), 'furn_office_desk', 0);
+    set(bx(cx), Y3 + 1, bz(17), 'furn_office_chair', 0);
+  };
+
+  placeTeamIsland(18, true);  // 1팀 (김대선·김로연·이규민·윤종민·최대성)
+  placeTeamIsland(24, true);  // 2팀 (김현지·김근호·심준표·유화정·김희경)
+  placeTeamIsland(30, true);  // 3팀 (이유신·손미정·이유진·최진희·김지은)
+  placeTeamIsland(36, true);  // 4팀 (지찬민·이정아·박정애·심은진)
+
+  // 3.3f. 우측 벽 사물함·캐비닛 전체 열 (dx = 40, dz = 8..17) & 탕비실 앞 캐비닛 (dx = 35, dz = 7..8)
+  for (let dz = 8; dz <= 17; dz++) {
+    set(bx(40), Y3 + 1, bz(dz), 'furn_cabinet');
+  }
+  set(bx(35), Y3 + 1, bz(7), 'furn_cabinet');
+  set(bx(35), Y3 + 1, bz(8), 'furn_cabinet');
+  set(bx(35), Y3 + 2, bz(8), 'furn_potted_plant');
+  set(bx(40), Y3 + 2, bz(8), 'furn_potted_plant');
+
+  // 3.3g. 천장 4방향 시스템 에어컨 배치 (y = Y3 + 5)
+  for (const [ax, az] of [[7, 15], [18, 13], [24, 13], [30, 13], [36, 13]]) {
+    set(bx(ax), Y3 + 5, bz(az), 'furn_ceiling_ac');
+  }
 
   // 3.5. 5F Detailed Interior (Matches 5F Floor Plan: 카운터·휴게라운지(16)·탕비장·교육장(36)·문서고·대기공간!)
   const Y5 = GROUND + 4 * FLOOR_H; // floor slab y = 28, interior y = 29..33
