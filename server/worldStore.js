@@ -518,10 +518,14 @@ export class WorldStore {
     return this.signOverrides[key];
   }
 
-  setCenterFurn(x, y, z, blockId, facing = 0) {
+  setCenterFurn(x, y, z, blockId, facing = 0, persistAir = false) {
     const k = keyOf(x, y, z);
-    if (!blockId) delete this.centerFurn[k];
-    else this.centerFurn[k] = { x, y, z, block: blockId, facing: Number(facing) & 3 };
+    if (!blockId) {
+      if (persistAir) this.centerFurn[k] = { x, y, z, block: null, facing: 0 };
+      else delete this.centerFurn[k];
+    } else {
+      this.centerFurn[k] = { x, y, z, block: blockId, facing: Number(facing) & 3 };
+    }
     this._scheduleSave('centerFurn', 150);
   }
 

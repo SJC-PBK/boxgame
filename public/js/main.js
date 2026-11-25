@@ -873,6 +873,7 @@ function handleServerMessage(msg) {
 function computeMiningTime(blockId) {
   const bDef = catalog[blockId];
   if (!bDef || !Number.isFinite(bDef.hardness)) return Infinity;
+  if (selfPlayer?.isAdmin && currentWorldMode === 'center' && blockId !== 'bedrock') return 0.14;
   const heldId = ui.getActiveItemId();
   if (heldId === 'sabo_sword') return 0.04;
   const heldDef = heldId ? catalog[heldId] : null;

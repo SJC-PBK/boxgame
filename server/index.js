@@ -59,9 +59,13 @@ for (const [k, txt] of Object.entries(store.signOverrides || {})) {
     if (jobWorld.signs[coord]) jobWorld.signs[coord].text = txt;
   }
 }
-// Restore persisted center-exclusive furniture placements
+// Restore persisted center-exclusive furniture & admin building edits
 for (const f of Object.values(store.centerFurn || {})) {
-  if (f && f.block && CENTER_FURNITURE_IDS.includes(f.block) && centerWorld.inBounds(f.x, f.y, f.z)) {
+  if (!f || !centerWorld.inBounds(f.x, f.y, f.z)) continue;
+  if (f.block === null) {
+    centerWorld.setBlock(f.x, f.y, f.z, null);
+    delete centerWorld.facings[`${f.x},${f.y},${f.z}`];
+  } else if (BLOCKS[f.block]) {
     centerWorld.setBlock(f.x, f.y, f.z, f.block);
     centerWorld.facings[`${f.x},${f.y},${f.z}`] = Number(f.facing) & 3;
   }
@@ -971,15 +975,39 @@ wss.on('connection', (ws) => {
           const { x, y, z, slotIndex } = msg;
           const idx = Number(slotIndex);
           const slot = (idx >= 0 && idx < BAG_SIZE) ? player.bag[idx] : null;
-          if (!slot || !CENTER_FURNITURE_IDS.includes(slot.block)) {
-            send(ws, { type: 'toast', level: 'warn', text: '🏢 행복플러스센터에서는 전용 카페·사무실 가구만 배치할 수 있습니다.' });
+          if (!slot || !BLOCKS[slot.block]) return;
+          if (!player.isAdmin && !CENTER_FURNITURE_IDS.includes(slot.block)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 행복플러스센터에서는 전용 카페·사무실 가구만 배치할 수 있습니다. (관리자모드 시 모든 블록 가능)' });
             return;
           }
           if (!centerWorld.inBounds(x, y, z) || centerWorld.getBlock(x, y, z) !== null) return;
           const fDir = Number(msg.facing) & 3;
+          const isDoor = slot.block.startsWith('door_');
+          if (isDoor) {
+            if (!centerWorld.inBounds(x, y + 1, z) || centerWorld.getBlock(x, y + 1, z) !== null) return;
+            centerWorld.setBlock(x, y, z, slot.block);
+            centerWorld.setBlock(x, y + 1, z, slot.block);
+            centerWorld.facings[`${x},${y},${z}`] = fDir;
+            centerWorld.facings[`${x},${y + 1},${z}`] = fDir;
+            store.setCenterFurn(x, y, z, slot.block, fDir);
+            store.setCenterFurn(x, y + 1, z, slot.block, fDir);
+            broadcast({
+              type: 'blocks_batch',
+              changes: [
+                { x, y, z, block: slot.block, facing: fDir },
+                { x, y: y + 1, z, block: slot.block, facing: fDir }
+              ],
+              by: player.nickname
+            }, null, 'center');
+            break;
+          }
           centerWorld.setBlock(x, y, z, slot.block);
           centerWorld.facings[`${x},${y},${z}`] = fDir;
           store.setCenterFurn(x, y, z, slot.block, fDir);
+          if (slot.block === 'sign') {
+            centerWorld.signs[`${x},${y},${z}`] = { x, y, z, text: `${player.nickname}의 표지판`, author: player.nickname };
+            broadcast({ type: 'signs_update', signs: centerWorld.signs }, null, 'center');
+          }
           broadcast({ type: 'block_update', x, y, z, block: slot.block, facing: fDir, by: player.nickname }, null, 'center');
           break;
         }
@@ -1554,13 +1582,19 @@ wss.on('connection', (ws) => {
           const { x, y, z } = msg;
           if (!centerWorld.inBounds(x, y, z)) return;
           const cur = centerWorld.getBlock(x, y, z);
-          if (!cur || !CENTER_FURNITURE_IDS.includes(cur)) {
-            send(ws, { type: 'toast', level: 'warn', text: '🏢 건물 구조는 보호되어 있습니다. (배치한 가구만 철거 가능)' });
+          if (!cur || cur === 'bedrock') return;
+          if (!player.isAdmin && !CENTER_FURNITURE_IDS.includes(cur)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 건물 구조는 보호되어 있습니다. (배치한 가구만 철거 가능 · /관리자모드 시 수정 가능)' });
             return;
           }
+          const persistAir = !CENTER_FURNITURE_IDS.includes(cur);
           centerWorld.setBlock(x, y, z, null);
           delete centerWorld.facings[`${x},${y},${z}`];
-          store.setCenterFurn(x, y, z, null);
+          store.setCenterFurn(x, y, z, null, 0, persistAir);
+          if (cur === 'sign' && centerWorld.signs[`${x},${y},${z}`]) {
+            delete centerWorld.signs[`${x},${y},${z}`];
+            broadcast({ type: 'signs_update', signs: centerWorld.signs }, null, 'center');
+          }
           broadcast({ type: 'block_update', x, y, z, block: null, by: player.nickname }, null, 'center');
           break;
         }
