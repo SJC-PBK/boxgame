@@ -17,6 +17,8 @@ export class GameUI {
     this.activeSlot = 0;
     this.usingTool = false;
     this.lastToolType = 'pickaxe';
+    this.cutSlot = null;
+    this.usingCut = false;
     this.moveSourceIdx = null;
     this.currentChest = null;
     this.currentFurnace = null;
@@ -651,6 +653,7 @@ export class GameUI {
 
   pressToolSwitchQ() {
     if (this.worldMode === 'job') return;
+    this.usingCut = false;
     if (!this.usingTool) {
       // Switch from block/empty -> last-used tool (or first owned tool in order)
       let found = this.findBestToolSlot(this.lastToolType);
@@ -686,9 +689,35 @@ export class GameUI {
 
   setActiveSlot(idx) {
     this.usingTool = false;
+    this.usingCut = false;
     this.activeSlot = ((idx % 9) + 9) % 9;
     this.renderHotbar();
     this.cb.onActiveSlotChange(this.getActiveItemId());
+  }
+
+  updateCutSlot(cutSlot, autoEquip = false) {
+    this.cutSlot = cutSlot || null;
+    if (!this.cutSlot) this.usingCut = false;
+    else if (autoEquip) {
+      this.usingTool = false;
+      this.usingCut = true;
+    }
+    this.renderHotbar();
+    this.cb.onActiveSlotChange(this.getActiveItemId());
+  }
+
+  isUsingCutSlot() {
+    return !!(this.usingCut && this.cutSlot && this.cutSlot.block);
+  }
+
+  pressCutSlotC() {
+    if (this.worldMode === 'job') return 'blocked';
+    if (!this.cutSlot || !this.cutSlot.block) return 'empty';
+    this.usingTool = false;
+    this.usingCut = !this.usingCut;
+    this.renderHotbar();
+    this.cb.onActiveSlotChange(this.getActiveItemId());
+    return this.usingCut ? 'equipped' : 'unequipped';
   }
 
   getActiveToolType() {
@@ -707,6 +736,7 @@ export class GameUI {
   }
 
   getActiveItemId() {
+    if (this.usingCut && this.cutSlot?.block) return this.cutSlot.block;
     if (this.usingTool) {
       const found = this.findBestToolSlot(this.lastToolType);
       if (found) return found.block;
@@ -781,9 +811,26 @@ export class GameUI {
       container.appendChild(qEl);
     }
 
+    // Dedicated [C] Cut-and-Move Clipboard slot (right next to [Q]!)
+    if (this.worldMode !== 'job') {
+      const cSlotData = this.cutSlot?.block ? { block: this.cutSlot.block, count: 1 } : null;
+      const cEl = this._makeSlotEl(cSlotData, {
+        active: this.usingCut && !!cSlotData,
+        keyLabel: 'C'
+      });
+      cEl.classList.add('tool-q-slot');
+      cEl.title = this.cutSlot?.block
+        ? `C키: 잘라낸 [${this.catalog[this.cutSlot.block]?.name || this.cutSlot.block}] 꺼내기/넣기`
+        : 'C키: 잘라내기/이동 슬롯 (비어 있음)';
+      cEl.addEventListener('click', () => {
+        if (this.cb.onCutKey) this.cb.onCutKey();
+      });
+      container.appendChild(cEl);
+    }
+
     for (let i = 0; i < 9; i++) {
       const el = this._makeSlotEl(this.bag[i], {
-        active: !this.usingTool && i === this.activeSlot,
+        active: !this.usingTool && !this.usingCut && i === this.activeSlot,
         keyLabel: i + 1
       });
       el.addEventListener('click', () => this.setActiveSlot(i));
@@ -791,13 +838,15 @@ export class GameUI {
     }
 
     const heldId = this.getActiveItemId();
-    const cur = this.usingTool
+    const cur = this.usingCut
       ? (heldId ? { block: heldId, count: 1 } : null)
-      : this.bag[this.activeSlot];
+      : this.usingTool
+        ? (heldId ? { block: heldId, count: 1 } : null)
+        : this.bag[this.activeSlot];
     const def = cur ? this.catalog[cur.block] : null;
     document.getElementById('hotbar-label').textContent = def
-      ? `${this.usingTool ? '[Q 도구] ' : ''}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
-      : '맨손 (Q 도구 · E 가방 · R 제작)';
+      ? `${this.usingCut ? '[C 이동] ' : (this.usingTool ? '[Q 도구] ' : '')}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
+      : '맨손 (Q 도구 · C 잘라내기 · E 가방)';
   }
 
   renderBagModal() {

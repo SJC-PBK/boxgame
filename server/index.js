@@ -745,7 +745,8 @@ wss.on('connection', (ws) => {
         jobOrder: initialOrder, jobScore: 0, jobCompleted: 0,
         openChestKey: null, openFurnaceKey: null,
         linkedTnts: new Set(),
-        editUndoStack: []
+        editUndoStack: [],
+        cutSlot: null
       };
       players.set(id, player);
 
@@ -1292,6 +1293,181 @@ wss.on('connection', (ws) => {
         send(ws, { type: 'bag_update', bag: player.bag });
         send(ws, { type: 'pick_select_slot', slotIndex: activeIdx });
         send(ws, { type: 'toast', level: 'success', text: `💧 스포이드: [${def.name}] 블록을 손에 들었습니다!` });
+        break;
+      }
+
+      case 'block_cut': {
+        const { x, y, z } = msg;
+        if (player.world === 'job') return;
+        const isCenter = player.world === 'center';
+        const targetStore = isCenter ? centerWorld : store;
+        if (!targetStore.inBounds(x, y, z)) return;
+        const cur = targetStore.getBlock(x, y, z);
+        if (!cur || cur === 'bedrock') return;
+
+        if (isCenter) {
+          if (!player.isAdmin && !CENTER_FURNITURE_IDS.includes(cur)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 건물 구조는 /관리자모드 에서만 잘라낼 수 있습니다.' });
+            return;
+          }
+        } else {
+          const region = store.findProtectingRegion(x, y, z);
+          if (region && !player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: `🔒 보호 구역("${region.name}")에서는 잘라낼 수 없습니다.` });
+            return;
+          }
+          if (cur === 'chest' && !store.isChestEmpty(x, y, z)) {
+            send(ws, { type: 'toast', level: 'warn', text: '📦 내용물이 있는 상자는 먼저 비운 뒤 잘라내세요.' });
+            return;
+          }
+        }
+
+        const CUT_MAP = {
+          door_open: 'door_closed',
+          door_stone_open: 'door_stone_closed',
+          door_iron_open: 'door_iron_closed',
+          door_glass_open: 'door_glass_closed',
+          redstone_lamp_on: 'redstone_lamp_off',
+          lever_on: 'lever_off'
+        };
+        const cutId = CUT_MAP[cur] || cur;
+        const def = CATALOG[cutId];
+        if (!def || def.kind !== 'block') return;
+
+        const k = `${x},${y},${z}`;
+        const prevFacing = isCenter ? (centerWorld.facings[k] || 0) : store.facings[k];
+        const signsMap = isCenter ? centerWorld.signs : store.signs;
+        const prevSign = cur === 'sign' && signsMap[k] ? { ...signsMap[k] } : null;
+        const signText = prevSign ? prevSign.text : null;
+
+        const changes = [{ x, y, z, block: null }];
+        const undoChanges = [{ x, y, z, prevBlock: cur, prevFacing, prevSign }];
+
+        if (isCenter) {
+          const persistAir = !CENTER_FURNITURE_IDS.includes(cur);
+          centerWorld.setBlock(x, y, z, null);
+          delete centerWorld.facings[k];
+          store.setCenterFurn(x, y, z, null, 0, persistAir);
+          if (cur.startsWith('door_')) {
+            for (const dy of [1, -1]) {
+              if (centerWorld.inBounds(x, y + dy, z) && centerWorld.getBlock(x, y + dy, z) === cur) {
+                const pk = `${x},${y + dy},${z}`;
+                undoChanges.push({ x, y: y + dy, z, prevBlock: cur, prevFacing: centerWorld.facings[pk] || 0 });
+                centerWorld.setBlock(x, y + dy, z, null);
+                delete centerWorld.facings[pk];
+                store.setCenterFurn(x, y + dy, z, null, 0, true);
+                changes.push({ x, y: y + dy, z, block: null });
+              }
+            }
+          }
+          if (prevSign) {
+            delete centerWorld.signs[k];
+            broadcast({ type: 'signs_update', signs: centerWorld.signs }, null, 'center');
+          }
+        } else {
+          store.setBlock(x, y, z, null);
+          if (cur.startsWith('door_')) {
+            for (const dy of [1, -1]) {
+              if (store.inBounds(x, y + dy, z) && store.getBlock(x, y + dy, z) === cur) {
+                const pk = `${x},${y + dy},${z}`;
+                undoChanges.push({ x, y: y + dy, z, prevBlock: cur, prevFacing: store.facings[pk] });
+                store.setBlock(x, y + dy, z, null);
+                changes.push({ x, y: y + dy, z, block: null });
+              }
+            }
+          }
+          if (prevSign) {
+            broadcast({ type: 'signs_update', signs: store.signs }, null, 'sandbox');
+          }
+        }
+
+        player.editUndoStack.push({ world: player.world, label: `잘라내기(${def.name})`, changes: undoChanges });
+        if (player.editUndoStack.length > 30) player.editUndoStack.shift();
+
+        player.cutSlot = { block: cutId, facing: Number(prevFacing || 0) & 3, signText, world: player.world };
+        broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, player.world);
+        send(ws, { type: 'cut_slot_update', cutSlot: player.cutSlot, autoEquip: true });
+        send(ws, { type: 'toast', level: 'success', text: `✂️ [${def.name}] 잘라내기 완료! [C] 슬롯에 담겼습니다. 원하는 위치에 우클릭으로 설치하세요.` });
+        break;
+      }
+
+      case 'block_paste': {
+        const { x, y, z } = msg;
+        if (!player.cutSlot || player.world === 'job') return;
+        const cut = player.cutSlot;
+        const blockId = cut.block;
+        const def = CATALOG[blockId];
+        if (!def || def.kind !== 'block') return;
+        const isCenter = player.world === 'center';
+        const targetStore = isCenter ? centerWorld : store;
+        if (!targetStore.inBounds(x, y, z) || targetStore.getBlock(x, y, z) !== null) return;
+
+        if (isCenter) {
+          if (!player.isAdmin && !CENTER_FURNITURE_IDS.includes(blockId)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 이 블록은 /관리자모드 에서만 배치할 수 있습니다.' });
+            return;
+          }
+        } else {
+          if (blockId.startsWith('furn_')) {
+            send(ws, { type: 'toast', level: 'warn', text: '🏢 카페·사무실 가구는 행복플러스센터에서만 설치할 수 있습니다.' });
+            return;
+          }
+          const region = store.findProtectingRegion(x, y, z);
+          if (region && !player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: `🔒 보호 구역("${region.name}")에서는 설치할 수 없습니다.` });
+            return;
+          }
+        }
+
+        const isDoor = blockId.startsWith('door_');
+        if (isDoor && (!targetStore.inBounds(x, y + 1, z) || targetStore.getBlock(x, y + 1, z) !== null)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🚪 문(1×2)을 설치하려면 위쪽 1칸이 비어 있어야 합니다.' });
+          return;
+        }
+
+        const fDir = Number(msg.facing !== undefined ? msg.facing : cut.facing) & 3;
+        const changes = [{ x, y, z, block: blockId, facing: fDir }];
+        const undoChanges = [{ x, y, z, prevBlock: null, prevFacing: 0 }];
+
+        if (isCenter) {
+          centerWorld.setBlock(x, y, z, blockId);
+          centerWorld.facings[`${x},${y},${z}`] = fDir;
+          store.setCenterFurn(x, y, z, blockId, fDir);
+          if (isDoor) {
+            centerWorld.setBlock(x, y + 1, z, blockId);
+            centerWorld.facings[`${x},${y + 1},${z}`] = fDir;
+            store.setCenterFurn(x, y + 1, z, blockId, fDir);
+            changes.push({ x, y: y + 1, z, block: blockId, facing: fDir });
+            undoChanges.push({ x, y: y + 1, z, prevBlock: null, prevFacing: 0 });
+          }
+          if (blockId === 'sign') {
+            const sText = cut.signText || `${player.nickname}의 표지판`;
+            centerWorld.signs[`${x},${y},${z}`] = { x, y, z, text: sText, author: player.nickname };
+            store.setSignOverride(`center:${x},${y},${z}`, sText);
+            broadcast({ type: 'signs_update', signs: centerWorld.signs }, null, 'center');
+          }
+        } else {
+          store.setBlock(x, y, z, blockId, player.nickname);
+          if (blockId.startsWith('stairs_') || isDoor) store.setFacing(x, y, z, fDir);
+          if (isDoor) {
+            store.setBlock(x, y + 1, z, blockId, player.nickname);
+            store.setFacing(x, y + 1, z, fDir);
+            changes.push({ x, y: y + 1, z, block: blockId, facing: fDir });
+            undoChanges.push({ x, y: y + 1, z, prevBlock: null, prevFacing: 0 });
+          }
+          if (blockId === 'sign' && cut.signText) {
+            store.setSignText(x, y, z, cut.signText, player.nickname);
+            broadcast({ type: 'signs_update', signs: store.signs }, null, 'sandbox');
+          }
+        }
+
+        player.editUndoStack.push({ world: player.world, label: `이동설치(${def.name})`, changes: undoChanges });
+        if (player.editUndoStack.length > 30) player.editUndoStack.shift();
+
+        player.cutSlot = null;
+        broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, player.world);
+        send(ws, { type: 'cut_slot_update', cutSlot: null, autoEquip: false });
+        send(ws, { type: 'toast', level: 'success', text: `✂️ [${def.name}] 이동 설치 완료!` });
         break;
       }
 

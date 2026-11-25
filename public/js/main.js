@@ -288,17 +288,38 @@ const touchControls = new TouchControls(canvas, {
 });
 
 let eyedropperMode = false;
+let cutMode = false;
 function setEyedropperMode(on) {
   eyedropperMode = !!on;
+  if (eyedropperMode && cutMode) setCutMode(false);
   const btn = document.getElementById('btn-eyedropper');
   if (btn) btn.classList.toggle('active-tool', eyedropperMode);
   if (eyedropperMode) ui.toast('💧 스포이드 활성화! 복사할 블록을 클릭하세요. (X로 취소)', 'info');
+}
+function setCutMode(on) {
+  cutMode = !!on;
+  if (cutMode && eyedropperMode) setEyedropperMode(false);
+  const btn = document.getElementById('btn-cut-move');
+  if (btn) btn.classList.toggle('active-tool', cutMode);
+  if (cutMode) ui.toast('✂️ 잘라내기 활성화! 옮길 블록(표지판·가구 등)을 클릭하세요. (C로 취소)', 'info');
+}
+function handleCutActionC() {
+  if (!joined || currentWorldMode === 'job') return;
+  const res = ui.pressCutSlotC();
+  if (res === 'empty') {
+    setCutMode(!cutMode);
+  } else {
+    if (cutMode) setCutMode(false);
+  }
 }
 document.getElementById('btn-undo-edit')?.addEventListener('click', () => {
   if (joined) send({ type: 'block_undo_edit' });
 });
 document.getElementById('btn-eyedropper')?.addEventListener('click', () => {
   if (joined) setEyedropperMode(!eyedropperMode);
+});
+document.getElementById('btn-cut-move')?.addEventListener('click', () => {
+  handleCutActionC();
 });
 
 function applyGameSettings(s) {
@@ -385,6 +406,7 @@ const ui = new GameUI({
   getPlayerBlockPos,
   getFrontPos,
   regionVis,
+  onCutKey: () => handleCutActionC(),
   get projector() { return projector; },
   onToggleSound: () => {
     sound.setMuted(!sound.muted);
@@ -755,6 +777,10 @@ function handleServerMessage(msg) {
       if (typeof msg.slotIndex === 'number') ui.setActiveSlot(msg.slotIndex);
       break;
 
+    case 'cut_slot_update':
+      ui.updateCutSlot(msg.cutSlot || null, !!msg.autoEquip);
+      break;
+
     case 'world_reload':
       if (worldRenderer) {
         worldRenderer.setFacings(msg.facings || {});
@@ -1099,7 +1125,11 @@ function handleRightClickOrInteract(interactOnly = false) {
   // Compute 4-way cardinal facing from player look direction: 0=N(-Z), 1=E(+X), 2=S(+Z), 3=W(-X)
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const facing = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
-  send({ type: 'block_place', x: px, y: py, z: pz, slotIndex: activeIdx, facing });
+  if (ui.isUsingCutSlot()) {
+    send({ type: 'block_paste', x: px, y: py, z: pz, facing });
+  } else {
+    send({ type: 'block_place', x: px, y: py, z: pz, slotIndex: activeIdx, facing });
+  }
 }
 
 canvas.addEventListener('click', () => {
@@ -1138,6 +1168,11 @@ canvas.addEventListener('mousedown', (e) => {
   if (!joined || ui.openModalId || ui.chatOpen) return;
   if (!pointerLocked && !remoteLook) return;
   if (e.button === 0) {
+    if (cutMode && currentHit) {
+      send({ type: 'block_cut', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      setCutMode(false);
+      return;
+    }
     if (eyedropperMode && currentHit) {
       send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
       setEyedropperMode(false);
@@ -1156,6 +1191,11 @@ canvas.addEventListener('mousedown', (e) => {
     fpHand?.triggerSwing();
   } else if (e.button === 2) {
     e.preventDefault();
+    if (cutMode && currentHit) {
+      send({ type: 'block_cut', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      setCutMode(false);
+      return;
+    }
     if (eyedropperMode && currentHit) {
       send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
       setEyedropperMode(false);
@@ -1229,6 +1269,11 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyX') {
     e.preventDefault();
     setEyedropperMode(!eyedropperMode);
+    return;
+  }
+  if (e.code === 'KeyC') {
+    e.preventDefault();
+    handleCutActionC();
     return;
   }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(true); return; }
