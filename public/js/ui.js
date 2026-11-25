@@ -767,8 +767,8 @@ export class GameUI {
     const container = document.getElementById('hotbar');
     container.innerHTML = '';
 
-    // Dedicated [Q] Tool Quick-Switch slot (left of hotbar 1..9, hidden in Job Village)
-    if (this.worldMode !== 'job' && this.worldMode !== 'center') {
+    // Dedicated [Q] Tool Quick-Switch slot (left of hotbar 1..9; shown in center for admins with Sabo Sword!)
+    if (this.worldMode !== 'job' && (this.worldMode !== 'center' || this.isAdmin)) {
       const bestTool = this.findBestToolSlot(this.lastToolType)
         || TOOL_ORDER.map(t => this.findBestToolSlot(t)).find(Boolean);
       const qEl = this._makeSlotEl(bestTool?.slot || null, {

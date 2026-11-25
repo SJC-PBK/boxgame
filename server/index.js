@@ -2091,6 +2091,7 @@ wss.on('connection', (ws) => {
         if (text === '/관리자모드') {
           // 비밀번호 없이 누구나 관리자 전환 (2026-11-24 pbk 결정 — 게임 데이터 가치 낮음)
           player.isAdmin = true;
+          send(ws, { type: 'admin_status', isAdmin: true });
           if (player.world === 'sandbox') {
             if (!player.bag[0]) player.bag[0] = { block: 'protect_beacon', count: 16 };
             else addItemToSlots(player.bag, 'protect_beacon', 16);
@@ -2098,9 +2099,16 @@ wss.on('connection', (ws) => {
             else addItemToSlots(player.bag, 'stealth_beacon', 16);
             send(ws, { type: 'bag_update', bag: player.bag });
             syncSaboSwordForPlayer(player);
+          } else if (player.world === 'center') {
+            player.tools = { pickaxe: null, axe: null, shovel: null, hoe: null, sword: 'sabo_sword' };
+            send(ws, { type: 'tools_update', tools: player.tools });
           }
-          send(ws, { type: 'admin_status', isAdmin: true });
-          send(ws, { type: 'toast', level: 'success', text: '🛡️ 관리자 모드 활성화! 1번(보호 비콘)·2번(투명 보호 비콘) 슬롯에 지급되었습니다.' });
+          send(ws, {
+            type: 'toast', level: 'success',
+            text: player.world === 'center'
+              ? '🛡️ 관리자 모드 활성화! [Q] 키로 사보검을 바로 꺼내 쓸 수 있습니다.'
+              : '🛡️ 관리자 모드 활성화! 1번(보호 비콘)·2번(투명 보호 비콘) 슬롯에 지급되었습니다.'
+          });
           broadcast({ type: 'player_admin', id: player.id, isAdmin: true }, null, player.world);
           return;
         }
