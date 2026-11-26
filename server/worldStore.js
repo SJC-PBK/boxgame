@@ -213,7 +213,8 @@ export class WorldStore {
       this.config = {
         supplyEnabled: !!savedConfig.supplyEnabled,
         unlimitedBlocks: !!savedConfig.unlimitedBlocks,
-        saboSwordEnabled: !!savedConfig.saboSwordEnabled
+        saboSwordEnabled: !!savedConfig.saboSwordEnabled,
+        sandboxBuildVersion: savedConfig.sandboxBuildVersion || ''
       };
     } else {
       this.saveNow('config');

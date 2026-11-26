@@ -15,7 +15,7 @@ import { AnimalManager } from './animals.js';
 import { createJobVillageWorld } from './jobWorld.js';
 import { createCenterWorld } from './centerWorld.js';
 import {
-  stampCenterIntoSandbox, stampVillaIntoSandbox,
+  stampCenterIntoSandbox, stampVillaIntoSandbox, getSandboxCenterPylon,
   SANDBOX_CENTER_ORIGIN, SANDBOX_VILLA_ORIGIN
 } from './sandboxBuilds.js';
 
@@ -93,25 +93,23 @@ const CENTER_NPCS = [
 ];
 const SANDBOX_CENTER_NPCS = CENTER_NPCS.map((n) => ({
   ...n,
-  x: n.x + SANDBOX_CENTER_ORIGIN.x,
+  x: SANDBOX_CENTER_ORIGIN.x - n.x, // 180° rotated to match cloned center!
   y: n.y + (SANDBOX_CENTER_ORIGIN.y - 4),
-  z: n.z + SANDBOX_CENTER_ORIGIN.z
+  z: SANDBOX_CENTER_ORIGIN.z - n.z,
+  facing: (n.facing + 2) & 3
 }));
-const SANDBOX_CENTER_PYLON = {
-  x: SANDBOX_CENTER_ORIGIN.x - 25.5,
-  y: SANDBOX_CENTER_ORIGIN.y + 1.0,
-  z: SANDBOX_CENTER_ORIGIN.z + 2.2,
-  rotY: 0
-};
+const SANDBOX_CENTER_PYLON = getSandboxCenterPylon(store);
 
 // Auto-stamp Happiness Plus Center clone (-75, 34, 94) and 5F Semi-Basement Villa (-78, 36, -45) into Sandbox once
-if (!store.deltas.has(`${SANDBOX_CENTER_ORIGIN.x},${SANDBOX_CENTER_ORIGIN.y + 42},${SANDBOX_CENTER_ORIGIN.z}`)) {
-  const res = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
-  console.log(`[SandboxBuilds] Stamped Happiness Plus Center at (${SANDBOX_CENTER_ORIGIN.x},${SANDBOX_CENTER_ORIGIN.y},${SANDBOX_CENTER_ORIGIN.z}): ${res.placed} blocks, ${res.signsCount} signs.`);
-}
-if (!store.deltas.has(`${SANDBOX_VILLA_ORIGIN.x},${SANDBOX_VILLA_ORIGIN.y + 23},${SANDBOX_VILLA_ORIGIN.z}`)) {
-  const res = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
-  console.log(`[SandboxBuilds] Stamped 5F Semi-Basement Villa at (${SANDBOX_VILLA_ORIGIN.x},${SANDBOX_VILLA_ORIGIN.y},${SANDBOX_VILLA_ORIGIN.z}): ${res.placed} blocks, ${res.signsCount} signs.`);
+// Bump version marker when layout changes so live server re-stamps automatically on restart!
+const SANDBOX_BUILD_VERSION = 'v2-snap13-rot180-splitstair';
+if (store.config.sandboxBuildVersion !== SANDBOX_BUILD_VERSION) {
+  const resC = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
+  console.log(`[SandboxBuilds] Stamped Happiness Plus Center (${resC.sourceLabel}, 180° rotated) at (${SANDBOX_CENTER_ORIGIN.x},${SANDBOX_CENTER_ORIGIN.y},${SANDBOX_CENTER_ORIGIN.z}): ${resC.placed} blocks, ${resC.signsCount} signs.`);
+  const resV = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
+  console.log(`[SandboxBuilds] Stamped 5F Semi-Basement Villa (side-by-side doors + split stairwell) at (${SANDBOX_VILLA_ORIGIN.x},${SANDBOX_VILLA_ORIGIN.y},${SANDBOX_VILLA_ORIGIN.z}): ${resV.placed} blocks, ${resV.signsCount} signs.`);
+  store.config.sandboxBuildVersion = SANDBOX_BUILD_VERSION;
+  store.saveNow('config');
 }
 
 // Real-time moving elevator state machine for Happiness Plus Center (1F~5F)
