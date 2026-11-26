@@ -976,7 +976,7 @@ export class GameUI {
 
     const supplyGroups = {
       건축: [
-        'stone', 'cobble', 'planks', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand',
+        'stone', 'cobble', 'planks', 'brick', 'glass', 'invisible_block', 'wood', 'grass', 'dirt', 'sand',
         'slab_metal', 'slab_wood', 'slab_stone', 'slab_white', 'slab_carpet',
         'wool_white', 'wool_red', 'wool_blue', 'wool_yellow'
       ],
@@ -998,7 +998,7 @@ export class GameUI {
         'rail_straight', 'rail_curve', 'rail_cross', 'rail_branch', 'rail_xbranch',
         'rail_up', 'rail_down',
         'rail_card_red', 'rail_card_yellow', 'rail_card_green',
-        'rail_signal', 'rail_gate_open',
+        'rail_signal', 'rail_gate_open', 'invisible_block',
         'train_engine', 'train_car'
       ],
       특수: [

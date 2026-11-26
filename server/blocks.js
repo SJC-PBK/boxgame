@@ -135,7 +135,8 @@ export const BLOCKS = {
   rail_down:         { numId: 105,id: 'rail_down',         name: '📉 하강 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_down',       sound: 'stone', stackable: 64, category: '기차' },
   rail_signal:       { numId: 106,id: 'rail_signal',       name: '🚦 기차용 신호등',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_signal',     sound: 'stone', stackable: 16, category: '기차' },
   rail_gate_open:    { numId: 107,id: 'rail_gate_open',    name: '🚧 자동 건널목 차단봉',transparent: true,  solid: false, hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' },
-  rail_gate_closed:  { numId: 108,id: 'rail_gate_closed',  name: '🚧 차단봉 (닫힘)',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' }
+  rail_gate_closed:  { numId: 108,id: 'rail_gate_closed',  name: '🚧 차단봉 (닫힘)',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' },
+  invisible_block:   { numId: 109,id: 'invisible_block',   name: '👻 투명 블록',         transparent: true,  solid: true,  hardness: 0.3,  preferredTool: null,      minTier: 0, drop: 'invisible_block', sound: 'glass', stackable: 64, category: '건축' }
 };
 
 export const RAIL_IDS = [
@@ -317,6 +318,7 @@ export const RECIPES = [
   { id: 'r-rail-dn',  category: '특수', out: { item: 'rail_down', count: 6 },       in: [{ item: 'iron_ingot', count: 2 }, { item: 'planks', count: 2 }] },
   { id: 'r-rail-sig', category: '특수', out: { item: 'rail_signal', count: 2 },     in: [{ item: 'iron_ingot', count: 2 }, { item: 'lamp', count: 1 }] },
   { id: 'r-rail-gat', category: '특수', out: { item: 'rail_gate_open', count: 2 },  in: [{ item: 'iron_ingot', count: 2 }, { item: 'wool_red', count: 1 }, { item: 'wool_yellow', count: 1 }] },
+  { id: 'r-invis',    category: '건축', out: { item: 'invisible_block', count: 8 }, in: [{ item: 'glass', count: 4 }] },
   { id: 'r-train-eng',category: '특수', out: { item: 'train_engine', count: 1 },  in: [{ item: 'iron_ingot', count: 4 }, { item: 'coal', count: 2 }] },
   { id: 'r-train-car',category: '특수', out: { item: 'train_car', count: 2 },     in: [{ item: 'iron_ingot', count: 3 }, { item: 'planks', count: 2 }] },
   { id: 'r-tnt',          category: '특수', out: { item: 'tnt', count: 1 },          in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },

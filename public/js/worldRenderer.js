@@ -115,6 +115,7 @@ export class WorldRenderer {
       this.idToNum['door_glass_closed'], this.idToNum['door_glass_open']
     ].filter(Boolean));
     this.stealthBeaconNum = this.idToNum['stealth_beacon'] || -1;
+    this.invisibleBlockNum = this.idToNum['invisible_block'] || -1;
     this.showAdminBlocks = false;
 
     this.worldGroup = new THREE.Group();
@@ -803,6 +804,7 @@ export class WorldRenderer {
             : this.grid[this.flatIndex(x, y, z)];
           if (num === 0) continue;
           if (num === this.stealthBeaconNum && !this.showAdminBlocks) continue;
+          if (num === this.invisibleBlockNum) continue;
           const blockId = this.numToId[num];
           if (!blockId) continue;
 

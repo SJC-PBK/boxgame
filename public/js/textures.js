@@ -732,6 +732,14 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(0, 11, 16, 2);
         break;
       }
+      case 'invisible_block': {
+        ctx.clearRect(0, 0, 16, 16);
+        ctx.strokeStyle = 'rgba(186, 230, 253, 0.75)';
+        ctx.setLineDash([2, 2]);
+        ctx.strokeRect(1.5, 1.5, 13, 13);
+        ctx.setLineDash([]);
+        break;
+      }
       case 'tnt': {
         if (face === 'top' || face === 'bottom') {
           fillNoise(ctx, ['#dc2626', '#b91c1c', '#991b1b'], 985);
@@ -1721,6 +1729,24 @@ export class TextureLibrary {
               ctx.fillStyle = '#f8fafc'; ctx.fillRect(4, 19, 24, 2);
               ctx.fillStyle = '#0f172a'; ctx.fillRect(6, 23, 5, 5); ctx.fillRect(21, 23, 5, 5);
             }
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'invisible_block') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, 32, 32);
+            // Crisp dashed sky-blue cube outline + subtle sparkle so it's unmistakable in hotbar/bag!
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.16)';
+            ctx.fillRect(4, 4, 24, 24);
+            ctx.fillStyle = '#7dd3fc';
+            for (let i = 3; i <= 25; i += 6) {
+              ctx.fillRect(i, 3, 4, 2); ctx.fillRect(i, 27, 4, 2);
+              ctx.fillRect(3, i, 2, 4); ctx.fillRect(27, i, 2, 4);
+            }
+            ctx.fillStyle = '#e0f2fe';
+            ctx.fillRect(15, 10, 2, 12);
+            ctx.fillRect(10, 15, 12, 2);
           }, 32);
           this.icons[def.id] = ic.toDataURL();
           this.itemTextures[def.id] = toTexture(ic);
