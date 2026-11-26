@@ -1448,7 +1448,7 @@ wss.on('connection', (ws) => {
         player.cutSlot = { block: cutId, facing: Number(prevFacing || 0) & 3, signText, world: player.world };
         broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, player.world);
         send(ws, { type: 'cut_slot_update', cutSlot: player.cutSlot, autoEquip: true });
-        send(ws, { type: 'toast', level: 'success', text: `✂️ [${def.name}] 잘라내기 완료! [C] 슬롯에 담겼습니다. 원하는 위치에 우클릭으로 설치하세요.` });
+        send(ws, { type: 'toast', level: 'success', text: `✂️ [${def.name}] 잘라내기 완료! [X] 슬롯에 담겼습니다. 원하는 위치에 우클릭으로 설치하세요.` });
         break;
       }
 

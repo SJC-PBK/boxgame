@@ -296,14 +296,14 @@ function setEyedropperMode(on) {
   if (eyedropperMode && cutMode) setCutMode(false);
   const btn = document.getElementById('btn-eyedropper');
   if (btn) btn.classList.toggle('active-tool', eyedropperMode);
-  if (eyedropperMode) ui.toast('💧 스포이드 활성화! 복사할 블록을 클릭하세요. (X로 취소)', 'info');
+  if (eyedropperMode) ui.toast('💧 스포이드 활성화! 복사할 블록을 클릭하세요. (C로 취소)', 'info');
 }
 function setCutMode(on) {
   cutMode = !!on;
   if (cutMode && eyedropperMode) setEyedropperMode(false);
   const btn = document.getElementById('btn-cut-move');
   if (btn) btn.classList.toggle('active-tool', cutMode);
-  if (cutMode) ui.toast('✂️ 잘라내기 활성화! 옮길 블록(표지판·가구 등)을 클릭하세요. (C로 취소)', 'info');
+  if (cutMode) ui.toast('✂️ 잘라내기 활성화! 옮길 블록(표지판·가구 등)을 클릭하세요. (X로 취소)', 'info');
 }
 function handleCutActionC() {
   if (!joined || currentWorldMode === 'job') return;
@@ -1296,12 +1296,12 @@ window.addEventListener('keydown', (e) => {
     send({ type: 'block_undo_edit' });
     return;
   }
-  if (e.code === 'KeyX') {
+  if (e.code === 'KeyC') {
     e.preventDefault();
     setEyedropperMode(!eyedropperMode);
     return;
   }
-  if (e.code === 'KeyC') {
+  if (e.code === 'KeyX') {
     e.preventDefault();
     handleCutActionC();
     return;

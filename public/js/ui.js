@@ -811,17 +811,17 @@ export class GameUI {
       container.appendChild(qEl);
     }
 
-    // Dedicated [C] Cut-and-Move Clipboard slot (right next to [Q]!)
+    // Dedicated [X] Cut-and-Move Clipboard slot (right next to [Q]!)
     if (this.worldMode !== 'job') {
       const cSlotData = this.cutSlot?.block ? { block: this.cutSlot.block, count: 1 } : null;
       const cEl = this._makeSlotEl(cSlotData, {
         active: this.usingCut && !!cSlotData,
-        keyLabel: 'C'
+        keyLabel: 'X'
       });
       cEl.classList.add('tool-q-slot');
       cEl.title = this.cutSlot?.block
-        ? `C키: 잘라낸 [${this.catalog[this.cutSlot.block]?.name || this.cutSlot.block}] 꺼내기/넣기`
-        : 'C키: 잘라내기/이동 슬롯 (비어 있음)';
+        ? `X키: 잘라낸 [${this.catalog[this.cutSlot.block]?.name || this.cutSlot.block}] 꺼내기/넣기`
+        : 'X키: 잘라내기/이동 슬롯 (비어 있음)';
       cEl.addEventListener('click', () => {
         if (this.cb.onCutKey) this.cb.onCutKey();
       });
@@ -845,8 +845,8 @@ export class GameUI {
         : this.bag[this.activeSlot];
     const def = cur ? this.catalog[cur.block] : null;
     document.getElementById('hotbar-label').textContent = def
-      ? `${this.usingCut ? '[C 이동] ' : (this.usingTool ? '[Q 도구] ' : '')}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
-      : '맨손 (Q 도구 · C 잘라내기 · E 가방)';
+      ? `${this.usingCut ? '[X 이동] ' : (this.usingTool ? '[Q 도구] ' : '')}${def.name}${cur.count > 1 ? ` (${cur.count}개)` : ''}`
+      : '맨손 (Q 도구 · X 잘라내기 · E 가방)';
   }
 
   renderBagModal() {
