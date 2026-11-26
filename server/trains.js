@@ -151,9 +151,11 @@ export class TrainManager {
       owner,
       cars: cCount,
       moving: !!autoMove,
+      reversed: false,
       speed: 3.1, // blocks per second
       prog: 0,    // 0..1 interpolation between path[0] and nextTile
       skipRedOnce: false,
+      skipGreenOnce: false,
       path: this._buildInitialPath(x, y, z, useDir, cCount + 2),
       nextTile: null
     };
@@ -289,15 +291,17 @@ export class TrainManager {
           events.push({ event: 'whistle', trainId: t.id, x: arrived.x, y: arrived.y, z: arrived.z });
         }
         if (blk === 'rail_card_green' && !t.skipGreenOnce) {
-          // Green Reverse Action Card: reverse the entire train consist cleanly backwards along the track!
+          // Green Reverse Action Card: true REVERSE gear (후진, NOT U-turn!)
+          // Locomotive stays in its exact physical spot & facing direction while the train backs up!
           const active = t.path.slice(0, Math.min(t.cars, t.path.length)).reverse().map((node) => ({
             x: node.x, y: node.y, z: node.z, dir: (node.dir + 2) & 3
           }));
           t.path = active;
+          t.reversed = !t.reversed;
           t.prog = 0;
           t.skipGreenOnce = true;
           t.nextTile = this._computeNextTile(t);
-          events.push({ event: 'reverse', trainId: t.id, x: arrived.x, y: arrived.y, z: arrived.z });
+          events.push({ event: 'reverse', trainId: t.id, x: arrived.x, y: arrived.y, z: arrived.z, reversed: t.reversed });
           continue;
         }
         t.skipGreenOnce = false;
@@ -330,14 +334,20 @@ export class TrainManager {
         const moveDx = target.x - cur.x;
         const moveDy = target.y - cur.y;
         const moveDz = target.z - cur.z;
-        const yaw = (moveDx !== 0 || moveDz !== 0)
+        const baseYaw = (moveDx !== 0 || moveDz !== 0)
           ? Math.atan2(moveDx, moveDz)
           : (YAW_FOR_DIR[cur.dir & 3] || 0);
+        // When reversing (후진), keep the locomotive & cars facing their original forward direction (no 180° U-turn)!
+        const yaw = t.reversed ? (baseYaw + Math.PI) : baseYaw;
         const curBlk = this.store.getBlock(cur.x, cur.y, cur.z);
-        const pitch = moveDy > 0 ? -0.42 : (moveDy < 0 ? 0.42 : (curBlk === 'rail_up' ? -0.35 : (curBlk === 'rail_down' ? 0.35 : 0)));
-        units.push({ x, y, z, yaw, pitch, isEngine: i === 0 });
+        const rawPitch = moveDy > 0 ? -0.42 : (moveDy < 0 ? 0.42 : (curBlk === 'rail_up' ? -0.35 : (curBlk === 'rail_down' ? 0.35 : 0)));
+        const pitch = t.reversed ? -rawPitch : rawPitch;
+        const isEngine = t.reversed ? (i === t.cars - 1) : (i === 0);
+        units.push({ x, y, z, yaw, pitch, isEngine });
       }
-      out.push({ id: t.id, moving: t.moving, cars: t.cars, units });
+      // Keep engine always at index 0 in serialized units so client mesh indices never swap!
+      if (t.reversed) units.reverse();
+      out.push({ id: t.id, moving: t.moving, reversed: !!t.reversed, cars: t.cars, units });
     }
     return out;
   }
