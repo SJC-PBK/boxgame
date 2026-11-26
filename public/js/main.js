@@ -833,6 +833,10 @@ function handleServerMessage(msg) {
       } else if (msg.event === 'stop_red') {
         sound.playTrainBrake(pos);
         ui.toast('🟥 빨강 정지 카드 도착! 기차가 정지했습니다. (선두 우클릭: 다시 출발)', 'info');
+      } else if (msg.event === 'reverse') {
+        sound.playElevatorChime();
+        worldExtras.spawnTrainSteam(pos.x, pos.y - 0.5, pos.z, 8);
+        ui.toast('🟩 초록 역주행 카드! 기차가 방향을 바꿔 뒤로 주행합니다!', 'info');
       } else if (msg.event === 'stop_end') {
         sound.playTrainBrake(pos);
       }
@@ -1088,15 +1092,20 @@ function handleRightClickOrInteract(interactOnly = false) {
         send({ type: 'train_couple_at', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
         return;
       }
-      if (heldNow === 'rail_card_red' || heldNow === 'rail_card_yellow') {
+      if (heldNow === 'rail_card_red' || heldNow === 'rail_card_yellow' || heldNow === 'rail_card_green') {
         fpHand?.triggerSwing();
         send({ type: 'rail_apply_card', x: currentHit.x, y: currentHit.y, z: currentHit.z, card: heldNow, slotIndex: ui.getActiveBagIndex() });
         return;
       }
-      if (currentHit.block === 'rail_branch' || currentHit.block === 'rail_branch_turn') {
+      if (currentHit.block === 'rail_branch' || currentHit.block === 'rail_branch_turn' ||
+          currentHit.block === 'rail_xbranch' || currentHit.block === 'rail_xbranch_turn') {
         fpHand?.triggerSwing();
         sound.playDoor();
         send({ type: 'toggle_rail_branch', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+        return;
+      }
+      // Prevent stacking a rail on top of another rail!
+      if (heldNow && heldNow.startsWith('rail_')) {
         return;
       }
     }

@@ -1121,6 +1121,13 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 설치할 수 있습니다.' });
           return;
         }
+        if (blockId.startsWith('rail_')) {
+          const below = store.getBlock(x, y - 1, z);
+          if (isRailBlock(below)) {
+            send(ws, { type: 'toast', level: 'warn', text: '🛤️ 레일 위에는 레일을 겹쳐 설치할 수 없습니다.' });
+            return;
+          }
+        }
         if (blockId === 'sapling') {
           const below = store.getBlock(x, y - 1, z);
           if (below !== 'grass' && below !== 'dirt') {
@@ -1662,15 +1669,23 @@ wss.on('connection', (ws) => {
         const { x, y, z } = msg;
         if (!store.inBounds(x, y, z)) return;
         const cur = store.getBlock(x, y, z);
-        if (cur !== 'rail_branch' && cur !== 'rail_branch_turn') return;
-        const next = cur === 'rail_branch' ? 'rail_branch_turn' : 'rail_branch';
+        const NEXT_BRANCH = {
+          rail_branch: 'rail_branch_turn',
+          rail_branch_turn: 'rail_branch',
+          rail_xbranch: 'rail_xbranch_turn',
+          rail_xbranch_turn: 'rail_xbranch'
+        };
+        const next = NEXT_BRANCH[cur];
+        if (!next) return;
         const fDir = store.facings[`${x},${y},${z}`] ?? 0;
         store.setBlock(x, y, z, next, player.nickname);
         store.setFacing(x, y, z, fDir);
         broadcast({ type: 'block_update', x, y, z, block: next, facing: fDir, by: player.nickname }, null, 'sandbox');
+        const isX = next.startsWith('rail_xbranch');
+        const isR = next.endsWith('_turn');
         send(ws, {
           type: 'toast', level: 'info',
-          text: next === 'rail_branch_turn' ? '🔀 분기 레일: 분기(전환) 방향으로 설정됨 (초록)' : '🔀 분기 레일: 직진 방향으로 설정됨 (파랑)'
+          text: `${isX ? '✖️ X분기' : '🔀 T분기'}: ${isR ? '🟩 R (오른쪽)' : '🟦 L (왼쪽)'} 방향으로 전환됨`
         });
         break;
       }
@@ -1678,7 +1693,7 @@ wss.on('connection', (ws) => {
       case 'rail_apply_card': {
         if (player.world !== 'sandbox') return;
         const { x, y, z, card, slotIndex } = msg;
-        if (card !== 'rail_card_red' && card !== 'rail_card_yellow') return;
+        if (card !== 'rail_card_red' && card !== 'rail_card_yellow' && card !== 'rail_card_green') return;
         if (!store.inBounds(x, y, z)) return;
         const cur = store.getBlock(x, y, z);
         if (!isRailBlock(cur)) return;
@@ -1696,7 +1711,11 @@ wss.on('connection', (ws) => {
         broadcast({ type: 'block_update', x, y, z, block: card, facing: fDir, by: player.nickname }, null, 'sandbox');
         send(ws, {
           type: 'toast', level: 'success',
-          text: card === 'rail_card_red' ? '🟥 빨강 정지 카드를 레일에 올렸습니다!' : '🟨 노랑 기적 카드를 레일에 올렸습니다!'
+          text: card === 'rail_card_red'
+            ? '🟥 빨강 정지 카드를 레일에 올렸습니다!'
+            : (card === 'rail_card_green'
+                ? '🟩 초록 역주행 카드를 레일에 올렸습니다!'
+                : '🟨 노랑 기적 카드를 레일에 올렸습니다!')
         });
         break;
       }

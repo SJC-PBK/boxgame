@@ -994,8 +994,8 @@ export class GameUI {
         'redstone_wire', 'lever_off', 'pressure_plate', 'redstone_lamp_off'
       ],
       기차: [
-        'rail_straight', 'rail_curve', 'rail_cross', 'rail_branch',
-        'rail_card_red', 'rail_card_yellow',
+        'rail_straight', 'rail_curve', 'rail_cross', 'rail_branch', 'rail_xbranch',
+        'rail_card_red', 'rail_card_yellow', 'rail_card_green',
         'train_engine', 'train_car'
       ],
       특수: [

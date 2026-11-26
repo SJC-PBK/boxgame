@@ -658,8 +658,37 @@ function drawBlockFace(blockId, face) {
       case 'rail_cross':
       case 'rail_branch':
       case 'rail_branch_turn':
+      case 'rail_xbranch':
+      case 'rail_xbranch_turn':
       case 'rail_card_red':
-      case 'rail_card_yellow': {
+      case 'rail_card_yellow':
+      case 'rail_card_green': {
+        if ((blockId === 'rail_branch' || blockId === 'rail_xbranch') && face === 'top') {
+          // Crisp Blue badge with bold white 'L' (facing North -Z upright!)
+          ctx.fillStyle = '#1d4ed8';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#2563eb';
+          ctx.fillRect(1, 1, 14, 14);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(5, 3, 2, 10);
+          ctx.fillRect(5, 11, 7, 2);
+          break;
+        }
+        if ((blockId === 'rail_branch_turn' || blockId === 'rail_xbranch_turn') && face === 'top') {
+          // Crisp Green badge with bold white 'R' (facing North -Z upright!)
+          ctx.fillStyle = '#15803d';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#16a34a';
+          ctx.fillRect(1, 1, 14, 14);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(4, 3, 2, 10);
+          ctx.fillRect(6, 3, 5, 2);
+          ctx.fillRect(10, 5, 2, 3);
+          ctx.fillRect(6, 7, 4, 2);
+          ctx.fillRect(9, 9, 2, 2);
+          ctx.fillRect(10, 11, 2, 2);
+          break;
+        }
         fillNoise(ctx, ['#94a3b8', '#cbd5e1', '#64748b'], 1040);
         if (blockId === 'rail_card_red') {
           ctx.fillStyle = '#ef4444';
@@ -667,9 +696,15 @@ function drawBlockFace(blockId, face) {
         } else if (blockId === 'rail_card_yellow') {
           ctx.fillStyle = '#facc15';
           ctx.fillRect(3, 3, 10, 10);
-        } else if (blockId === 'rail_branch_turn') {
+        } else if (blockId === 'rail_card_green') {
           ctx.fillStyle = '#22c55e';
-          ctx.fillRect(4, 4, 8, 8);
+          ctx.fillRect(3, 3, 10, 10);
+        } else if (blockId === 'rail_branch' || blockId === 'rail_xbranch') {
+          ctx.fillStyle = '#2563eb';
+          ctx.fillRect(2, 2, 12, 12);
+        } else if (blockId === 'rail_branch_turn' || blockId === 'rail_xbranch_turn') {
+          ctx.fillStyle = '#16a34a';
+          ctx.fillRect(2, 2, 12, 12);
         }
         break;
       }
@@ -1550,7 +1585,7 @@ export class TextureLibrary {
             const tie = '#8b5a2b';
             const rail = '#cbd5e1';
             const railDark = '#475569';
-            if (def.id === 'rail_straight' || def.id === 'rail_card_red' || def.id === 'rail_card_yellow') {
+            if (def.id === 'rail_straight' || def.id === 'rail_card_red' || def.id === 'rail_card_yellow' || def.id === 'rail_card_green') {
               for (const y of [4, 11, 18, 25]) { ctx.fillStyle = tie; ctx.fillRect(5, y, 22, 3); }
               ctx.fillStyle = railDark; ctx.fillRect(7, 1, 5, 30); ctx.fillRect(20, 1, 5, 30);
               ctx.fillStyle = rail; ctx.fillRect(8, 1, 3, 30); ctx.fillRect(21, 1, 3, 30);
@@ -1561,6 +1596,12 @@ export class TextureLibrary {
                 ctx.fillStyle = '#eab308'; ctx.fillRect(10, 9, 12, 14);
                 ctx.fillStyle = '#fef9c3'; ctx.fillRect(12, 11, 8, 10);
                 ctx.fillStyle = '#0f172a'; ctx.fillRect(14, 13, 4, 6);
+              } else if (def.id === 'rail_card_green') {
+                ctx.fillStyle = '#16a34a'; ctx.fillRect(10, 9, 12, 14);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(15, 11, 2, 10);
+                ctx.fillRect(13, 17, 6, 2);
+                ctx.fillRect(14, 19, 4, 2);
               }
             } else if (def.id === 'rail_curve') {
               ctx.fillStyle = tie;
@@ -1581,13 +1622,27 @@ export class TextureLibrary {
               ctx.fillRect(9, 1, 2, 30); ctx.fillRect(21, 1, 2, 30);
               ctx.fillRect(1, 9, 30, 2); ctx.fillRect(1, 21, 30, 2);
             } else {
-              // Branch rail (Y/T junction + colored switch indicator)
-              for (const y of [4, 11, 18, 25]) { ctx.fillStyle = tie; ctx.fillRect(5, y, 22, 3); }
-              ctx.fillStyle = railDark; ctx.fillRect(7, 1, 4, 30); ctx.fillRect(17, 1, 4, 30);
-              ctx.fillStyle = rail; ctx.fillRect(8, 1, 2, 30); ctx.fillRect(18, 1, 2, 30);
-              ctx.fillStyle = rail; ctx.fillRect(17, 14, 14, 3); ctx.fillRect(17, 22, 14, 3);
-              ctx.fillStyle = def.id === 'rail_branch_turn' ? '#22c55e' : '#38bdf8';
-              ctx.fillRect(22, 4, 7, 7);
+              // T-branch or X-branch rail with clear Blue 'L' / Green 'R' center badge!
+              const isX = def.id.startsWith('rail_xbranch');
+              const isR = def.id.endsWith('_turn');
+              ctx.fillStyle = tie;
+              ctx.fillRect(1, 14, 30, 4);
+              ctx.fillRect(14, isX ? 1 : 14, 4, isX ? 30 : 17);
+              ctx.fillStyle = railDark;
+              ctx.fillRect(1, 9, 30, 3); ctx.fillRect(1, 20, 30, 3);
+              ctx.fillRect(9, isX ? 1 : 16, 3, isX ? 30 : 15);
+              ctx.fillRect(20, isX ? 1 : 16, 3, isX ? 30 : 15);
+              ctx.fillStyle = rail;
+              ctx.fillRect(1, 10, 30, 1); ctx.fillRect(1, 21, 30, 1);
+              ctx.fillRect(10, isX ? 1 : 16, 1, isX ? 30 : 15);
+              ctx.fillRect(21, isX ? 1 : 16, 1, isX ? 30 : 15);
+              ctx.fillStyle = isR ? '#16a34a' : '#2563eb';
+              ctx.fillRect(9, 9, 14, 14);
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 12px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(isR ? 'R' : 'L', 16, 16.5);
             }
           }, 32);
           this.icons[def.id] = ic.toDataURL();

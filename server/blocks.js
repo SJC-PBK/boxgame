@@ -122,18 +122,22 @@ export const BLOCKS = {
   rail_straight:     { numId: 92, id: 'rail_straight',     name: '🛤️ 직선 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_straight',   sound: 'stone', stackable: 64, category: '기차' },
   rail_curve:        { numId: 93, id: 'rail_curve',        name: '↩️ 곡선 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_curve',      sound: 'stone', stackable: 64, category: '기차' },
   rail_cross:        { numId: 94, id: 'rail_cross',        name: '➕ 교차 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_cross',      sound: 'stone', stackable: 64, category: '기차' },
-  rail_branch:       { numId: 95, id: 'rail_branch',       name: '🔀 분기 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_branch',     sound: 'stone', stackable: 64, category: '기차' },
-  rail_branch_turn:  { numId: 96, id: 'rail_branch_turn',  name: '🔀 분기 레일 (전환)',  transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_branch',     sound: 'stone', stackable: 64, category: '기차' },
+  rail_branch:       { numId: 95, id: 'rail_branch',       name: '🔀 T분기 레일 (L)',    transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_branch',     sound: 'stone', stackable: 64, category: '기차' },
+  rail_branch_turn:  { numId: 96, id: 'rail_branch_turn',  name: '🔀 T분기 레일 (R)',    transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_branch',     sound: 'stone', stackable: 64, category: '기차' },
   rail_card_red:     { numId: 97, id: 'rail_card_red',     name: '🟥 빨강 정지 카드 레일',transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_card_red',   sound: 'stone', stackable: 64, category: '기차' },
   rail_card_yellow:  { numId: 98, id: 'rail_card_yellow',  name: '🟨 노랑 기적 카드 레일',transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_card_yellow',sound: 'stone', stackable: 64, category: '기차' },
   train_engine:      { numId: 99, id: 'train_engine',      name: '🚂 기차 기관차 (선두)', transparent: true,  solid: true,  hardness: 0.5,  preferredTool: 'pickaxe', minTier: 0, drop: 'train_engine',    sound: 'stone', stackable: 8,  category: '기차' },
-  train_car:         { numId: 100,id: 'train_car',         name: '🚃 기차 객차 (연결)',   transparent: true,  solid: true,  hardness: 0.5,  preferredTool: 'pickaxe', minTier: 0, drop: 'train_car',       sound: 'stone', stackable: 16, category: '기차' }
+  train_car:         { numId: 100,id: 'train_car',         name: '🚃 기차 객차 (연결)',   transparent: true,  solid: true,  hardness: 0.5,  preferredTool: 'pickaxe', minTier: 0, drop: 'train_car',       sound: 'stone', stackable: 16, category: '기차' },
+  rail_xbranch:      { numId: 101,id: 'rail_xbranch',      name: '✖️ X분기 레일 (L)',    transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_xbranch',    sound: 'stone', stackable: 64, category: '기차' },
+  rail_xbranch_turn: { numId: 102,id: 'rail_xbranch_turn', name: '✖️ X분기 레일 (R)',    transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_xbranch',    sound: 'stone', stackable: 64, category: '기차' },
+  rail_card_green:   { numId: 103,id: 'rail_card_green',   name: '🟩 초록 역주행 카드 레일',transparent: true, solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_card_green', sound: 'stone', stackable: 64, category: '기차' }
 };
 
 export const RAIL_IDS = [
   'rail_straight', 'rail_curve', 'rail_cross',
   'rail_branch', 'rail_branch_turn',
-  'rail_card_red', 'rail_card_yellow'
+  'rail_xbranch', 'rail_xbranch_turn',
+  'rail_card_red', 'rail_card_yellow', 'rail_card_green'
 ];
 
 export const BUTTON_IDS = ['btn_white', 'btn_red', 'btn_blue', 'btn_yellow', 'btn_green', 'btn_metal'];
@@ -299,8 +303,10 @@ export const RECIPES = [
   { id: 'r-rail-cv',  category: '특수', out: { item: 'rail_curve', count: 8 },    in: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 2 }] },
   { id: 'r-rail-cr',  category: '특수', out: { item: 'rail_cross', count: 4 },    in: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 2 }] },
   { id: 'r-rail-br',  category: '특수', out: { item: 'rail_branch', count: 4 },   in: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 2 }] },
+  { id: 'r-rail-xbr', category: '특수', out: { item: 'rail_xbranch', count: 4 },  in: [{ item: 'iron_ingot', count: 2 }, { item: 'stick', count: 2 }] },
   { id: 'r-rail-red', category: '특수', out: { item: 'rail_card_red', count: 4 }, in: [{ item: 'iron_ingot', count: 1 }, { item: 'wool_red', count: 1 }] },
   { id: 'r-rail-yel', category: '특수', out: { item: 'rail_card_yellow', count: 4 }, in: [{ item: 'iron_ingot', count: 1 }, { item: 'wool_yellow', count: 1 }] },
+  { id: 'r-rail-grn', category: '특수', out: { item: 'rail_card_green', count: 4 }, in: [{ item: 'iron_ingot', count: 1 }, { item: 'leaves', count: 1 }] },
   { id: 'r-train-eng',category: '특수', out: { item: 'train_engine', count: 1 },  in: [{ item: 'iron_ingot', count: 4 }, { item: 'coal', count: 2 }] },
   { id: 'r-train-car',category: '특수', out: { item: 'train_car', count: 2 },     in: [{ item: 'iron_ingot', count: 3 }, { item: 'planks', count: 2 }] },
   { id: 'r-tnt',          category: '특수', out: { item: 'tnt', count: 1 },          in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },

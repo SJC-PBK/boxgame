@@ -17,10 +17,12 @@ export function isRailBlock(id) {
 
 function getRailConnections(blockId, facing) {
   const f = Number(facing || 0) & 3;
-  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow') {
+  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
     return (f === 0 || f === 2) ? [0, 2] : [1, 3];
   }
-  if (blockId === 'rail_cross') return [0, 1, 2, 3];
+  if (blockId === 'rail_cross' || blockId === 'rail_xbranch' || blockId === 'rail_xbranch_turn') {
+    return [0, 1, 2, 3];
+  }
   if (blockId === 'rail_curve') {
     if (f === 0) return [0, 1];
     if (f === 1) return [1, 2];
@@ -28,7 +30,8 @@ function getRailConnections(blockId, facing) {
     return [3, 0];
   }
   if (blockId === 'rail_branch' || blockId === 'rail_branch_turn') {
-    return [(f + 2) & 3, f, (f + 1) & 3];
+    // T-branch: stem rear=(f+2)&3, Left=(f+3)&3, Right=(f+1)&3
+    return [(f + 2) & 3, (f + 3) & 3, (f + 1) & 3];
   }
   return [];
 }
@@ -37,7 +40,7 @@ function chooseExitDir(blockId, facing, enterFrom) {
   const f = Number(facing || 0) & 3;
   const opp = (enterFrom + 2) & 3;
   if (blockId === 'rail_cross') return opp;
-  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow') {
+  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
     const conns = getRailConnections(blockId, f);
     if (conns.includes(opp)) return opp;
     return conns.find(c => c !== enterFrom) ?? opp;
@@ -49,13 +52,21 @@ function chooseExitDir(blockId, facing, enterFrom) {
     return conns[0];
   }
   if (blockId === 'rail_branch' || blockId === 'rail_branch_turn') {
+    // T-branch: Blue (L) -> Left (f+3)&3, Green (R) -> Right (f+1)&3
     const rear = (f + 2) & 3;
-    const straight = f;
-    const branch = (f + 1) & 3;
-    if (enterFrom === rear) {
-      return blockId === 'rail_branch_turn' ? branch : straight;
-    }
-    return rear;
+    const left = (f + 3) & 3;
+    const right = (f + 1) & 3;
+    const isR = blockId === 'rail_branch_turn';
+    if (enterFrom === rear) return isR ? right : left;
+    if (enterFrom === left) return isR ? right : rear;
+    if (enterFrom === right) return isR ? rear : left;
+    return opp;
+  }
+  if (blockId === 'rail_xbranch' || blockId === 'rail_xbranch_turn') {
+    // X-branch (4-way switchable): Blue (L) turns Left from approaching direction, Green (R) turns Right!
+    const fwd = opp;
+    const isR = blockId === 'rail_xbranch_turn';
+    return isR ? ((fwd + 1) & 3) : ((fwd + 3) & 3);
   }
   return opp;
 }
@@ -266,6 +277,19 @@ export class TrainManager {
         if (blk === 'rail_card_yellow') {
           events.push({ event: 'whistle', trainId: t.id, x: arrived.x, y: arrived.y, z: arrived.z });
         }
+        if (blk === 'rail_card_green' && !t.skipGreenOnce) {
+          // Green Reverse Action Card: reverse the entire train consist cleanly backwards along the track!
+          const active = t.path.slice(0, Math.min(t.cars, t.path.length)).reverse().map((node) => ({
+            x: node.x, y: node.y, z: node.z, dir: (node.dir + 2) & 3
+          }));
+          t.path = active;
+          t.prog = 0;
+          t.skipGreenOnce = true;
+          t.nextTile = this._computeNextTile(t);
+          events.push({ event: 'reverse', trainId: t.id, x: arrived.x, y: arrived.y, z: arrived.z });
+          continue;
+        }
+        t.skipGreenOnce = false;
 
         // Compute next tile along track (handles live branch switches!)
         t.nextTile = this._computeNextTile(t);

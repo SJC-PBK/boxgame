@@ -1078,15 +1078,15 @@ export class WorldRenderer {
               pushSubBox('stone', x, y, z, x0, 0.04, 0.18, x1, 0.10, 0.28, lr, lg, lb, 0.04);
               pushSubBox('stone', x, y, z, x0, 0.04, 0.72, x1, 0.10, 0.82, lr, lg, lb, 0.04);
             };
-            if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow') {
+            if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
               if (fDir === 0 || fDir === 2) drawNS(0, 1);
               else drawEW(0, 1);
               if (blockId === 'rail_card_red') {
-                // Bright Red STOP action card plate between the rails!
                 pushSubBox('wool_red', x, y, z, 0.28, 0.04, 0.22, 0.72, 0.11, 0.78, Math.max(lr, 0.6), lg, lb, 0);
               } else if (blockId === 'rail_card_yellow') {
-                // Bright Yellow WHISTLE action card plate between the rails!
                 pushSubBox('wool_yellow', x, y, z, 0.28, 0.04, 0.22, 0.72, 0.11, 0.78, Math.max(lr, 0.6), Math.max(lg, 0.5), lb, 0);
+              } else if (blockId === 'rail_card_green') {
+                pushSubBox('btn_green', x, y, z, 0.28, 0.04, 0.22, 0.72, 0.11, 0.78, lr, Math.max(lg, 0.6), lb, 0);
               }
             } else if (blockId === 'rail_cross') {
               drawNS(0, 1);
@@ -1097,17 +1097,39 @@ export class WorldRenderer {
               else if (fDir === 1) { drawEW(0.35, 1); drawNS(0.35, 1); }
               else if (fDir === 2) { drawNS(0.35, 1); drawEW(0, 0.65); }
               else { drawEW(0, 0.65); drawNS(0, 0.65); }
-            } else if (blockId === 'rail_branch' || blockId === 'rail_branch_turn') {
-              // Straight trunk along fDir + branch to right ((fDir+1)&3) + glowing switch indicator!
-              if (fDir === 0 || fDir === 2) drawNS(0, 1);
-              else drawEW(0, 1);
-              const bDir = (fDir + 1) & 3;
-              if (bDir === 0) drawNS(0, 0.65);
-              else if (bDir === 1) drawEW(0.35, 1);
-              else if (bDir === 2) drawNS(0.35, 1);
-              else drawEW(0, 0.65);
-              const indBlk = blockId === 'rail_branch_turn' ? 'btn_green' : 'btn_blue';
-              pushSubBox(indBlk, x, y, z, 0.38, 0.08, 0.38, 0.62, 0.20, 0.62, Math.max(lr, 0.4), Math.max(lg, 0.6), Math.max(lb, 0.5), 0);
+            } else if (blockId === 'rail_branch' || blockId === 'rail_branch_turn' || blockId === 'rail_xbranch' || blockId === 'rail_xbranch_turn') {
+              const isX = blockId.startsWith('rail_xbranch');
+              if (isX) {
+                // X-branch: full 4-way switchable tracks
+                drawNS(0, 1);
+                drawEW(0, 1);
+              } else {
+                // T-branch: crossbar (Left <-> Right) + stem from rear ((fDir + 2) & 3)
+                if (fDir === 0 || fDir === 2) drawEW(0, 1);
+                else drawNS(0, 1);
+                const rear = (fDir + 2) & 3;
+                if (rear === 0) drawNS(0, 0.65);
+                else if (rear === 1) drawEW(0.35, 1);
+                else if (rear === 2) drawNS(0.35, 1);
+                else drawEW(0, 0.65);
+              }
+              // Rotated center L (Blue) / R (Green) indicator plate oriented upright along fDir!
+              const x0 = 0.26, y0 = 0.08, z0 = 0.26, x1 = 0.74, y1 = 0.16, z1 = 0.74;
+              for (let f = 0; f < 6; f++) {
+                const face = FACES[f];
+                const buf = getBucket(blockId, face.faceKind);
+                const base = buf.positions.length / 3;
+                for (let i = 0; i < 4; i++) {
+                  const c = face.corners[i];
+                  buf.positions.push(x + (c[0] ? x1 : x0), y + (c[1] ? y1 : y0), z + (c[2] ? z1 : z0));
+                  buf.normals.push(face.dir[0], face.dir[1], face.dir[2]);
+                  const uv = (f === 2) ? UVS[(i + fDir) & 3] : UVS[i];
+                  buf.uvs.push(uv[0], uv[1]);
+                  buf.lights.push(Math.max(lr, 0.45), Math.max(lg, 0.45), Math.max(lb, 0.45));
+                  buf.aoDarks.push(0);
+                }
+                buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+              }
             }
             continue;
           }
