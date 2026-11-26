@@ -1,14 +1,43 @@
-// Procedural Web Audio API 3D Spatial Sound Engine (zero external files, works offline!)
+const BGM_TRACKS = [
+  { title: '평화로운 피아노 1', url: 'audio/bgm-piano-1.mp3' },
+  { title: '아늑한 마을 테마', url: 'audio/bgm-town.mp3' },
+  { title: '잔잔한 피아노 2', url: 'audio/bgm-piano-2.mp3' }
+];
+
+// Procedural Web Audio API 3D Spatial Sound Engine + CC0 BGM Playlist Player
 export class SoundEngine {
   constructor() {
     this.ctx = null;
     this.muted = false;
     this.volume = 1.0;
     this.listenerPos = { x: 0, y: 17, z: 0 };
+
+    // Background Music (CC0 Public Domain playlist)
+    this.bgmEnabled = localStorage.getItem('boxworld_bgm') !== 'off';
+    this.bgmBaseVolume = 0.28;
+    this.bgmIndex = 0;
+    this.bgmAudio = null;
+    this.bgmStarted = false;
+    this._bgmNextTimer = null;
+    this._bgmUnlockBound = false;
+  }
+
+  _syncBgmVolume() {
+    if (!this.bgmAudio) return;
+    if (this.muted || !this.bgmEnabled) {
+      this.bgmAudio.volume = 0;
+      if (!this.bgmAudio.paused) this.bgmAudio.pause();
+    } else {
+      this.bgmAudio.volume = Math.max(0, Math.min(1, this.bgmBaseVolume * this.volume));
+      if (this.bgmStarted && this.bgmAudio.paused && !this._bgmNextTimer) {
+        this.bgmAudio.play().catch(() => {});
+      }
+    }
   }
 
   setVolume(v) {
     this.volume = Math.max(0, Math.min(1, Number(v)));
+    this._syncBgmVolume();
   }
 
   _ensureCtx() {
@@ -24,6 +53,88 @@ export class SoundEngine {
 
   setMuted(m) {
     this.muted = !!m;
+    this._syncBgmVolume();
+  }
+
+  _playCurrentTrack() {
+    if (!this.bgmAudio) {
+      this.bgmAudio = new Audio();
+      this.bgmAudio.preload = 'auto';
+      this.bgmAudio.addEventListener('ended', () => {
+        if (this._bgmNextTimer) clearTimeout(this._bgmNextTimer);
+        this._bgmNextTimer = setTimeout(() => {
+          this._bgmNextTimer = null;
+          this.bgmIndex = (this.bgmIndex + 1) % BGM_TRACKS.length;
+          if (this.bgmEnabled && !this.muted) this._playCurrentTrack();
+        }, 2200);
+      });
+      this.bgmAudio.addEventListener('error', () => {
+        if (this._bgmNextTimer) clearTimeout(this._bgmNextTimer);
+        this._bgmNextTimer = setTimeout(() => {
+          this._bgmNextTimer = null;
+          this.bgmIndex = (this.bgmIndex + 1) % BGM_TRACKS.length;
+          if (this.bgmEnabled && !this.muted) this._playCurrentTrack();
+        }, 3000);
+      });
+    }
+    const track = BGM_TRACKS[this.bgmIndex % BGM_TRACKS.length];
+    this.bgmAudio.src = track.url;
+    this.bgmAudio.volume = (this.muted || !this.bgmEnabled) ? 0 : Math.max(0, Math.min(1, this.bgmBaseVolume * this.volume));
+    if (this.bgmEnabled && !this.muted) {
+      this.bgmAudio.play().catch(() => {
+        // Browser autoplay policy: retry once on next user gesture
+        if (!this._bgmUnlockBound) {
+          this._bgmUnlockBound = true;
+          const unlock = () => {
+            this._bgmUnlockBound = false;
+            window.removeEventListener('pointerdown', unlock);
+            window.removeEventListener('keydown', unlock);
+            if (this.bgmEnabled && !this.muted && this.bgmAudio && this.bgmAudio.paused) {
+              this.bgmAudio.play().catch(() => {});
+            }
+          };
+          window.addEventListener('pointerdown', unlock, { once: true });
+          window.addEventListener('keydown', unlock, { once: true });
+        }
+      });
+    }
+  }
+
+  startBgm() {
+    this.bgmStarted = true;
+    if (!this.bgmAudio) {
+      this._playCurrentTrack();
+    } else {
+      this._syncBgmVolume();
+    }
+  }
+
+  toggleBgm() {
+    this.bgmEnabled = !this.bgmEnabled;
+    localStorage.setItem('boxworld_bgm', this.bgmEnabled ? 'on' : 'off');
+    if (this.bgmEnabled) {
+      this.bgmStarted = true;
+      if (!this.bgmAudio) this._playCurrentTrack();
+      else this._syncBgmVolume();
+    } else {
+      if (this._bgmNextTimer) { clearTimeout(this._bgmNextTimer); this._bgmNextTimer = null; }
+      this._syncBgmVolume();
+    }
+    return this.bgmEnabled;
+  }
+
+  nextBgmTrack() {
+    if (this._bgmNextTimer) { clearTimeout(this._bgmNextTimer); this._bgmNextTimer = null; }
+    this.bgmIndex = (this.bgmIndex + 1) % BGM_TRACKS.length;
+    this.bgmEnabled = true;
+    this.bgmStarted = true;
+    localStorage.setItem('boxworld_bgm', 'on');
+    this._playCurrentTrack();
+    return BGM_TRACKS[this.bgmIndex];
+  }
+
+  getBgmTrackTitle() {
+    return BGM_TRACKS[this.bgmIndex % BGM_TRACKS.length]?.title || 'BGM';
   }
 
   updateListener(pos, yaw) {

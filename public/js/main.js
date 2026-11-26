@@ -414,6 +414,8 @@ const ui = new GameUI({
     sound.setMuted(!sound.muted);
     return sound.muted;
   },
+  onToggleBgm: () => sound.toggleBgm(),
+  onNextBgm: () => sound.nextBgmTrack().title,
   onToggleBrush: () => toggleBrushMode(),
   onApplySettings: (s) => applyGameSettings(s),
   onWarp: (x, y, z, label) => warpPlayer(x, y, z, label),
@@ -601,6 +603,7 @@ function handleServerMessage(msg) {
 
       document.getElementById('login-overlay').classList.add('hidden');
       document.getElementById('hud').classList.remove('hidden');
+      sound.startBgm();
       document.getElementById('chat-messages').innerHTML = '';
       ui.addChatMessage({
         system: true,

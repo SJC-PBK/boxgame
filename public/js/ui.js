@@ -146,6 +146,22 @@ export class GameUI {
       const muted = this.cb.onToggleSound();
       e.currentTarget.textContent = muted ? '🔇' : '🔊';
     });
+    const bgmBtn = document.getElementById('btn-bgm');
+    if (bgmBtn) {
+      const syncBgmBtn = (on) => { bgmBtn.textContent = on ? '🎵 BGM' : '🔇 BGM'; };
+      syncBgmBtn(localStorage.getItem('boxworld_bgm') !== 'off');
+      bgmBtn.addEventListener('click', (e) => {
+        if (e.shiftKey && this.cb.onNextBgm) {
+          const title = this.cb.onNextBgm();
+          syncBgmBtn(true);
+          this.toast(`🎵 다음 곡 재생: ${title}`, 'info');
+        } else if (this.cb.onToggleBgm) {
+          const on = this.cb.onToggleBgm();
+          syncBgmBtn(on);
+          this.toast(on ? '🎵 배경음악이 켜졌습니다.' : '🔇 배경음악을 껐습니다.', 'info');
+        }
+      });
+    }
     document.getElementById('btn-brush').addEventListener('click', () => this.cb.onToggleBrush());
     document.getElementById('btn-map').addEventListener('click', () => this.toggleModal('modal-map'));
     document.getElementById('btn-emote').addEventListener('click', () => this.toggleModal('modal-emote'));
