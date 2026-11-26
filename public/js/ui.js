@@ -38,6 +38,7 @@ export class GameUI {
     this.regions = [];
     this.skins = [];
     this.craftCat = '전체';
+    this.supplyCat = '전체';
     this.bpPos1 = null;
     this.bpPos2 = null;
     this.regPos1 = null;
@@ -409,6 +410,15 @@ export class GameUI {
     });
 
     // Crafting tabs
+    document.querySelectorAll('#supply-tabs .tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#supply-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.supplyCat = btn.dataset.scat || '전체';
+        this._renderSupplyCatalog();
+      });
+    });
+
     document.querySelectorAll('#craft-tabs .tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#craft-tabs .tab-btn').forEach(b => b.classList.remove('active'));
@@ -960,21 +970,47 @@ export class GameUI {
         : '🛡️ 관리자 전용 비콘 보급함';
     }
 
+    const tabsEl = document.getElementById('supply-tabs');
+    if (tabsEl) tabsEl.classList.toggle('hidden', !showFull);
+
+    const supplyGroups = {
+      건축: [
+        'stone', 'cobble', 'planks', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand',
+        'slab_metal', 'slab_wood', 'slab_stone', 'slab_white', 'slab_carpet',
+        'wool_white', 'wool_red', 'wool_blue', 'wool_yellow'
+      ],
+      문계단: [
+        'door_closed', 'door_stone_closed', 'door_iron_closed', 'door_glass_closed',
+        'stairs_wood', 'stairs_cobble', 'stairs_brick', 'stairs_stone',
+        'ladder', 'lamp', 'torch', 'sign', 'sign_fixed'
+      ],
+      가구: [
+        'furn_office_desk', 'furn_office_chair', 'furn_white_table', 'furn_partition', 'furn_cabinet',
+        'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac',
+        'furn_toilet_closed', 'furn_urinal', 'bed', 'chest', 'furnace'
+      ],
+      버튼: [
+        'btn_white', 'btn_red', 'btn_blue', 'btn_yellow', 'btn_green', 'btn_metal',
+        'redstone_wire', 'lever_off', 'pressure_plate', 'redstone_lamp_off'
+      ],
+      특수: [
+        ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
+        'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator',
+        'portal', 'jumppad', 'sapling', 'wheat_seeds'
+      ]
+    };
+
     const supplyAllow = showFull
-      ? [
-          ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
-          ...(this.worldMode === 'center' ? [
-            'furn_office_desk', 'furn_office_chair', 'furn_white_table', 'furn_partition', 'furn_cabinet',
-            'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac'
-          ] : []),
-          'stone', 'cobble', 'planks', 'brick', 'glass', 'wood', 'grass', 'dirt', 'sand', 'lamp',
-          'slab_metal', 'slab_wood', 'slab_stone', 'slab_white', 'slab_carpet',
-          'wool_white', 'wool_red', 'wool_blue', 'wool_yellow', 'sapling', 'wheat_seeds',
-          'bed', 'door_closed', 'door_stone_closed', 'door_iron_closed', 'door_glass_closed',
-          'stairs_wood', 'stairs_cobble', 'stairs_brick', 'stairs_stone', 'torch',
-          'redstone_wire', 'lever_off', 'pressure_plate', 'redstone_lamp_off',
-          'ladder', 'sign', 'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator', 'portal', 'jumppad', 'furnace', 'chest'
-        ]
+      ? (this.supplyCat && this.supplyCat !== '전체' && supplyGroups[this.supplyCat]
+          ? supplyGroups[this.supplyCat]
+          : [
+              ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
+              ...supplyGroups.건축,
+              ...supplyGroups.문계단,
+              ...supplyGroups.가구,
+              ...supplyGroups.버튼,
+              ...supplyGroups.특수.filter(id => id !== 'protect_beacon' && id !== 'stealth_beacon')
+            ])
       : ['protect_beacon', 'stealth_beacon'];
     for (const id of supplyAllow) {
       const def = this.catalog[id];
