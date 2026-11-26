@@ -1624,7 +1624,7 @@ function animate(now) {
   lastTime = now;
 
   if (joined) {
-    worldExtras.update(dt);
+    worldExtras.update(dt, playerPos, worldRenderer);
     const isMoving = updatePhysics(dt);
     remotePlayers.update(dt);
     animalRenderer.update(dt);

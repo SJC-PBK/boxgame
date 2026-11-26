@@ -91,10 +91,12 @@ export class WorldExtras {
         const ox = f === 1 ? off : (f === 3 ? -off : 0);
         const oz = f === 2 ? off : (f === 0 ? -off : 0);
         plane.position.set(s.x + 0.5 + ox, s.y + 0.88, s.z + 0.5 + oz);
+        plane.userData = { bx: s.x, by: s.y, bz: s.z };
         this.signGroup.add(plane);
       } else {
         const sp = makeBillboardSprite(lines, 'rgba(120, 72, 32, 0.92)', '#fde68a', '#ffffff', 1.85, 0.8);
         sp.position.set(s.x + 0.5, s.y + 1.35, s.z + 0.5);
+        sp.userData = { bx: s.x, by: s.y, bz: s.z };
         this.signGroup.add(sp);
       }
     }
@@ -517,8 +519,42 @@ export class WorldExtras {
     this.emotes.push({ sprite: sp, life: 2.6 });
   }
 
-  update(dt) {
+  update(dt, playerPos = null, worldRenderer = null) {
     const now = performance.now();
+    // Distance + chunk-loaded culling for signs, portals, NPCs & pylon so unloaded building interiors never float in the sky!
+    if (playerPos) {
+      const streaming = !!(worldRenderer && worldRenderer.streaming);
+      const chunks = streaming ? worldRenderer.chunkGroups : null;
+      const isChunkLoaded = (x, z) => !streaming || chunks.has(`${Math.floor(x / 16)},${Math.floor(z / 16)}`);
+
+      const SIGN_MAX_DIST_SQ = 42 * 42;
+      for (let i = 0; i < this.signGroup.children.length; i++) {
+        const ch = this.signGroup.children[i];
+        const dx = ch.position.x - playerPos.x;
+        const dy = ch.position.y - playerPos.y;
+        const dz = ch.position.z - playerPos.z;
+        const distSq = dx * dx + dy * dy + dz * dz;
+        const bx = ch.userData?.bx ?? ch.position.x;
+        const bz = ch.userData?.bz ?? ch.position.z;
+        ch.visible = distSq <= SIGN_MAX_DIST_SQ && isChunkLoaded(bx, bz);
+      }
+      const PORTAL_MAX_DIST_SQ = 56 * 56;
+      for (let i = 0; i < this.portalGroup.children.length; i++) {
+        const ch = this.portalGroup.children[i];
+        const dx = ch.position.x - playerPos.x;
+        const dz = ch.position.z - playerPos.z;
+        ch.visible = (dx * dx + dz * dz) <= PORTAL_MAX_DIST_SQ && isChunkLoaded(ch.position.x, ch.position.z);
+      }
+      if (this._pylonGroup) {
+        this._pylonGroup.visible = isChunkLoaded(this._pylonGroup.position.x, this._pylonGroup.position.z);
+      }
+      if (this._npcRigs) {
+        for (let i = 0; i < this._npcRigs.length; i++) {
+          const g = this._npcRigs[i].group;
+          g.visible = isChunkLoaded(g.position.x, g.position.z);
+        }
+      }
+    }
     for (let i = this.ignitedTnts.length - 1; i >= 0; i--) {
       const t = this.ignitedTnts[i];
       if (now >= t.endTime) {
