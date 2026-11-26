@@ -126,7 +126,10 @@ for (const [k, v] of store.deltas.entries()) {
 
 // 10Hz real-time Train Physics, Action-Card, Auto Crossing Gate & Animal Push Tick Loop
 setInterval(() => {
-  const { anyMoved, events } = trains.tick(0.1);
+  const { anyMoved, events, switchChanges } = trains.tick(0.1);
+  if (switchChanges && switchChanges.length > 0) {
+    broadcast({ type: 'blocks_batch', changes: switchChanges, by: 'TrainSwitch' }, null, 'sandbox');
+  }
   const allTrains = (anyMoved || railGateKeys.size > 0) ? trains.serializeAll() : null;
 
   if (anyMoved && allTrains) {

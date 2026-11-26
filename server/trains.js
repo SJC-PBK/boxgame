@@ -52,14 +52,17 @@ function chooseExitDir(blockId, facing, enterFrom) {
     return conns[0];
   }
   if (blockId === 'rail_branch' || blockId === 'rail_branch_turn') {
-    // T-branch: Blue (L) -> Left (f+3)&3, Green (R) -> Right (f+1)&3
+    // T-branch (real trailing-point railway switch!):
+    // A = rear (f+2)&3, B = left (f+3)&3 (L), C = right (f+1)&3 (R)
+    // - Entering from A: L -> B, R -> C
+    // - Entering from B: ALWAYS exits to A (and auto-flips switch R -> L!)
+    // - Entering from C: ALWAYS exits to A (and auto-flips switch L -> R!)
     const rear = (f + 2) & 3;
     const left = (f + 3) & 3;
     const right = (f + 1) & 3;
     const isR = blockId === 'rail_branch_turn';
     if (enterFrom === rear) return isR ? right : left;
-    if (enterFrom === left) return isR ? right : rear;
-    if (enterFrom === right) return isR ? rear : left;
+    if (enterFrom === left || enterFrom === right) return rear;
     return opp;
   }
   if (blockId === 'rail_xbranch' || blockId === 'rail_xbranch_turn') {
@@ -187,7 +190,7 @@ export class TrainManager {
       const nextFacing = this.store.facings[`${nx},${ny},${nz}`] || 0;
       const enterFrom = (dir + 2) & 3;
       const exitDir = chooseExitDir(nextBlk, nextFacing, enterFrom);
-      return { x: nx, y: ny, z: nz, dir: exitDir, block: nextBlk };
+      return { x: nx, y: ny, z: nz, dir: exitDir, enterFrom, block: nextBlk };
     }
     return null;
   }
@@ -277,9 +280,10 @@ export class TrainManager {
     return { engine: 1, cars: Math.max(0, t.cars - 1) };
   }
 
-  // Advance all moving trains by dt seconds; returns list of triggered card/stop events
+  // Advance all moving trains by dt seconds; returns list of triggered card/stop/switch events
   tick(dt) {
     const events = [];
+    const switchChanges = [];
     let anyMoved = false;
     for (const t of this.trains.values()) {
       if (!t.moving) continue;
@@ -304,8 +308,24 @@ export class TrainManager {
         const maxLen = Math.max(8, t.cars + 3);
         if (t.path.length > maxLen) t.path.length = maxLen;
 
-        // Check Action Card on arrived rail tile!
+        // Trailing-point auto-switch on T-branch:
+        // Entering from B (left) while R -> force switch to L! Entering from C (right) while L -> force switch to R!
         const blk = this.store.getBlock(arrived.x, arrived.y, arrived.z);
+        if ((blk === 'rail_branch' || blk === 'rail_branch_turn') && arrived.enterFrom !== undefined) {
+          const bf = this.store.facings[`${arrived.x},${arrived.y},${arrived.z}`] || 0;
+          const left = (bf + 3) & 3;
+          const right = (bf + 1) & 3;
+          if (arrived.enterFrom === left && blk === 'rail_branch_turn') {
+            this.store.setBlock(arrived.x, arrived.y, arrived.z, 'rail_branch', 'Train');
+            this.store.setFacing(arrived.x, arrived.y, arrived.z, bf);
+            switchChanges.push({ x: arrived.x, y: arrived.y, z: arrived.z, block: 'rail_branch', facing: bf });
+          } else if (arrived.enterFrom === right && blk === 'rail_branch') {
+            this.store.setBlock(arrived.x, arrived.y, arrived.z, 'rail_branch_turn', 'Train');
+            this.store.setFacing(arrived.x, arrived.y, arrived.z, bf);
+            switchChanges.push({ x: arrived.x, y: arrived.y, z: arrived.z, block: 'rail_branch_turn', facing: bf });
+          }
+        }
+        // Check Action Card on arrived rail tile!
         if (blk === 'rail_card_red' && !t.skipRedOnce) {
           t.moving = false;
           t.prog = 0;
@@ -342,7 +362,7 @@ export class TrainManager {
         }
       }
     }
-    return { anyMoved, events };
+    return { anyMoved, events, switchChanges };
   }
 
   // Serialize interpolated car positions & orientations for all trains
