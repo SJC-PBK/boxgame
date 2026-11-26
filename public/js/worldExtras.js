@@ -714,17 +714,6 @@ export class WorldExtras {
       receivedAt: performance.now()
     };
     this._updateElevator();
-    // Subtle typing animation for seated office staff NPCs
-    if (this._npcRigs && this._npcRigs.length > 0) {
-      const t = now * 0.008;
-      for (let i = 0; i < this._npcRigs.length; i++) {
-        const rig = this._npcRigs[i];
-        rig.leftArm.rotation.x = -1.15 + Math.sin(t * 2.4 + i) * 0.14;
-        rig.rightArm.rotation.x = -1.15 + Math.cos(t * 2.7 + i) * 0.14;
-        rig.head.rotation.y = Math.sin(t * 0.35 + i) * 0.12;
-        rig.head.rotation.x = 0.12 + Math.sin(t * 0.5 + i) * 0.04;
-      }
-    }
   }
 
   _updateElevator() {

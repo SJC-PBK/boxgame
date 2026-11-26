@@ -603,9 +603,9 @@ function drawBlockFace(blockId, face) {
       case 'sign_fixed': {
         ctx.fillStyle = '#784820';
         ctx.fillRect(7, 9, 2, 7);
-        ctx.fillStyle = id === 'sign_fixed' ? '#d4a36a' : '#c2975f';
+        ctx.fillStyle = blockId === 'sign_fixed' ? '#d4a36a' : '#c2975f';
         ctx.fillRect(1, 2, 14, 8);
-        if (id === 'sign_fixed') {
+        if (blockId === 'sign_fixed') {
           ctx.fillStyle = '#925c28';
           ctx.fillRect(1, 2, 14, 1); ctx.fillRect(1, 9, 14, 1);
           ctx.fillRect(1, 2, 1, 8); ctx.fillRect(14, 2, 1, 8);
@@ -622,7 +622,7 @@ function drawBlockFace(blockId, face) {
         ctx.fillStyle = '#cbd5e1';
         ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
         ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
-        if (id === 'furn_toilet_open' && face === 'top') {
+        if (blockId === 'furn_toilet_open' && face === 'top') {
           ctx.fillStyle = '#38bdf8';
           ctx.fillRect(4, 4, 8, 8);
           ctx.fillStyle = '#0284c7';
@@ -644,7 +644,7 @@ function drawBlockFace(blockId, face) {
           btn_green:  ['#22c55e', '#16a34a', '#4ade80'],
           btn_metal:  ['#cbd5e1', '#94a3b8', '#e2e8f0']
         };
-        const pal = bCols[id] || bCols.btn_metal;
+        const pal = bCols[blockId] || bCols.btn_metal;
         ctx.fillStyle = pal[1];
         ctx.fillRect(0, 0, 16, 16);
         ctx.fillStyle = pal[0];
