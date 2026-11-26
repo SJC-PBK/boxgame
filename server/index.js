@@ -15,8 +15,8 @@ import { AnimalManager } from './animals.js';
 import { createJobVillageWorld } from './jobWorld.js';
 import { createCenterWorld } from './centerWorld.js';
 import {
-  stampCenterIntoSandbox, stampVillaIntoSandbox, getSandboxCenterPylon,
-  SANDBOX_CENTER_ORIGIN, SANDBOX_VILLA_ORIGIN
+  stampCenterIntoSandbox, stampVillaIntoSandbox, propagateVillaFrom402, getSandboxCenterPylon,
+  SANDBOX_CENTER_ORIGIN, SANDBOX_VILLA_ORIGIN, SANDBOX_VILLA_BOUNDS
 } from './sandboxBuilds.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -102,12 +102,22 @@ const SANDBOX_CENTER_PYLON = getSandboxCenterPylon(store);
 
 // Auto-stamp Happiness Plus Center clone (-75, 34, 94) and 5F Semi-Basement Villa (-78, 36, -45) into Sandbox once
 // Bump version marker when layout changes so live server re-stamps automatically on restart!
-const SANDBOX_BUILD_VERSION = 'v2-snap13-rot180-splitstair';
+const SANDBOX_BUILD_VERSION = 'v3-villa-from-402';
 if (store.config.sandboxBuildVersion !== SANDBOX_BUILD_VERSION) {
-  const resC = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
-  console.log(`[SandboxBuilds] Stamped Happiness Plus Center (${resC.sourceLabel}, 180° rotated) at (${SANDBOX_CENTER_ORIGIN.x},${SANDBOX_CENTER_ORIGIN.y},${SANDBOX_CENTER_ORIGIN.z}): ${resC.placed} blocks, ${resC.signsCount} signs.`);
-  const resV = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
-  console.log(`[SandboxBuilds] Stamped 5F Semi-Basement Villa (side-by-side doors + split stairwell) at (${SANDBOX_VILLA_ORIGIN.x},${SANDBOX_VILLA_ORIGIN.y},${SANDBOX_VILLA_ORIGIN.z}): ${resV.placed} blocks, ${resV.signsCount} signs.`);
+  if (!store.config.sandboxBuildVersion) {
+    const resC = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
+    console.log(`[SandboxBuilds] Stamped Happiness Plus Center (${resC.sourceLabel}, 180° rotated): ${resC.placed} blocks.`);
+    const resV = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
+    console.log(`[SandboxBuilds] Stamped 5F Semi-Basement Villa: ${resV.placed} blocks.`);
+  } else {
+    // Propagate user's live 402호 layout across all 5 floors (101~502호) and fix any floor holes!
+    const resP = propagateVillaFrom402(store, SANDBOX_VILLA_ORIGIN);
+    console.log(`[SandboxBuilds] Propagated live 402호 layout across all 10 villa units (${resP.updated} cells updated).`);
+    if (store.listVillaSnapshots().length === 0) {
+      const saved = store.saveVillaSnapshot('402호기준', 'System', SANDBOX_VILLA_BOUNDS);
+      console.log(`[SandboxBuilds] Auto-saved Villa Snapshot #${saved.number} "${saved.entry.name}".`);
+    }
+  }
   store.config.sandboxBuildVersion = SANDBOX_BUILD_VERSION;
   store.saveNow('config');
 }
@@ -1130,7 +1140,7 @@ wss.on('connection', (ws) => {
           slot.count -= 1;
           if (slot.count <= 0) player.bag[idx] = null;
         }
-        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId === 'sign_fixed';
+        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId === 'sign_fixed' || blockId === 'ladder';
         const facingVal = needsFacing ? (Number(msg.facing || 0) & 3) : undefined;
         const prevFacing0 = store.facings[`${x},${y},${z}`];
         store.setBlock(x, y, z, blockId, player.nickname);
@@ -2718,12 +2728,64 @@ wss.on('connection', (ws) => {
           }
           return;
         }
-        if (text === '/빌라복구') {
+        if (text === '/빌라저장' || text.startsWith('/빌라저장 ')) {
+          if (!player.isAdmin || player.world !== 'sandbox') {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /빌라저장 명령어는 자유 건축 월드 /관리자 모드에서 사용할 수 있습니다.' });
+            return;
+          }
+          const rawName = text.slice(5).trim();
+          const { number, entry } = store.saveVillaSnapshot(rawName, player.nickname, SANDBOX_VILLA_BOUNDS);
+          send(ws, { type: 'toast', level: 'success', text: `💾 [빌라 #${number}] "${entry.name}" 저장 완료!` });
+          broadcast({
+            type: 'chat', system: true,
+            text: `🏠 [빌라] #${number} "${entry.name}" 구조가 저장되었습니다. (/빌라구조 로 목록 확인 · /빌라복구 ${number} 로 복원)`
+          }, null, 'sandbox');
+          return;
+        }
+        if (text === '/빌라구조') {
+          if (!player.isAdmin || player.world !== 'sandbox') {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /빌라구조 명령어는 자유 건축 월드 /관리자 모드에서 사용할 수 있습니다.' });
+            return;
+          }
+          const list = store.listVillaSnapshots();
+          if (list.length === 0) {
+            send(ws, { type: 'chat', system: true, text: '📂 저장된 빌라 구조가 없습니다. "/빌라저장 이름" 으로 먼저 저장해 보세요!' });
+            return;
+          }
+          send(ws, { type: 'chat', system: true, text: '🏠 저장된 빌라 구조 목록 ("/빌라복구 번호" 로 복원):' });
+          list.forEach((s, i) => {
+            send(ws, { type: 'chat', system: true, text: `  ${i + 1}. [빌라] ${s.name} (저장: ${s.author})` });
+          });
+          return;
+        }
+        if (text === '/빌라복구' || text.startsWith('/빌라복구 ')) {
           if (!player.isAdmin || player.world !== 'sandbox') {
             send(ws, { type: 'toast', level: 'warn', text: '🔒 /빌라복구 명령어는 자유 건축 월드 /관리자 모드에서 사용할 수 있습니다.' });
             return;
           }
-          const res = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
+          const arg = text.slice(5).trim();
+          let toastMsg = '';
+          if (arg) {
+            const num = Number(arg);
+            const snap = store.loadVillaSnapshot(num);
+            if (!snap) {
+              send(ws, { type: 'toast', level: 'warn', text: '❌ 해당 번호의 빌라 저장 구조를 찾을 수 없습니다. (/빌라구조 로 확인)' });
+              return;
+            }
+            const cnt = store.restoreVillaSnapshot(snap.data);
+            toastMsg = `♻️ [빌라 #${num}] "${snap.entry.name}" 복원 완료! (${cnt.toLocaleString()}블록)`;
+          } else {
+            const list = store.listVillaSnapshots();
+            if (list.length > 0) {
+              const latestNum = list.length;
+              const snap = store.loadVillaSnapshot(latestNum);
+              const cnt = snap ? store.restoreVillaSnapshot(snap.data) : 0;
+              toastMsg = `♻️ 최신 저장 구조 [빌라 #${latestNum}] "${snap?.entry?.name}" 복원 완료! (${cnt.toLocaleString()}블록)`;
+            } else {
+              const res = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
+              toastMsg = `🏠 5층 반지하 빌라 기본 구조 복구 완료! (${res.placed.toLocaleString()}블록)`;
+            }
+          }
           broadcast({
             type: 'world_reload',
             worldDeltas: store.getDeltasObject(),
@@ -2735,7 +2797,8 @@ wss.on('connection', (ws) => {
             centerPylon: SANDBOX_CENTER_PYLON,
             centerNpcs: SANDBOX_CENTER_NPCS
           }, null, 'sandbox');
-          send(ws, { type: 'toast', level: 'success', text: `🏠 5층 반지하 빌라(401·402호) 복구 완료! (${res.placed.toLocaleString()}블록)` });
+          send(ws, { type: 'toast', level: 'success', text: toastMsg });
+          broadcast({ type: 'chat', system: true, text: `🏠 관리자(${player.nickname})님이 빌라를 복구했습니다! (${toastMsg})` }, null, 'sandbox');
           return;
         }
         if (text === '/간판이동' || text === '/간판회전') {

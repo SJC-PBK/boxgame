@@ -6,6 +6,7 @@ import { BLOCKS } from './blocks.js';
 
 export const SANDBOX_CENTER_ORIGIN = { x: -75, y: 34, z: 94 };
 export const SANDBOX_VILLA_ORIGIN = { x: -78, y: 36, z: -45 };
+export const SANDBOX_VILLA_BOUNDS = { minX: -80, maxX: -42, minY: 30, maxY: 64, minZ: -66, maxZ: -24 };
 export const SANDBOX_CENTER_SNAPSHOT_NUM = 13;
 
 // Load snapshot #13 data if available (falling back to live centerFurn/signOverrides/centerPylon)
@@ -372,7 +373,7 @@ export function stampVillaIntoSandbox(store, origin = SANDBOX_VILLA_ORIGIN) {
     uSet(22, 2, 14, 'wool_white');
     uSet(22, 3, 14, 'slab_white');
     for (let dx = 14; dx <= 21; dx++) {
-      for (let lz = 9; lz <= 12; lz++) uSet(dx, 0, lz, 'slab_white');
+      for (let lz = 9; lz <= 12; lz++) uSet(dx, 0, lz, 'planks');
     }
 
     // Ceiling lamps
@@ -538,4 +539,101 @@ export function stampVillaIntoSandbox(store, origin = SANDBOX_VILLA_ORIGIN) {
       minZ: vz(0), maxZ: vz(BD - 1)
     }
   };
+}
+
+// Propagate the live customized 402호 layout (blocks, facings, signs) across ALL 5 floors:
+// - 102호, 202호, 302호, 402호, 502호: exact copy of 402호
+// - 101호, 201호, 301호, 401호, 501호: exact Z-mirror of 402호 (with N/S facing flip 0 <-> 2)
+// Also guarantees every dy=0 floor block is solid (never slab_white / air) so players never fall through!
+export function propagateVillaFrom402(store, origin = SANDBOX_VILLA_ORIGIN) {
+  const OX = origin.x;      // -78
+  const GROUND = origin.y;  // 36
+  const OZ = origin.z - 19; // -64
+  const BD = 39;            // dz: 0..38
+  const FLOOR_H = 5;
+  const F1_BASE = GROUND - 2; // 34
+  const BASE_402 = F1_BASE + 3 * FLOOR_H; // 49 (4F)
+
+  const vx = (dx) => OX + dx;
+  const vz = (dz) => OZ + dz;
+
+  // 1. Capture live 402호 template:
+  //    Main rooms: dx = 1..23, lz = 1..15 (dy = 0..4)
+  //    Entryway & corridor wall: dx = 1..11, lz = 16..18 (dy = 0..4)
+  //    Stairwell-side wall: dx = 12..23, lz = 16 (dy = 0..4)
+  const inUnitTemplate = (dx, lz) => (
+    (dx >= 1 && dx <= 23 && lz >= 1 && lz <= 16) ||
+    (dx >= 1 && dx <= 11 && lz >= 17 && lz <= 18)
+  );
+
+  const template = [];
+  for (let dy = 0; dy <= 4; dy++) {
+    for (let dx = 1; dx <= 23; dx++) {
+      for (let lz = 1; lz <= 18; lz++) {
+        if (!inUnitTemplate(dx, lz)) continue;
+        const sx = vx(dx), sy = BASE_402 + dy, sz = vz(lz);
+        const k = `${sx},${sy},${sz}`;
+        let blk = store.getBlock(sx, sy, sz);
+        // Never allow non-solid slab_white or air holes on the floor slab (dy=0)!
+        if (dy === 0 && (!blk || blk === 'slab_white')) blk = 'planks';
+        const facing = store.facings[k];
+        const sign = store.signs[k] ? { ...store.signs[k] } : null;
+        template.push({ dx, dy, lz, blk, facing, sign });
+      }
+    }
+  }
+
+  let updated = 0;
+  for (let fIdx = 0; fIdx < 5; fIdx++) {
+    const baseY = F1_BASE + fIdx * FLOOR_H;
+    const floorNum = fIdx + 1;
+
+    for (const mirror of [false, true]) {
+      const unitLabel = `${floorNum}0${mirror ? '1' : '2'}호`;
+      const mapZ = (lz) => vz(mirror ? (BD - 1 - lz) : lz);
+      const mapFace = (f) => {
+        if (f === undefined) return undefined;
+        if (!mirror) return f & 3;
+        if (f === 0) return 2;
+        if (f === 2) return 0;
+        return f & 3;
+      };
+
+      for (const cell of template) {
+        const tx = vx(cell.dx);
+        const ty = baseY + cell.dy;
+        const tz = mapZ(cell.lz);
+        if (!store.inBounds(tx, ty, tz)) continue;
+        const tk = `${tx},${ty},${tz}`;
+        store.setBlock(tx, ty, tz, cell.blk || null, 'System');
+        if (cell.blk && cell.facing !== undefined) {
+          store.setFacing(tx, ty, tz, mapFace(cell.facing));
+        }
+        if (cell.sign && (cell.blk === 'sign' || cell.blk === 'sign_fixed')) {
+          const text = String(cell.sign.text || '').replace(/402호/g, unitLabel);
+          store.signs[tk] = {
+            x: tx, y: ty, z: tz,
+            text,
+            author: cell.sign.author || 'System',
+            fixed: cell.blk === 'sign_fixed' || !!cell.sign.fixed,
+            facing: mapFace(cell.sign.facing ?? cell.facing ?? 2)
+          };
+        }
+        updated++;
+      }
+
+      // Refresh each unit's own front door plaque on the stairwell landing (dx=12, lz=18)
+      const px = vx(12), py = baseY + 2, pz = mapZ(18);
+      if (store.inBounds(px, py, pz)) {
+        store.setBlock(px, py, pz, 'sign_fixed', 'System');
+        store.setFacing(px, py, pz, 1);
+        store.signs[`${px},${py},${pz}`] = { x: px, y: py, z: pz, text: `🏠 ${unitLabel}`, author: 'System', fixed: true, facing: 1 };
+      }
+    }
+  }
+
+  store.saveNow('world');
+  store.saveNow('facings');
+  store.saveNow('signs');
+  return { updated };
 }

@@ -1140,9 +1140,18 @@ function handleRightClickOrInteract(interactOnly = false) {
     if (overlapsPlayer) return;
   }
   fpHand?.triggerSwing();
-  // Compute 4-way cardinal facing from player look direction: 0=N(-Z), 1=E(+X), 2=S(+Z), 3=W(-X)
+  // Compute 4-way cardinal facing: for wall-mounted ladder & buttons, stick flush to the clicked vertical wall face!
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-  const facing = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
+  let facing = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
+  if ((heldDef.id === 'ladder' || heldDef.id.startsWith('btn_')) && currentHit) {
+    const nX = px - currentHit.x;
+    const nZ = pz - currentHit.z;
+    if (nX === 1) facing = 1;       // clicked +X face -> stick to West wall, facing East
+    else if (nX === -1) facing = 3; // clicked -X face -> stick to East wall, facing West
+    else if (nZ === 1) facing = 2;  // clicked +Z face -> stick to North wall, facing South
+    else if (nZ === -1) facing = 0; // clicked -Z face -> stick to South wall, facing North
+    else facing = (facing + 2) & 3; // placed on top/bottom -> face player
+  }
   if (ui.isUsingCutSlot()) {
     send({ type: 'block_paste', x: px, y: py, z: pz, facing });
   } else {

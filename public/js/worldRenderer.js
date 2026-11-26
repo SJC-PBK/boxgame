@@ -93,9 +93,9 @@ export class WorldRenderer {
       this.idToNum['wheat_1'],
       this.idToNum['wheat_2'],
       this.idToNum['wheat_3'],
-      this.idToNum['ladder'],
       this.idToNum['sign']
     ].filter(Boolean));
+    this.ladderNum = this.idToNum['ladder'] || -1;
     this.fuseNum = this.idToNum['fuse'] || -1;
     this.wireNum = this.idToNum['redstone_wire'] || -1;
     this.plateNum = this.idToNum['pressure_plate'] || -1;
@@ -1015,6 +1015,43 @@ export class WorldRenderer {
             } else {
               pushSubBox('stone', x, y, z, 0.90, 0.30, 0.26, 1.0, 0.70, 0.74, lr, lg, lb, 0.06);
               pushSubBox(blockId, x, y, z, 0.80, 0.38, 0.34, 0.90, 0.62, 0.66, lr, lg, lb, 0.02);
+            }
+            continue;
+          }
+
+          if (num === this.ladderNum) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            // Wall-hugging Minecraft-style 3D wooden ladder (2 vertical side rails + 4 horizontal rungs!)
+            // facing: 0=N(-Z, sticks to south wall z=0.92..1), 1=E(+X, west wall x=0..0.08), 2=S(+Z, north wall z=0..0.08), 3=W(-X, east wall x=0.92..1)
+            let fDir = this.facings.get(`${x},${y},${z}`);
+            if (fDir === undefined) {
+              if (isOpaqueFast(x, y, z - 1)) fDir = 2;
+              else if (isOpaqueFast(x, y, z + 1)) fDir = 0;
+              else if (isOpaqueFast(x - 1, y, z)) fDir = 1;
+              else if (isOpaqueFast(x + 1, y, z)) fDir = 3;
+              else fDir = 2;
+            }
+            const rungs = [[0.12, 0.22], [0.36, 0.46], [0.60, 0.70], [0.84, 0.94]];
+            if (fDir === 0) {
+              pushSubBox('wood', x, y, z, 0.10, 0, 0.91, 0.22, 1, 0.99, lr, lg, lb, 0.06);
+              pushSubBox('wood', x, y, z, 0.78, 0, 0.91, 0.90, 1, 0.99, lr, lg, lb, 0.06);
+              for (const [ry0, ry1] of rungs) pushSubBox('planks', x, y, z, 0.22, ry0, 0.92, 0.78, ry1, 0.99, lr, lg, lb, 0.04);
+            } else if (fDir === 1) {
+              pushSubBox('wood', x, y, z, 0.01, 0, 0.10, 0.09, 1, 0.22, lr, lg, lb, 0.06);
+              pushSubBox('wood', x, y, z, 0.01, 0, 0.78, 0.09, 1, 0.90, lr, lg, lb, 0.06);
+              for (const [ry0, ry1] of rungs) pushSubBox('planks', x, y, z, 0.01, ry0, 0.22, 0.08, ry1, 0.78, lr, lg, lb, 0.04);
+            } else if (fDir === 2) {
+              pushSubBox('wood', x, y, z, 0.10, 0, 0.01, 0.22, 1, 0.09, lr, lg, lb, 0.06);
+              pushSubBox('wood', x, y, z, 0.78, 0, 0.01, 0.90, 1, 0.09, lr, lg, lb, 0.06);
+              for (const [ry0, ry1] of rungs) pushSubBox('planks', x, y, z, 0.22, ry0, 0.01, 0.78, ry1, 0.08, lr, lg, lb, 0.04);
+            } else {
+              pushSubBox('wood', x, y, z, 0.91, 0, 0.10, 0.99, 1, 0.22, lr, lg, lb, 0.06);
+              pushSubBox('wood', x, y, z, 0.91, 0, 0.78, 0.99, 1, 0.90, lr, lg, lb, 0.06);
+              for (const [ry0, ry1] of rungs) pushSubBox('planks', x, y, z, 0.92, ry0, 0.22, 0.99, ry1, 0.78, lr, lg, lb, 0.04);
             }
             continue;
           }

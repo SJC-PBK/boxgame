@@ -513,8 +513,16 @@ export class WorldStore {
 
   setSignText(x, y, z, text, author) {
     const k = keyOf(x, y, z);
-    if (this.getBlock(x, y, z) !== 'sign') return null;
-    this.signs[k] = { x, y, z, text: String(text || '').trim().slice(0, 60) || '표지판', author };
+    const blk = this.getBlock(x, y, z);
+    if (blk !== 'sign' && blk !== 'sign_fixed') return null;
+    const prev = this.signs[k];
+    this.signs[k] = {
+      x, y, z,
+      text: String(text || '').trim().slice(0, 60) || '표지판',
+      author,
+      fixed: blk === 'sign_fixed' || !!prev?.fixed,
+      facing: prev?.facing ?? this.facings[k] ?? 2
+    };
     this._scheduleSave('signs', 100);
     return this.signs[k];
   }
@@ -635,6 +643,98 @@ export class WorldStore {
     this.saveNow('centerFurn');
     this.saveNow('centerPylon');
     this.saveNow('signOverrides');
+  }
+
+  // ---- Villa Region Snapshots (/빌라저장, /빌라구조, /빌라복구) ----
+  _ensureVillaSnapshotsDir() {
+    const dir = path.join(this.dataDir, 'villa_snapshots');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  listVillaSnapshots() {
+    const dir = this._ensureVillaSnapshotsDir();
+    const arr = this._readJson(path.join(dir, 'index.json'));
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  saveVillaSnapshot(rawName, author, bounds) {
+    const dir = this._ensureVillaSnapshotsDir();
+    const kst = new Date(Date.now() + 9 * 3600 * 1000);
+    const yymmdd = `${String(kst.getUTCFullYear()).slice(-2)}${String(kst.getUTCMonth() + 1).padStart(2, '0')}${String(kst.getUTCDate()).padStart(2, '0')}`;
+    const baseName = String(rawName || '').trim().slice(0, 40) || '빌라';
+    const fullName = `${baseName}(${yymmdd})`;
+
+    const blocks = {};
+    const facings = {};
+    const signs = {};
+    for (let y = bounds.minY; y <= bounds.maxY; y++) {
+      for (let x = bounds.minX; x <= bounds.maxX; x++) {
+        for (let z = bounds.minZ; z <= bounds.maxZ; z++) {
+          const k = `${x},${y},${z}`;
+          if (this.deltas.has(k)) blocks[k] = this.deltas.get(k);
+          if (this.facings[k] !== undefined) facings[k] = this.facings[k];
+          if (this.signs[k]) signs[k] = this.signs[k];
+        }
+      }
+    }
+
+    const ts = Date.now();
+    const file = `villa-${ts}-${Math.random().toString(36).slice(2, 6)}.json`;
+    this._writeJsonAtomic(path.join(dir, file), { bounds, blocks, facings, signs });
+    const list = this.listVillaSnapshots();
+    const entry = {
+      id: `villa-${ts}`,
+      name: fullName,
+      author: String(author || '관리자').slice(0, 20),
+      createdAt: ts,
+      file
+    };
+    list.push(entry);
+    this._writeJsonAtomic(path.join(dir, 'index.json'), list);
+    return { number: list.length, entry };
+  }
+
+  loadVillaSnapshot(num1Based) {
+    const list = this.listVillaSnapshots();
+    const idx = Number(num1Based) - 1;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= list.length) return null;
+    const entry = list[idx];
+    const dir = this._ensureVillaSnapshotsDir();
+    const data = this._readJson(path.join(dir, entry.file));
+    if (!data) return null;
+    return { entry, data };
+  }
+
+  restoreVillaSnapshot(data) {
+    const b = data.bounds;
+    if (!b) return 0;
+    // Clear existing deltas/facings/signs inside villa bounds
+    for (let y = b.minY; y <= b.maxY; y++) {
+      for (let x = b.minX; x <= b.maxX; x++) {
+        for (let z = b.minZ; z <= b.maxZ; z++) {
+          const k = `${x},${y},${z}`;
+          this.deltas.delete(k);
+          delete this.facings[k];
+          delete this.signs[k];
+        }
+      }
+    }
+    let count = 0;
+    for (const [k, v] of Object.entries(data.blocks || {})) {
+      this.deltas.set(k, v);
+      if (v) count++;
+    }
+    for (const [k, v] of Object.entries(data.facings || {})) {
+      this.facings[k] = Number(v) & 3;
+    }
+    for (const [k, v] of Object.entries(data.signs || {})) {
+      this.signs[k] = v;
+    }
+    this.saveNow('world');
+    this.saveNow('facings');
+    this.saveNow('signs');
+    return count;
   }
 
   restoreSandboxSnapshot(data) {
