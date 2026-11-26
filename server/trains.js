@@ -3,7 +3,7 @@
 // and multi-car connected trains that snake smoothly around curves and junctions!
 import fs from 'node:fs';
 import path from 'node:path';
-import { RAIL_IDS } from './blocks.js';
+import { RAIL_IDS, CHEST_SIZE } from './blocks.js';
 
 const RAIL_SET = new Set(RAIL_IDS);
 // 0=N(-Z), 1=E(+X), 2=S(+Z), 3=W(-X)
@@ -156,6 +156,7 @@ export class TrainManager {
       prog: 0,    // 0..1 interpolation between path[0] and nextTile
       skipRedOnce: false,
       skipGreenOnce: false,
+      carStorages: {},
       path: this._buildInitialPath(x, y, z, useDir, cCount + 2),
       nextTile: null
     };
@@ -240,6 +241,32 @@ export class TrainManager {
     t.skipRedOnce = true;
     this.save();
     return { train: t, started: true };
+  }
+
+  getCarStorage(trainId, unitIndex) {
+    const t = this.trains.get(trainId);
+    const idx = Number(unitIndex);
+    if (!t || !Number.isInteger(idx) || idx < 1 || idx >= t.cars) return null;
+    if (!t.carStorages || typeof t.carStorages !== 'object') t.carStorages = {};
+    const k = String(idx);
+    if (!t.carStorages[k]) {
+      t.carStorages[k] = {
+        label: `🚃 ${idx}번 객차 화물칸`,
+        owner: t.owner || 'System',
+        slots: Array(CHEST_SIZE).fill(null)
+      };
+      this.save();
+    }
+    return t.carStorages[k];
+  }
+
+  hasStoredItems(trainId) {
+    const t = this.trains.get(trainId);
+    if (!t || !t.carStorages) return false;
+    for (const st of Object.values(t.carStorages)) {
+      if (st?.slots?.some(s => s && s.count > 0)) return true;
+    }
+    return false;
   }
 
   removeTrain(trainId) {

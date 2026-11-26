@@ -1854,9 +1854,28 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'train_car_open': {
+        if (player.world !== 'sandbox') return;
+        const trainId = String(msg.trainId || '');
+        const unitIndex = Number(msg.unitIndex);
+        const st = trains.getCarStorage(trainId, unitIndex);
+        if (!st) return;
+        player.openChestKey = `train:${trainId}:${unitIndex}`;
+        send(ws, {
+          type: 'chest_data',
+          chest: { trainId, unitIndex, label: st.label, owner: st.owner, slots: st.slots }
+        });
+        break;
+      }
+
       case 'train_remove': {
         if (player.world !== 'sandbox') return;
-        const refund = trains.removeTrain(String(msg.trainId || ''));
+        const tid = String(msg.trainId || '');
+        if (trains.hasStoredItems(tid)) {
+          send(ws, { type: 'toast', level: 'warn', text: '🚃 객차 안에 아이템이 남아 있어 회수할 수 없습니다. 먼저 비워주세요!' });
+          return;
+        }
+        const refund = trains.removeTrain(tid);
         if (!refund) return;
         addItemToSlots(player.bag, 'train_engine', refund.engine);
         if (refund.cars > 0) addItemToSlots(player.bag, 'train_car', refund.cars);
@@ -2556,9 +2575,23 @@ wss.on('connection', (ws) => {
       }
 
       case 'chest_transfer': {
-        const { x, y, z, direction, fromIndex, amount } = msg;
-        const chest = store.getChest(x, y, z);
+        const { x, y, z, trainId, unitIndex, direction, fromIndex, amount } = msg;
+        const isTrainCar = !!trainId;
+        const chest = isTrainCar ? trains.getCarStorage(String(trainId), Number(unitIndex)) : store.getChest(x, y, z);
         if (!chest) return;
+        const chestKey = isTrainCar ? `train:${trainId}:${unitIndex}` : `${x},${y},${z}`;
+        const saveChest = () => { if (isTrainCar) trains.save(); else store.saveChestsSoon(); };
+        const syncViewers = () => {
+          if (isTrainCar) {
+            for (const p of players.values()) {
+              if (p.openChestKey === chestKey) {
+                send(p.ws, { type: 'chest_data', chest: { trainId, unitIndex: Number(unitIndex), label: chest.label, owner: chest.owner, slots: chest.slots } });
+              }
+            }
+          } else {
+            broadcastChestToViewers(chestKey, chest);
+          }
+        };
         const idx = Number(fromIndex);
 
         if (direction === 'to_chest') {
@@ -2571,10 +2604,10 @@ wss.on('connection', (ws) => {
           if (moved > 0) {
             src.count -= moved;
             if (src.count <= 0) player.bag[idx] = null;
-            store.saveChestsSoon();
+            saveChest();
             send(ws, { type: 'bag_update', bag: player.bag });
-            broadcastChestToViewers(`${x},${y},${z}`, chest);
-          } else send(ws, { type: 'toast', level: 'warn', text: '상자가 가득 찼습니다.' });
+            syncViewers();
+          } else send(ws, { type: 'toast', level: 'warn', text: '보관함이 가득 찼습니다.' });
         } else if (direction === 'to_bag') {
           if (!Number.isInteger(idx) || idx < 0 || idx >= CHEST_SIZE) return;
           const src = chest.slots[idx];
@@ -2585,23 +2618,34 @@ wss.on('connection', (ws) => {
           if (moved > 0) {
             src.count -= moved;
             if (src.count <= 0) chest.slots[idx] = null;
-            store.saveChestsSoon();
+            saveChest();
             send(ws, { type: 'bag_update', bag: player.bag });
-            broadcastChestToViewers(`${x},${y},${z}`, chest);
+            syncViewers();
           } else send(ws, { type: 'toast', level: 'warn', text: '개인 가방이 가득 찼습니다.' });
         }
         break;
       }
 
       case 'chest_rename': {
-        const { x, y, z, label } = msg;
-        const chest = store.getChest(x, y, z);
+        const { x, y, z, trainId, unitIndex, label } = msg;
+        const isTrainCar = !!trainId;
+        const chest = isTrainCar ? trains.getCarStorage(String(trainId), Number(unitIndex)) : store.getChest(x, y, z);
         if (!chest) return;
         const clean = String(label || '').trim().slice(0, 24);
         if (!clean) return;
         chest.label = clean;
-        store.saveChestsSoon();
-        broadcastChestToViewers(`${x},${y},${z}`, chest);
+        if (isTrainCar) {
+          trains.save();
+          const ck = `train:${trainId}:${unitIndex}`;
+          for (const p of players.values()) {
+            if (p.openChestKey === ck) {
+              send(p.ws, { type: 'chest_data', chest: { trainId, unitIndex: Number(unitIndex), label: chest.label, owner: chest.owner, slots: chest.slots } });
+            }
+          }
+        } else {
+          store.saveChestsSoon();
+          broadcastChestToViewers(`${x},${y},${z}`, chest);
+        }
         break;
       }
 

@@ -993,13 +993,17 @@ function handleRightClickOrInteract(interactOnly = false) {
     return;
   }
 
-  // 1.5 Check Train interaction on right-click (start/stop lead engine, or couple a passenger car!)
+  // 1.5 Check Train interaction on right-click (lead engine: start/stop, passenger car: open cargo storage, holding car: couple!)
   const trainHit = worldExtras.raycastTrains(eyePos, lookDir, 6.0);
   if (trainHit) {
     fpHand?.triggerSwing();
     const heldIdNow = ui.getActiveItemId();
     if (heldIdNow === 'train_car') {
       send({ type: 'train_couple', trainId: trainHit.trainId, slotIndex: ui.getActiveBagIndex() });
+    } else if (!trainHit.isEngine && trainHit.unitIndex >= 1) {
+      if (document.pointerLockElement) document.exitPointerLock();
+      sound.playOpen();
+      send({ type: 'train_car_open', trainId: trainHit.trainId, unitIndex: trainHit.unitIndex });
     } else {
       sound.playDoor();
       send({ type: 'train_toggle', trainId: trainHit.trainId });

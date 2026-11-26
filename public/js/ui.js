@@ -461,6 +461,7 @@ export class GameUI {
       this.cb.send({
         type: 'chest_rename',
         x: this.currentChest.x, y: this.currentChest.y, z: this.currentChest.z,
+        trainId: this.currentChest.trainId, unitIndex: this.currentChest.unitIndex,
         label: val
       });
     });
@@ -1237,7 +1238,9 @@ export class GameUI {
     if (!this.currentChest) return;
     const c = this.currentChest;
     document.getElementById('chest-title').textContent = c.label || '보관 상자';
-    document.getElementById('chest-info').textContent = `위치: (${c.x}, ${c.y}, ${c.z}) · 설치자: ${c.owner}`;
+    document.getElementById('chest-info').textContent = c.trainId
+      ? `🚃 기차 화물칸 (${c.unitIndex}번 객차) · 소유자: ${c.owner}`
+      : `위치: (${c.x}, ${c.y}, ${c.z}) · 설치자: ${c.owner}`;
     document.getElementById('chest-rename-input').value = c.label || '';
 
     const chestGrid = document.getElementById('chest-grid');
@@ -1251,7 +1254,7 @@ export class GameUI {
       el.addEventListener('click', (e) => {
         if (!slot) return;
         const amt = e.shiftKey ? Math.max(1, Math.ceil(slot.count / 2)) : slot.count;
-        this.cb.send({ type: 'chest_transfer', x: c.x, y: c.y, z: c.z, direction: 'to_bag', fromIndex: i, amount: amt });
+        this.cb.send({ type: 'chest_transfer', x: c.x, y: c.y, z: c.z, trainId: c.trainId, unitIndex: c.unitIndex, direction: 'to_bag', fromIndex: i, amount: amt });
       });
       chestGrid.appendChild(el);
     }
@@ -1262,7 +1265,7 @@ export class GameUI {
       el.addEventListener('click', (e) => {
         if (!slot) return;
         const amt = e.shiftKey ? Math.max(1, Math.ceil(slot.count / 2)) : slot.count;
-        this.cb.send({ type: 'chest_transfer', x: c.x, y: c.y, z: c.z, direction: 'to_chest', fromIndex: i, amount: amt });
+        this.cb.send({ type: 'chest_transfer', x: c.x, y: c.y, z: c.z, trainId: c.trainId, unitIndex: c.unitIndex, direction: 'to_chest', fromIndex: i, amount: amt });
       });
       bagGrid.appendChild(el);
     }
