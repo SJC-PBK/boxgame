@@ -1120,11 +1120,22 @@ export class WorldExtras {
       win.position.set(0, 0.72, -0.24);
       const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.34, 0.20), chassisMat);
       chimney.position.set(0, 0.90, 0.28);
-      const headlight = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.06), goldMat);
+      const headlight = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.20, 0.08),
+        new THREE.MeshBasicMaterial({ color: '#fef9c3' })
+      );
       headlight.position.set(0, 0.52, 0.46);
+      // Soft glowing headlight halo + real warm PointLight illuminating tracks ahead at night!
+      const halo = new THREE.Mesh(
+        new THREE.BoxGeometry(0.38, 0.30, 0.06),
+        new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.45, depthWrite: false })
+      );
+      halo.position.set(0, 0.52, 0.50);
+      const headLightSrc = new THREE.PointLight(0xfff1a8, 3.4, 16, 1.35);
+      headLightSrc.position.set(0, 0.75, 1.45);
       const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.14, 0.10), goldMat);
       bumper.position.set(0, 0.20, 0.48);
-      g.add(boiler, cab, cabRoof, win, chimney, headlight, bumper);
+      g.add(boiler, cab, cabRoof, win, chimney, headlight, halo, headLightSrc, bumper);
     } else {
       // Cozy blue & white passenger railcar
       const blueMat = new THREE.MeshLambertMaterial({ color: '#2563eb' });
