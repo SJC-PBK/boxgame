@@ -307,8 +307,14 @@ export class WorldStore {
         };
         this._scheduleSave('furnaces', 100);
       }
-      if (val === 'sign' && !this.signs[k]) {
-        this.signs[k] = { x, y, z, text: `${ownerName || '플레이어'}의 표지판`, author: ownerName || 'Unknown' };
+      if ((val === 'sign' || val === 'sign_fixed') && !this.signs[k]) {
+        this.signs[k] = {
+          x, y, z,
+          text: `${ownerName || '플레이어'}의 표지판`,
+          author: ownerName || 'Unknown',
+          fixed: val === 'sign_fixed',
+          facing: this.facings[k] ?? 2
+        };
         this._scheduleSave('signs', 100);
       }
       if (val === 'portal' && !this.portals[k]) {

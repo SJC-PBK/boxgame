@@ -128,8 +128,10 @@ let currentHit = null;
 let selfWalkPhase = 0;
 let stepSoundTimer = 0;
 
-// Hold-to-mine state (crack animation + particle bursts, no gauge!)
+// Hold-to-mine & hold-to-place state
 let isLeftDown = false;
+let isRightDown = false;
+let rightPlaceTimer = 0;
 let miningTargetKey = null;
 let miningElapsed = 0;
 let miningDuration = 0.5;
@@ -531,7 +533,8 @@ function handleServerMessage(msg) {
       worldExtras.syncPortals(currentPortals);
       worldExtras.syncBeacons(msg.beacons || {});
       worldExtras.syncElevator(msg.elevator || null);
-      worldExtras.syncCenterPylon(currentWorldMode === 'center' ? (msg.centerPylon || { x: -25.5, y: 5.0, z: 2.2, rotY: 0 }) : null);
+      worldExtras.syncCenterPylon(msg.centerPylon || null);
+      worldExtras.syncCenterNpcs(msg.centerNpcs || []);
 
       playerPos.set(selfPlayer.x, selfPlayer.y, selfPlayer.z);
       playerVel.set(0, 0, 0);
@@ -790,7 +793,8 @@ function handleServerMessage(msg) {
       if (msg.signs) { currentSigns = msg.signs; worldExtras.syncSigns(currentSigns); }
       if (msg.portals) { currentPortals = msg.portals; worldExtras.syncPortals(currentPortals); }
       if (msg.beacons) worldExtras.syncBeacons(msg.beacons);
-      if (msg.centerPylon) worldExtras.syncCenterPylon(msg.centerPylon);
+      if (msg.centerPylon !== undefined) worldExtras.syncCenterPylon(msg.centerPylon);
+      if (msg.centerNpcs !== undefined) worldExtras.syncCenterNpcs(msg.centerNpcs);
       if (msg.regions) regionVis.setRegions(msg.regions);
       break;
 
@@ -934,11 +938,13 @@ function computeMiningTime(blockId) {
   const heldId = ui.getActiveItemId();
   if (heldId === 'sabo_sword' && blockId && blockId !== 'bedrock') return 0.04;
   if (!bDef || !Number.isFinite(bDef.hardness)) return Infinity;
-  if (selfPlayer?.isAdmin && currentWorldMode === 'center' && blockId !== 'bedrock') return 0.14;
+  // In Happiness Plus Center, hand-breaking takes 2x longer to prevent accidental break-through!
+  if (selfPlayer?.isAdmin && currentWorldMode === 'center' && blockId !== 'bedrock') return 0.30;
   const heldDef = heldId ? catalog[heldId] : null;
   const isPreferred = heldDef && heldDef.kind === 'tool' && heldDef.toolType === bDef.preferredTool;
   const speed = isPreferred ? (heldDef.speed || 2.0) : 1.0;
-  return Math.max(0.12, bDef.hardness / speed);
+  const base = Math.max(0.12, bDef.hardness / speed);
+  return currentWorldMode === 'center' ? base * 2.0 : base;
 }
 
 function getEyeAndLook() {
@@ -1020,6 +1026,18 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'toggle_lever', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
+    if (currentHit.block.startsWith('btn_')) {
+      fpHand?.triggerSwing();
+      sound.playDoor();
+      send({ type: 'press_button', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      return;
+    }
+    if (currentHit.block === 'furn_toilet_closed' || currentHit.block === 'furn_toilet_open') {
+      fpHand?.triggerSwing();
+      sound.playDoor();
+      send({ type: 'toggle_toilet', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      return;
+    }
     if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb' || currentHit.block === 'water_bomb' || currentHit.block === 'flatten_bomb') {
       fpHand?.triggerSwing();
       const heldIdNow = ui.getActiveItemId();
@@ -1041,7 +1059,7 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'fuse_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
-    if (currentHit.block === 'sign') {
+    if (currentHit.block === 'sign' || currentHit.block === 'sign_fixed') {
       if (document.pointerLockElement) document.exitPointerLock();
       fpHand?.triggerSwing();
       sound.playOpen();
@@ -1108,7 +1126,7 @@ function handleRightClickOrInteract(interactOnly = false) {
   const px = currentHit.placeX, py = currentHit.placeY, pz = currentHit.placeZ;
 
   const brushPositions = computeBrushPositions(px, py, pz);
-  if (brushPositions && !['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'sapling'].includes(heldDef.id)) {
+  if (brushPositions && !['chest', 'furnace', 'bed', 'sign', 'sign_fixed', 'portal', 'tnt', 'sapling'].includes(heldDef.id)) {
     fpHand?.triggerSwing();
     send({ type: 'block_place_brush', positions: brushPositions, slotIndex: activeIdx });
     return;
@@ -1140,7 +1158,7 @@ canvas.addEventListener('click', () => {
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === canvas;
   document.getElementById('play-hint').classList.toggle('hidden', pointerLocked || touchControls.enabled);
-  if (!pointerLocked && !remoteLook) { isLeftDown = false; resetMining(); }
+  if (!pointerLocked && !remoteLook) { isLeftDown = false; isRightDown = false; resetMining(); }
 });
 
 document.addEventListener('mousemove', (e) => {
@@ -1207,6 +1225,8 @@ canvas.addEventListener('mousedown', (e) => {
       lastDragX = e.clientX;
       lastDragY = e.clientY;
     } else {
+      isRightDown = true;
+      rightPlaceTimer = 0.24;
       handleRightClickOrInteract(false);
     }
   } else if (e.button === 1 && !remoteLook) {
@@ -1225,6 +1245,7 @@ canvas.addEventListener('mousedown', (e) => {
 
 window.addEventListener('mouseup', (e) => {
   if (e.button === 0) { isLeftDown = false; resetMining(); }
+  if (e.button === 2) { isRightDown = false; }
   if ((e.button === 2 || e.button === 1) && isRightDragging) {
     isRightDragging = false;
     if (e.button === 2 && dragMovedDist < 7 && joined && !ui.openModalId && !ui.chatOpen) {
@@ -1710,6 +1731,23 @@ function animate(now) {
       worldRenderer.updateStreaming(playerPos);
       currentHit = worldRenderer.raycast(eyePos, lookDir, 7, ui.getActiveItemId() === 'sabo_sword');
       updateMining(dt);
+      // Continuous right-click block placement while holding RMB!
+      if (isRightDown && pointerLocked && !ui.openModalId && !ui.chatOpen && currentHit) {
+        rightPlaceTimer -= dt;
+        if (rightPlaceTimer <= 0) {
+          rightPlaceTimer = 0.17;
+          const b = currentHit.block;
+          const isInteractive = b === 'chest' || b === 'furnace' || b === 'bed' || b === 'sign' || b === 'sign_fixed' ||
+            b === 'portal' || b === 'lever_off' || b === 'lever_on' || b === 'tnt' || b === 'fill_bomb' ||
+            b === 'water_bomb' || b === 'flatten_bomb' || b === 'fuse' ||
+            b.startsWith('door_') || b.startsWith('btn_') || b.startsWith('job_') ||
+            b === 'furn_toilet_closed' || b === 'furn_toilet_open';
+          const heldNow = catalog[ui.getActiveItemId()];
+          if (!isInteractive && heldNow && heldNow.kind === 'block') {
+            handleRightClickOrInteract(false);
+          }
+        }
+      }
       const ratio = miningTargetKey && Number.isFinite(miningDuration) ? Math.min(1, miningElapsed / miningDuration) : 0;
       worldRenderer.updateHighlight(currentHit, ratio);
       const heldDef = catalog[ui.getActiveItemId()];

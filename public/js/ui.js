@@ -67,7 +67,12 @@ export class GameUI {
       btn.addEventListener('click', () => this.closeModal());
     });
     document.querySelectorAll('.modal').forEach((m) => {
-      m.addEventListener('click', (e) => { if (e.target === m) this.closeModal(); });
+      let downOnBackdrop = false;
+      m.addEventListener('mousedown', (e) => { downOnBackdrop = (e.target === m); });
+      m.addEventListener('click', (e) => {
+        if (downOnBackdrop && e.target === m) this.closeModal();
+        downOnBackdrop = false;
+      });
     });
 
     const mobileMenuBtn = document.getElementById('btn-mobile-menu');

@@ -14,6 +14,10 @@ import { WorldStore } from './worldStore.js';
 import { AnimalManager } from './animals.js';
 import { createJobVillageWorld } from './jobWorld.js';
 import { createCenterWorld } from './centerWorld.js';
+import {
+  stampCenterIntoSandbox, stampVillaIntoSandbox,
+  SANDBOX_CENTER_ORIGIN, SANDBOX_VILLA_ORIGIN
+} from './sandboxBuilds.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +76,43 @@ function applyPersistedCenterState() {
   }
 }
 applyPersistedCenterState();
+
+// Seated office staff NPCs (4F "야근하는 박부규" at chair (-10, 23, 7) facing PC desk (-10, 23, 6)!)
+const CENTER_NPCS = [
+  {
+    id: 'park-bugyu',
+    name: '💻 야근하는 박부규',
+    x: -10, y: 23, z: 7,
+    facing: 0, // North (-Z) toward PC desk
+    roundGlasses: true,
+    shirtColor: '#1f2937',
+    pantsColor: '#111827',
+    hairColor: '#18181b',
+    skinColor: '#f1c69c'
+  }
+];
+const SANDBOX_CENTER_NPCS = CENTER_NPCS.map((n) => ({
+  ...n,
+  x: n.x + SANDBOX_CENTER_ORIGIN.x,
+  y: n.y + (SANDBOX_CENTER_ORIGIN.y - 4),
+  z: n.z + SANDBOX_CENTER_ORIGIN.z
+}));
+const SANDBOX_CENTER_PYLON = {
+  x: SANDBOX_CENTER_ORIGIN.x - 25.5,
+  y: SANDBOX_CENTER_ORIGIN.y + 1.0,
+  z: SANDBOX_CENTER_ORIGIN.z + 2.2,
+  rotY: 0
+};
+
+// Auto-stamp Happiness Plus Center clone (-75, 34, 94) and 5F Semi-Basement Villa (-78, 36, -45) into Sandbox once
+if (!store.deltas.has(`${SANDBOX_CENTER_ORIGIN.x},${SANDBOX_CENTER_ORIGIN.y + 42},${SANDBOX_CENTER_ORIGIN.z}`)) {
+  const res = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
+  console.log(`[SandboxBuilds] Stamped Happiness Plus Center at (${SANDBOX_CENTER_ORIGIN.x},${SANDBOX_CENTER_ORIGIN.y},${SANDBOX_CENTER_ORIGIN.z}): ${res.placed} blocks, ${res.signsCount} signs.`);
+}
+if (!store.deltas.has(`${SANDBOX_VILLA_ORIGIN.x},${SANDBOX_VILLA_ORIGIN.y + 23},${SANDBOX_VILLA_ORIGIN.z}`)) {
+  const res = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
+  console.log(`[SandboxBuilds] Stamped 5F Semi-Basement Villa at (${SANDBOX_VILLA_ORIGIN.x},${SANDBOX_VILLA_ORIGIN.y},${SANDBOX_VILLA_ORIGIN.z}): ${res.placed} blocks, ${res.signsCount} signs.`);
+}
 
 // Real-time moving elevator state machine for Happiness Plus Center (1F~5F)
 const centerElevator = {
@@ -776,7 +817,8 @@ wss.on('connection', (ws) => {
         beacons: isStaticZone ? {} : store.beacons,
         facings: worldMode === 'job' ? {} : (worldMode === 'center' ? centerWorld.facings : store.facings),
         elevator: worldMode === 'center' ? getCenterElevatorPayload() : null,
-        centerPylon: worldMode === 'center' ? store.centerPylon : null,
+        centerPylon: worldMode === 'center' ? store.centerPylon : (worldMode === 'sandbox' ? SANDBOX_CENTER_PYLON : null),
+        centerNpcs: worldMode === 'center' ? CENTER_NPCS : (worldMode === 'sandbox' ? SANDBOX_CENTER_NPCS : []),
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
         regions: isStaticZone ? [] : store.regions,
@@ -1023,18 +1065,20 @@ wss.on('connection', (ws) => {
           centerWorld.setBlock(x, y, z, slot.block);
           centerWorld.facings[`${x},${y},${z}`] = fDir;
           store.setCenterFurn(x, y, z, slot.block, fDir);
-          if (slot.block === 'sign') {
-            centerWorld.signs[`${x},${y},${z}`] = { x, y, z, text: `${player.nickname}의 표지판`, author: player.nickname };
+          if (slot.block === 'sign' || slot.block === 'sign_fixed') {
+            centerWorld.signs[`${x},${y},${z}`] = {
+              x, y, z,
+              text: `${player.nickname}의 표지판`,
+              author: player.nickname,
+              fixed: slot.block === 'sign_fixed',
+              facing: fDir
+            };
             broadcast({ type: 'signs_update', signs: centerWorld.signs }, null, 'center');
           }
           broadcast({ type: 'block_update', x, y, z, block: slot.block, facing: fDir, by: player.nickname }, null, 'center');
           break;
         }
         const { x, y, z, slotIndex } = msg;
-        if (player.bag[Number(slotIndex)]?.block?.startsWith('furn_')) {
-          send(ws, { type: 'toast', level: 'warn', text: '🏢 카페·사무실 가구는 행복플러스센터 구역에서만 사용할 수 있습니다.' });
-          return;
-        }
         if (!store.inBounds(x, y, z)) {
           send(ws, { type: 'toast', level: 'warn', text: '월드 경계 밖에는 설치할 수 없습니다.' });
           return;
@@ -1088,10 +1132,18 @@ wss.on('connection', (ws) => {
           slot.count -= 1;
           if (slot.count <= 0) player.bag[idx] = null;
         }
-        const facingVal = (blockId.startsWith('stairs_') || isDoorBlock) ? (Number(msg.facing || 0) & 3) : undefined;
+        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId === 'sign_fixed';
+        const facingVal = needsFacing ? (Number(msg.facing || 0) & 3) : undefined;
         const prevFacing0 = store.facings[`${x},${y},${z}`];
         store.setBlock(x, y, z, blockId, player.nickname);
-        if (facingVal !== undefined) store.setFacing(x, y, z, facingVal);
+        if (facingVal !== undefined) {
+          store.setFacing(x, y, z, facingVal);
+          if (blockId === 'sign_fixed' && store.signs[`${x},${y},${z}`]) {
+            store.signs[`${x},${y},${z}`].facing = facingVal;
+            store.signs[`${x},${y},${z}`].fixed = true;
+            store._scheduleSave('signs', 100);
+          }
+        }
         if (isDoorBlock) {
           const prevTop = store.getBlock(x, y + 1, z);
           const prevFacingTop = store.facings[`${x},${y + 1},${z}`];
@@ -1130,7 +1182,7 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'toast', level: 'success', text: '🌱 묘목을 심었습니다! 잠시 후 나무로 자랍니다.' });
           scheduleSaplingGrowth(x, y, z);
         }
-        if (blockId === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
+        if (blockId === 'sign' || blockId === 'sign_fixed') broadcast({ type: 'signs_update', signs: store.signs });
         if (blockId === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
         if (isBeaconBlock) {
           broadcast({ type: 'beacons_update', beacons: store.beacons });
@@ -1249,12 +1301,12 @@ wss.on('connection', (ws) => {
           door_iron_open: 'door_iron_closed',
           door_glass_open: 'door_glass_closed',
           redstone_lamp_on: 'redstone_lamp_off',
-          lever_on: 'lever_off'
+          lever_on: 'lever_off',
+          furn_toilet_open: 'furn_toilet_closed'
         };
         const pickId = PICK_MAP[rawId] || rawId;
         const def = CATALOG[pickId];
         if (!def || def.kind !== 'block') return;
-        if (player.world === 'sandbox' && pickId.startsWith('furn_')) return;
 
         // 1. Check if player already has it in hotbar (0..8)
         for (let i = 0; i < 9; i++) {
@@ -1328,7 +1380,8 @@ wss.on('connection', (ws) => {
           door_iron_open: 'door_iron_closed',
           door_glass_open: 'door_glass_closed',
           redstone_lamp_on: 'redstone_lamp_off',
-          lever_on: 'lever_off'
+          lever_on: 'lever_off',
+          furn_toilet_open: 'furn_toilet_closed'
         };
         const cutId = CUT_MAP[cur] || cur;
         const def = CATALOG[cutId];
@@ -1337,7 +1390,7 @@ wss.on('connection', (ws) => {
         const k = `${x},${y},${z}`;
         const prevFacing = isCenter ? (centerWorld.facings[k] || 0) : store.facings[k];
         const signsMap = isCenter ? centerWorld.signs : store.signs;
-        const prevSign = cur === 'sign' && signsMap[k] ? { ...signsMap[k] } : null;
+        const prevSign = (cur === 'sign' || cur === 'sign_fixed') && signsMap[k] ? { ...signsMap[k] } : null;
         const signText = prevSign ? prevSign.text : null;
 
         const changes = [{ x, y, z, block: null }];
@@ -1408,10 +1461,6 @@ wss.on('connection', (ws) => {
             return;
           }
         } else {
-          if (blockId.startsWith('furn_')) {
-            send(ws, { type: 'toast', level: 'warn', text: '🏢 카페·사무실 가구는 행복플러스센터에서만 설치할 수 있습니다.' });
-            return;
-          }
           const region = store.findProtectingRegion(x, y, z);
           if (region && !player.isAdmin) {
             send(ws, { type: 'toast', level: 'warn', text: `🔒 보호 구역("${region.name}")에서는 설치할 수 없습니다.` });
@@ -1586,6 +1635,52 @@ wss.on('connection', (ws) => {
           changes.push({ x, y: y - 1, z, block: next });
         }
         broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, player.world);
+        break;
+      }
+
+      case 'toggle_toilet': {
+        const { x, y, z } = msg;
+        const isCenter = player.world === 'center';
+        const targetStore = isCenter ? centerWorld : (player.world === 'sandbox' ? store : null);
+        if (!targetStore || !targetStore.inBounds(x, y, z)) return;
+        const cur = targetStore.getBlock(x, y, z);
+        if (cur !== 'furn_toilet_closed' && cur !== 'furn_toilet_open') return;
+        const next = cur === 'furn_toilet_closed' ? 'furn_toilet_open' : 'furn_toilet_closed';
+        const k = `${x},${y},${z}`;
+        const fDir = isCenter ? (centerWorld.facings[k] ?? 2) : (store.facings[k] ?? 2);
+        targetStore.setBlock(x, y, z, next);
+        if (isCenter) {
+          centerWorld.facings[k] = fDir;
+          store.setCenterFurn(x, y, z, next, fDir);
+        } else {
+          store.setFacing(x, y, z, fDir);
+        }
+        broadcast({ type: 'block_update', x, y, z, block: next, facing: fDir, by: player.nickname }, null, player.world);
+        break;
+      }
+
+      case 'press_button': {
+        const { x, y, z } = msg;
+        if (player.world === 'center') {
+          const ev = centerWorld.elevator;
+          if (x === ev.buttonX && z === ev.buttonZ) {
+            callCenterElevator(getCenterElevatorFloorByY(y), player.nickname, ws);
+            break;
+          }
+          send(ws, { type: 'toast', level: 'info', text: '🔘 버튼을 눌렀습니다!' });
+          break;
+        }
+        if (player.world !== 'sandbox' || !store.inBounds(x, y, z)) return;
+        const cur = store.getBlock(x, y, z);
+        if (!cur || !cur.startsWith('btn_')) return;
+        const pk = `btn:${x},${y},${z}`;
+        const alreadyActive = plateTimers.has(pk);
+        if (alreadyActive) clearTimeout(plateTimers.get(pk));
+        else propagateRedstoneSignal(x, y, z, true, player.isAdmin);
+        plateTimers.set(pk, setTimeout(() => {
+          plateTimers.delete(pk);
+          propagateRedstoneSignal(x, y, z, false, false);
+        }, 1600));
         break;
       }
 
@@ -1951,7 +2046,7 @@ wss.on('connection', (ws) => {
           }
           const persistAir = !CENTER_FURNITURE_IDS.includes(cur);
           const prevFacing = centerWorld.facings[`${x},${y},${z}`] || 0;
-          const prevSign = cur === 'sign' && centerWorld.signs[`${x},${y},${z}`] ? { ...centerWorld.signs[`${x},${y},${z}`] } : null;
+          const prevSign = (cur === 'sign' || cur === 'sign_fixed') && centerWorld.signs[`${x},${y},${z}`] ? { ...centerWorld.signs[`${x},${y},${z}`] } : null;
           player.editUndoStack.push({
             world: 'center',
             label: CATALOG[cur]?.name || cur,
@@ -1961,7 +2056,7 @@ wss.on('connection', (ws) => {
           centerWorld.setBlock(x, y, z, null);
           delete centerWorld.facings[`${x},${y},${z}`];
           store.setCenterFurn(x, y, z, null, 0, persistAir);
-          if (cur === 'sign' && centerWorld.signs[`${x},${y},${z}`]) {
+          if ((cur === 'sign' || cur === 'sign_fixed') && centerWorld.signs[`${x},${y},${z}`]) {
             delete centerWorld.signs[`${x},${y},${z}`];
             broadcast({ type: 'signs_update', signs: centerWorld.signs }, null, 'center');
           }
@@ -2071,7 +2166,7 @@ wss.on('connection', (ws) => {
         if (doorPairCoord) {
           broadcast({ type: 'block_update', x: doorPairCoord.x, y: doorPairCoord.y, z: doorPairCoord.z, block: null, by: player.nickname, brokenBlock: existing });
         }
-        if (existing === 'sign') broadcast({ type: 'signs_update', signs: store.signs });
+        if (existing === 'sign' || existing === 'sign_fixed') broadcast({ type: 'signs_update', signs: store.signs });
         if (existing === 'portal') broadcast({ type: 'portals_update', portals: store.portals });
         if (existing === 'protect_beacon' || existing === 'stealth_beacon') {
           broadcast({ type: 'beacons_update', beacons: store.beacons });
@@ -2561,7 +2656,8 @@ wss.on('connection', (ws) => {
               worldRLE: centerWorld.getRLE(),
               signs: centerWorld.signs,
               facings: centerWorld.facings,
-              centerPylon: store.centerPylon
+              centerPylon: store.centerPylon,
+              centerNpcs: CENTER_NPCS
             }, null, 'center');
           } else {
             store.restoreSandboxSnapshot(snap.data);
@@ -2572,7 +2668,9 @@ wss.on('connection', (ws) => {
               portals: store.portals,
               beacons: store.beacons,
               facings: store.facings,
-              regions: store.regions
+              regions: store.regions,
+              centerPylon: SANDBOX_CENTER_PYLON,
+              centerNpcs: SANDBOX_CENTER_NPCS
             }, null, 'sandbox');
           }
           send(ws, { type: 'toast', level: 'success', text: `♻️ [${num}번] "${snap.entry.name}" 복원 완료!` });
@@ -2580,6 +2678,66 @@ wss.on('connection', (ws) => {
             type: 'chat', system: true,
             text: `♻️ 관리자(${player.nickname})님이 #${num} "${snap.entry.name}" 구조로 복원했습니다!`
           }, null, player.world);
+          return;
+        }
+        if (text === '/행플복구') {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /행플복구 명령어는 /관리자 모드에서만 사용할 수 있습니다.' });
+            return;
+          }
+          if (player.world === 'center') {
+            store.centerFurn = {};
+            store.saveNow('centerFurn');
+            centerWorld = createCenterWorld();
+            applyPersistedCenterState();
+            broadcast({
+              type: 'world_reload',
+              worldRLE: centerWorld.getRLE(),
+              signs: centerWorld.signs,
+              facings: centerWorld.facings,
+              centerPylon: store.centerPylon,
+              centerNpcs: CENTER_NPCS
+            }, null, 'center');
+            send(ws, { type: 'toast', level: 'success', text: '🏢 행복플러스센터를 초기 상태로 복구했습니다!' });
+          } else if (player.world === 'sandbox') {
+            const res = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
+            broadcast({
+              type: 'world_reload',
+              worldDeltas: store.getDeltasObject(),
+              signs: store.signs,
+              portals: store.portals,
+              beacons: store.beacons,
+              facings: store.facings,
+              regions: store.regions,
+              centerPylon: SANDBOX_CENTER_PYLON,
+              centerNpcs: SANDBOX_CENTER_NPCS
+            }, null, 'sandbox');
+            send(ws, { type: 'toast', level: 'success', text: `🏢 자유 월드 행복플러스센터 복구 완료! (${res.placed.toLocaleString()}블록)` });
+            broadcast({
+              type: 'chat', system: true,
+              text: `🏢 관리자(${player.nickname})님이 자유 월드 행복플러스센터(-75, 34, 94)를 초기 상태로 복구했습니다!`
+            }, null, 'sandbox');
+          }
+          return;
+        }
+        if (text === '/빌라복구') {
+          if (!player.isAdmin || player.world !== 'sandbox') {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /빌라복구 명령어는 자유 건축 월드 /관리자 모드에서 사용할 수 있습니다.' });
+            return;
+          }
+          const res = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
+          broadcast({
+            type: 'world_reload',
+            worldDeltas: store.getDeltasObject(),
+            signs: store.signs,
+            portals: store.portals,
+            beacons: store.beacons,
+            facings: store.facings,
+            regions: store.regions,
+            centerPylon: SANDBOX_CENTER_PYLON,
+            centerNpcs: SANDBOX_CENTER_NPCS
+          }, null, 'sandbox');
+          send(ws, { type: 'toast', level: 'success', text: `🏠 5층 반지하 빌라(401·402호) 복구 완료! (${res.placed.toLocaleString()}블록)` });
           return;
         }
         if (text === '/간판이동' || text === '/간판회전') {

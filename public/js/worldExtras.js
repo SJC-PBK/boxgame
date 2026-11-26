@@ -1,6 +1,6 @@
 import * as THREE from '../vendor/three/three.module.min.js';
 
-function makeBillboardSprite(lines, bgColor, borderColor, textColor, scaleW = 1.9, scaleH = 0.85) {
+function makeSignCanvasTexture(lines, bgColor, borderColor, textColor) {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 112;
   const ctx = c.getContext('2d');
@@ -22,10 +22,22 @@ function makeBillboardSprite(lines, bgColor, borderColor, textColor, scaleW = 1.
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function makeBillboardSprite(lines, bgColor, borderColor, textColor, scaleW = 1.9, scaleH = 0.85) {
+  const tex = makeSignCanvasTexture(lines, bgColor, borderColor, textColor);
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true });
   const sp = new THREE.Sprite(mat);
   sp.scale.set(scaleW, scaleH, 1);
   return sp;
+}
+
+function makeFixedSignPlane(lines, bgColor, borderColor, textColor, w = 1.65, h = 0.72) {
+  const tex = makeSignCanvasTexture(lines, bgColor, borderColor, textColor);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  return mesh;
 }
 
 export class WorldExtras {
@@ -35,7 +47,9 @@ export class WorldExtras {
     this.portalGroup = new THREE.Group();
     this.remoteGroup = new THREE.Group();
     this.beaconGroup = new THREE.Group();
-    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup, this.beaconGroup);
+    this.npcGroup = new THREE.Group();
+    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup, this.beaconGroup, this.npcGroup);
+    this._npcRigs = [];
 
     this.ignitedTnts = []; // { mesh, mat, light, x, y, z, startTime, endTime, sparkAcc }
     this.explosions = [];  // { flashLight, core, outer, ring, debris, smokes, age, maxAge }
@@ -57,12 +71,32 @@ export class WorldExtras {
   }
 
   syncSigns(signsObj) {
-    this._clearGroup(this.signGroup);
+    while (this.signGroup.children.length > 0) {
+      const ch = this.signGroup.children[0];
+      ch.geometry?.dispose?.();
+      ch.material?.map?.dispose?.();
+      ch.material?.dispose?.();
+      this.signGroup.remove(ch);
+    }
     for (const s of Object.values(signsObj || {})) {
       const lines = String(s.text || '표지판').split('\n');
-      const sp = makeBillboardSprite(lines, 'rgba(120, 72, 32, 0.92)', '#fde68a', '#ffffff', 1.85, 0.8);
-      sp.position.set(s.x + 0.5, s.y + 1.35, s.z + 0.5);
-      this.signGroup.add(sp);
+      if (s.fixed) {
+        // Front-facing fixed 3D sign plane (does NOT track camera!)
+        const plane = makeFixedSignPlane(lines, 'rgba(110, 66, 28, 0.96)', '#fde68a', '#ffffff', 1.55, 0.68);
+        const f = Number(s.facing ?? 2) & 3;
+        // facing: 0=N(-Z), 1=E(+X), 2=S(+Z), 3=W(-X); plane front (+Z) faces the viewer in front of the sign!
+        const rotMap = [Math.PI, Math.PI / 2, 0, -Math.PI / 2];
+        plane.rotation.y = rotMap[f];
+        const off = 0.09;
+        const ox = f === 1 ? off : (f === 3 ? -off : 0);
+        const oz = f === 2 ? off : (f === 0 ? -off : 0);
+        plane.position.set(s.x + 0.5 + ox, s.y + 0.88, s.z + 0.5 + oz);
+        this.signGroup.add(plane);
+      } else {
+        const sp = makeBillboardSprite(lines, 'rgba(120, 72, 32, 0.92)', '#fde68a', '#ffffff', 1.85, 0.8);
+        sp.position.set(s.x + 0.5, s.y + 1.35, s.z + 0.5);
+        this.signGroup.add(sp);
+      }
     }
   }
 
@@ -608,6 +642,17 @@ export class WorldExtras {
     }
 
     this._updateElevator();
+    // Subtle typing animation for seated office staff NPCs
+    if (this._npcRigs && this._npcRigs.length > 0) {
+      const t = now * 0.008;
+      for (let i = 0; i < this._npcRigs.length; i++) {
+        const rig = this._npcRigs[i];
+        rig.leftArm.rotation.x = -1.15 + Math.sin(t * 2.4 + i) * 0.14;
+        rig.rightArm.rotation.x = -1.15 + Math.cos(t * 2.7 + i) * 0.14;
+        rig.head.rotation.y = Math.sin(t * 0.35 + i) * 0.12;
+        rig.head.rotation.x = 0.12 + Math.sin(t * 0.5 + i) * 0.04;
+      }
+    }
   }
 
   // ---- Real Animated 3D Elevator Cab (Happiness Plus Center) ----
@@ -669,6 +714,17 @@ export class WorldExtras {
       receivedAt: performance.now()
     };
     this._updateElevator();
+    // Subtle typing animation for seated office staff NPCs
+    if (this._npcRigs && this._npcRigs.length > 0) {
+      const t = now * 0.008;
+      for (let i = 0; i < this._npcRigs.length; i++) {
+        const rig = this._npcRigs[i];
+        rig.leftArm.rotation.x = -1.15 + Math.sin(t * 2.4 + i) * 0.14;
+        rig.rightArm.rotation.x = -1.15 + Math.cos(t * 2.7 + i) * 0.14;
+        rig.head.rotation.y = Math.sin(t * 0.35 + i) * 0.12;
+        rig.head.rotation.x = 0.12 + Math.sin(t * 0.5 + i) * 0.04;
+      }
+    }
   }
 
   _updateElevator() {
@@ -874,5 +930,124 @@ export class WorldExtras {
     group.rotation.y = pylonData.rotY || 0;
     this.scene.add(group);
     this._pylonGroup = group;
+  }
+
+  // ---- Seated Office Staff NPCs (e.g. 4F "야근하는 박부규" with round black glasses & dark clothes!) ----
+  syncCenterNpcs(npcList) {
+    while (this.npcGroup.children.length > 0) {
+      this.npcGroup.remove(this.npcGroup.children[0]);
+    }
+    this._npcRigs = [];
+    if (!Array.isArray(npcList) || npcList.length === 0) return;
+
+    for (const npc of npcList) {
+      const g = new THREE.Group();
+
+      // Face canvas with crisp round black glasses!
+      const fc = document.createElement('canvas');
+      fc.width = 128; fc.height = 128;
+      const ctx = fc.getContext('2d');
+      ctx.fillStyle = npc.skinColor || '#f1c69c';
+      ctx.fillRect(0, 0, 128, 128);
+      // Dark hair bangs at top
+      ctx.fillStyle = npc.hairColor || '#18181b';
+      ctx.fillRect(0, 0, 128, 30);
+      ctx.fillRect(0, 30, 16, 18);
+      ctx.fillRect(112, 30, 16, 18);
+      // Eyes
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(32, 56, 14, 14);
+      ctx.fillRect(82, 56, 14, 14);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(34, 58, 4, 4);
+      ctx.fillRect(84, 58, 4, 4);
+      // Round black glasses frames!
+      if (npc.roundGlasses !== false) {
+        ctx.strokeStyle = '#09090b';
+        ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(39, 63, 21, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(89, 63, 21, 0, Math.PI * 2); ctx.stroke();
+        // Bridge & temples
+        ctx.fillStyle = '#09090b';
+        ctx.fillRect(58, 59, 12, 6);
+        ctx.fillRect(0, 59, 18, 6);
+        ctx.fillRect(110, 59, 18, 6);
+        // Subtle lens sheen
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.25)';
+        ctx.beginPath(); ctx.arc(39, 63, 17, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(89, 63, 17, 0, Math.PI * 2); ctx.fill();
+      }
+      // Subtle determined smile
+      ctx.fillStyle = '#7c4a32';
+      ctx.fillRect(52, 98, 24, 5);
+
+      const faceTex = new THREE.CanvasTexture(fc);
+      faceTex.colorSpace = THREE.SRGBColorSpace;
+      const skinMat = new THREE.MeshLambertMaterial({ color: npc.skinColor || '#f1c69c' });
+      const hairMat = new THREE.MeshLambertMaterial({ color: npc.hairColor || '#18181b' });
+      const faceMat = new THREE.MeshLambertMaterial({ map: faceTex });
+      const shirtMat = new THREE.MeshLambertMaterial({ color: npc.shirtColor || '#1f2937' }); // dark clothes!
+      const pantsMat = new THREE.MeshLambertMaterial({ color: npc.pantsColor || '#111827' });
+      const shoeMat = new THREE.MeshLambertMaterial({ color: '#09090b' });
+
+      // Head (+Z is front face in local coords; we rotate group by rotY so +Z faces the PC monitor!)
+      const head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.46, 0.46, 0.46),
+        [hairMat, hairMat, hairMat, skinMat, faceMat, hairMat]
+      );
+      head.position.set(0, 1.32, 0.02);
+      g.add(head);
+
+      // Torso (dark jacket/shirt, seated on chair cushion y ~ 0.50)
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.58, 0.26), shirtMat);
+      torso.position.set(0, 0.80, 0);
+      g.add(torso);
+
+      // Seated thighs extending forward (+Z) + bent lower legs
+      const thighL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.19, 0.44), pantsMat);
+      thighL.position.set(-0.12, 0.54, 0.22);
+      const thighR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.19, 0.44), pantsMat);
+      thighR.position.set(0.12, 0.54, 0.22);
+      const shinL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), pantsMat);
+      shinL.position.set(-0.12, 0.28, 0.38);
+      const shinR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), pantsMat);
+      shinR.position.set(0.12, 0.28, 0.38);
+      const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
+      shoeL.position.set(-0.12, 0.06, 0.41);
+      const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
+      shoeR.position.set(0.12, 0.06, 0.41);
+      g.add(thighL, thighR, shinL, shinR, shoeL, shoeR);
+
+      // Left & right arms pivoted at shoulders, reaching forward to type on keyboard!
+      const makeArm = (sx) => {
+        const pivot = new THREE.Group();
+        pivot.position.set(sx, 1.04, 0.02);
+        const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.42, 0.16), shirtMat);
+        sleeve.position.set(0, -0.18, 0);
+        const hand = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.14, 0.15), skinMat);
+        hand.position.set(0, -0.44, 0);
+        pivot.add(sleeve, hand);
+        pivot.rotation.x = -1.15;
+        return pivot;
+      };
+      const leftArm = makeArm(-0.31);
+      const rightArm = makeArm(0.31);
+      g.add(leftArm, rightArm);
+
+      // Floating name tag above seated staff member
+      if (npc.name) {
+        const tag = makeBillboardSprite([npc.name], 'rgba(15, 23, 42, 0.85)', '#38bdf8', '#f8fafc', 1.45, 0.42);
+        tag.position.set(0, 1.88, 0);
+        g.add(tag);
+      }
+
+      // Position on chair & rotate to face desk (facing: 0=N(-Z)->rotY=Math.PI, 1=E(+X)->Math.PI/2, 2=S(+Z)->0, 3=W(-X)->-Math.PI/2)
+      const f = Number(npc.facing ?? 0) & 3;
+      const rotMap = [Math.PI, Math.PI / 2, 0, -Math.PI / 2];
+      g.rotation.y = rotMap[f];
+      g.position.set(npc.x + 0.5, npc.y, npc.z + 0.5);
+      this.npcGroup.add(g);
+      this._npcRigs.push({ group: g, head, leftArm, rightArm });
+    }
   }
 }

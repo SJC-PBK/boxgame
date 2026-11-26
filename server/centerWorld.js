@@ -259,9 +259,9 @@ export function createCenterWorld() {
     const initDoor = f === 0 ? 'door_iron_open' : 'door_iron_closed';
     setDoor(bx(6), baseY + 1, bz(4), initDoor, 2);
     setDoor(bx(7), baseY + 1, bz(4), initDoor, 2);
-    // Call button (lever) & sign right outside elevator entrance on each floor
-    set(bx(8), baseY + 2, bz(5), 'lever_off');
-    addSign(bx(5), baseY + 2, bz(5), `🛗 엘리베이터 (${f + 1}F)\n문·버튼 우클릭: 호출\n탑승 후 [1~5]층 선택`);
+    // Call button (sleek blue wall button) & sign right outside elevator entrance on each floor
+    set(bx(8), baseY + 2, bz(5), 'btn_blue', 2);
+    addSign(bx(5), baseY + 2, bz(5), `🛗 엘리베이터 (${f + 1}F)\n문·버튼 우클릭: 호출\n탑승 후 [1~7]층 선택`);
 
     // -- 계단실 (dx = 9..18, dz = 1..5) --
     // Clear stairwell interior & cut ceiling void above stairs so player walks smoothly 1F->5F->Roof!
@@ -332,11 +332,9 @@ export function createCenterWorld() {
     }
     setDoor(bx(22), baseY + 1, bz(3), 'door_closed', 2);
     setDoor(bx(27), baseY + 1, bz(3), 'door_closed', 2);
-    // Toilets + flush levers
-    set(bx(22), baseY + 1, bz(1), 'wool_white');
-    set(bx(22), baseY + 2, bz(1), 'lever_off');
-    set(bx(27), baseY + 1, bz(1), 'wool_white');
-    set(bx(27), baseY + 2, bz(1), 'lever_off');
+    // Interactive Toilets (right-click to open/close lid!)
+    set(bx(22), baseY + 1, bz(1), 'furn_toilet_closed', 2);
+    set(bx(27), baseY + 1, bz(1), 'furn_toilet_closed', 2);
     // Center sink & mirror + corner sink
     set(bx(25), baseY + 1, bz(1), 'cobble');
     set(bx(24), baseY + 1, bz(1), 'water');
@@ -344,7 +342,7 @@ export function createCenterWorld() {
     set(bx(25), ceilY - 1, bz(3), 'lamp');
     addSign(bx(24), baseY + 2, bz(6), `🚺 여자화장실 (${f + 1}F)`);
 
-    // -- 남자화장실 (dx = 29..35, dz = 1..5) — Identical on 1F~5F! --
+    // -- 남자화장실 (dx = 29..35, dz = 1..5) — Identical on 1F~6F! --
     fill(bx(29), baseY, bz(1), bx(35), baseY, bz(5), 'wool_white');
     for (let y = baseY + 1; y < ceilY; y++) {
       for (let dz = 1; dz <= 5; dz++) set(bx(35), y, bz(dz), 'stone');
@@ -360,12 +358,10 @@ export function createCenterWorld() {
     }
     setDoor(bx(29), baseY + 1, bz(3), 'door_closed', 2);
     setDoor(bx(34), baseY + 1, bz(3), 'door_closed', 2);
-    set(bx(29), baseY + 1, bz(1), 'wool_white');
-    set(bx(29), baseY + 2, bz(1), 'lever_off');
-    set(bx(34), baseY + 1, bz(1), 'wool_white');
-    set(bx(34), baseY + 2, bz(1), 'lever_off');
-    // Center sink & corner sink
-    set(bx(32), baseY + 1, bz(1), 'cobble');
+    set(bx(29), baseY + 1, bz(1), 'furn_toilet_closed', 2);
+    set(bx(34), baseY + 1, bz(1), 'furn_toilet_closed', 2);
+    // Urinal directly opposite the men's restroom door (dx=32, dz=1 facing south toward door at dx=32, dz=5!) + sink
+    set(bx(32), baseY + 1, bz(1), 'furn_urinal', 2);
     set(bx(31), baseY + 1, bz(1), 'water');
     set(bx(29), baseY + 1, bz(4), 'cobble');
     set(bx(32), ceilY - 1, bz(3), 'lamp');
@@ -1229,7 +1225,7 @@ export function createCenterWorld() {
   setDoor(bx(6), ROOF_Y + 1, bz(4), 'door_iron_closed', 2);
   setDoor(bx(7), ROOF_Y + 1, bz(4), 'door_iron_closed', 2);
   set(bx(5), ROOF_Y + 3, bz(2), 'lamp');
-  set(bx(8), ROOF_Y + 2, bz(5), 'lever_off');
+  set(bx(8), ROOF_Y + 2, bz(5), 'btn_blue', 2);
   addSign(bx(5), ROOF_Y + 2, bz(5), '🛗 엘리베이터 (7F 옥상)\n문·버튼 우클릭: 호출\n탑승 후 [1~7]층 선택');
   setDoor(bx(13), ROOF_Y + 1, bz(8), 'door_glass_closed', 2);
   setDoor(bx(14), ROOF_Y + 1, bz(8), 'door_glass_closed', 2);

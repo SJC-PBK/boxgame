@@ -106,17 +106,38 @@ export const BLOCKS = {
   slab_wood:         { numId: 78, id: 'slab_wood',         name: '🟫 우드 얇은 바닥판',  transparent: true,  solid: false, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'slab_wood',         sound: 'wood',  stackable: 64, category: '건축' },
   slab_stone:        { numId: 79, id: 'slab_stone',        name: '⬛ 돌 얇은 바닥판',    transparent: true,  solid: false, hardness: 0.3,  preferredTool: null, minTier: 0, drop: 'slab_stone',        sound: 'stone', stackable: 64, category: '건축' },
   slab_white:        { numId: 80, id: 'slab_white',        name: '⬜ 화이트 타일판',     transparent: true,  solid: false, hardness: 0.25, preferredTool: null, minTier: 0, drop: 'slab_white',        sound: 'stone', stackable: 64, category: '건축' },
-  slab_carpet:       { numId: 81, id: 'slab_carpet',       name: '🟦 블루 카펫 타일',    transparent: true,  solid: false, hardness: 0.2,  preferredTool: null, minTier: 0, drop: 'slab_carpet',       sound: 'dirt',  stackable: 64, category: '건축' }
+  slab_carpet:       { numId: 81, id: 'slab_carpet',       name: '🟦 블루 카펫 타일',    transparent: true,  solid: false, hardness: 0.2,  preferredTool: null, minTier: 0, drop: 'slab_carpet',       sound: 'dirt',  stackable: 64, category: '건축' },
+  // Front-facing fixed sign, Interactive Toilet, Urinal & Multi-Color Buttons (numId 82..91)
+  sign_fixed:        { numId: 82, id: 'sign_fixed',        name: '🪧 정면 고정 표지판',  transparent: true,  solid: false, hardness: 0.5,  preferredTool: 'axe', minTier: 0, drop: 'sign_fixed',        sound: 'wood',  stackable: 16, category: '기능' },
+  furn_toilet_closed:{ numId: 83, id: 'furn_toilet_closed',name: '🚽 변기 (뚜껑 닫힘)',  transparent: true,  solid: true,  hardness: 0.4,  preferredTool: null,  minTier: 0, drop: 'furn_toilet_closed',sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true },
+  furn_toilet_open:  { numId: 84, id: 'furn_toilet_open',  name: '🚽 변기 (뚜껑 열림)',  transparent: true,  solid: true,  hardness: 0.4,  preferredTool: null,  minTier: 0, drop: 'furn_toilet_closed',sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true },
+  furn_urinal:       { numId: 85, id: 'furn_urinal',       name: '🚹 소변기',            transparent: true,  solid: true,  hardness: 0.4,  preferredTool: null,  minTier: 0, drop: 'furn_urinal',       sound: 'stone', stackable: 64, category: '센터가구', centerOnly: true },
+  btn_white:         { numId: 86, id: 'btn_white',         name: '⬜ 화이트 버튼',       transparent: true,  solid: false, hardness: 0.25, preferredTool: null,  minTier: 0, drop: 'btn_white',         sound: 'stone', stackable: 64, category: '특수' },
+  btn_red:           { numId: 87, id: 'btn_red',           name: '🟥 레드 버튼',         transparent: true,  solid: false, hardness: 0.25, preferredTool: null,  minTier: 0, drop: 'btn_red',           sound: 'stone', stackable: 64, category: '특수' },
+  btn_blue:          { numId: 88, id: 'btn_blue',          name: '🟦 블루 버튼',         transparent: true,  solid: false, hardness: 0.25, preferredTool: null,  minTier: 0, drop: 'btn_blue',          sound: 'stone', stackable: 64, category: '특수' },
+  btn_yellow:        { numId: 89, id: 'btn_yellow',        name: '🟨 옐로우 버튼',       transparent: true,  solid: false, hardness: 0.25, preferredTool: null,  minTier: 0, drop: 'btn_yellow',        sound: 'stone', stackable: 64, category: '특수' },
+  btn_green:         { numId: 90, id: 'btn_green',         name: '🟩 그린 버튼',         transparent: true,  solid: false, hardness: 0.25, preferredTool: null,  minTier: 0, drop: 'btn_green',         sound: 'stone', stackable: 64, category: '특수' },
+  btn_metal:         { numId: 91, id: 'btn_metal',         name: '🔘 메탈 버튼',         transparent: true,  solid: false, hardness: 0.25, preferredTool: null,  minTier: 0, drop: 'btn_metal',         sound: 'stone', stackable: 64, category: '특수' }
 };
+
+export const BUTTON_IDS = ['btn_white', 'btn_red', 'btn_blue', 'btn_yellow', 'btn_green', 'btn_metal'];
 
 export const CENTER_FURNITURE_IDS = [
   'furn_office_desk', 'furn_office_chair', 'furn_white_table', 'furn_partition', 'furn_cabinet',
-  'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac'
+  'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac',
+  'furn_toilet_closed', 'furn_toilet_open', 'furn_urinal',
+  'sign_fixed', ...BUTTON_IDS
 ];
 
 export function createCenterFurnitureBag() {
   const bag = Array(BAG_SIZE).fill(null);
-  CENTER_FURNITURE_IDS.forEach((id, i) => {
+  const initialIds = [
+    'furn_office_desk', 'furn_office_chair', 'furn_white_table', 'furn_partition', 'furn_cabinet',
+    'furn_potted_plant', 'furn_cafe_table', 'furn_sofa', 'furn_tv_screen', 'furn_ceiling_ac',
+    'furn_toilet_closed', 'furn_urinal', 'sign_fixed',
+    'btn_metal', 'btn_white', 'btn_red', 'btn_blue', 'btn_yellow', 'btn_green'
+  ];
+  initialIds.forEach((id, i) => {
     bag[i] = { block: id, count: 64 };
   });
   return bag;
@@ -249,6 +270,15 @@ export const RECIPES = [
   { id: 'r-torch',         category: '건축', out: { item: 'torch', count: 4 },          in: [{ item: 'stick', count: 1 }, { item: 'coal', count: 1 }] },
   { id: 'r-ladder',   category: '건축', out: { item: 'ladder', count: 4 },      in: [{ item: 'stick', count: 6 }] },
   { id: 'r-sign',     category: '건축', out: { item: 'sign', count: 2 },        in: [{ item: 'planks', count: 4 }, { item: 'stick', count: 1 }] },
+  { id: 'r-sign-fix', category: '건축', out: { item: 'sign_fixed', count: 2 },  in: [{ item: 'planks', count: 4 }, { item: 'stick', count: 1 }] },
+  { id: 'r-toilet',   category: '건축', out: { item: 'furn_toilet_closed', count: 1 }, in: [{ item: 'wool_white', count: 2 }, { item: 'stone', count: 2 }] },
+  { id: 'r-urinal',   category: '건축', out: { item: 'furn_urinal', count: 1 },        in: [{ item: 'wool_white', count: 1 }, { item: 'stone', count: 2 }] },
+  { id: 'r-btn-w',    category: '특수', out: { item: 'btn_white', count: 4 },   in: [{ item: 'stone', count: 1 }, { item: 'wool_white', count: 1 }] },
+  { id: 'r-btn-r',    category: '특수', out: { item: 'btn_red', count: 4 },     in: [{ item: 'stone', count: 1 }, { item: 'wool_red', count: 1 }] },
+  { id: 'r-btn-b',    category: '특수', out: { item: 'btn_blue', count: 4 },    in: [{ item: 'stone', count: 1 }, { item: 'wool_blue', count: 1 }] },
+  { id: 'r-btn-y',    category: '특수', out: { item: 'btn_yellow', count: 4 },  in: [{ item: 'stone', count: 1 }, { item: 'wool_yellow', count: 1 }] },
+  { id: 'r-btn-g',    category: '특수', out: { item: 'btn_green', count: 4 },   in: [{ item: 'stone', count: 1 }, { item: 'leaves', count: 1 }] },
+  { id: 'r-btn-m',    category: '특수', out: { item: 'btn_metal', count: 4 },   in: [{ item: 'iron_ingot', count: 1 }] },
   { id: 'r-tnt',          category: '특수', out: { item: 'tnt', count: 1 },          in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },
   { id: 'r-flatten-bomb', category: '특수', out: { item: 'flatten_bomb', count: 1 }, in: [{ item: 'tnt', count: 1 }, { item: 'iron_ingot', count: 2 }] },
   { id: 'r-fill-bomb',    category: '특수', out: { item: 'fill_bomb', count: 1 },    in: [{ item: 'dirt', count: 8 }, { item: 'coal', count: 2 }] },

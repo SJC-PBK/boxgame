@@ -599,14 +599,58 @@ function drawBlockFace(blockId, face) {
         for (let y = 2; y < 16; y += 4) ctx.fillRect(2, y, 12, 2);
         break;
       }
-      case 'sign': {
+      case 'sign':
+      case 'sign_fixed': {
         ctx.fillStyle = '#784820';
         ctx.fillRect(7, 9, 2, 7);
-        ctx.fillStyle = '#c2975f';
+        ctx.fillStyle = id === 'sign_fixed' ? '#d4a36a' : '#c2975f';
         ctx.fillRect(1, 2, 14, 8);
+        if (id === 'sign_fixed') {
+          ctx.fillStyle = '#925c28';
+          ctx.fillRect(1, 2, 14, 1); ctx.fillRect(1, 9, 14, 1);
+          ctx.fillRect(1, 2, 1, 8); ctx.fillRect(14, 2, 1, 8);
+        }
         ctx.fillStyle = '#5c3f24';
         ctx.fillRect(3, 4, 10, 1);
         ctx.fillRect(3, 6, 8, 1);
+        break;
+      }
+      case 'furn_toilet_closed':
+      case 'furn_toilet_open':
+      case 'furn_urinal': {
+        fillNoise(ctx, ['#f8fafc', '#f1f5f9', '#e2e8f0'], 1030);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(0, 0, 16, 1); ctx.fillRect(0, 15, 16, 1);
+        ctx.fillRect(0, 0, 1, 16); ctx.fillRect(15, 0, 1, 16);
+        if (id === 'furn_toilet_open' && face === 'top') {
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(4, 4, 8, 8);
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(6, 6, 4, 4);
+        }
+        break;
+      }
+      case 'btn_white':
+      case 'btn_red':
+      case 'btn_blue':
+      case 'btn_yellow':
+      case 'btn_green':
+      case 'btn_metal': {
+        const bCols = {
+          btn_white:  ['#f8fafc', '#e2e8f0', '#cbd5e1'],
+          btn_red:    ['#ef4444', '#dc2626', '#f87171'],
+          btn_blue:   ['#3b82f6', '#2563eb', '#60a5fa'],
+          btn_yellow: ['#facc15', '#eab308', '#fde047'],
+          btn_green:  ['#22c55e', '#16a34a', '#4ade80'],
+          btn_metal:  ['#cbd5e1', '#94a3b8', '#e2e8f0']
+        };
+        const pal = bCols[id] || bCols.btn_metal;
+        ctx.fillStyle = pal[1];
+        ctx.fillRect(0, 0, 16, 16);
+        ctx.fillStyle = pal[0];
+        ctx.fillRect(2, 2, 12, 12);
+        ctx.fillStyle = pal[2];
+        ctx.fillRect(3, 3, 10, 3);
         break;
       }
       case 'tnt': {
@@ -1271,7 +1315,90 @@ export class TextureLibrary {
               ctx.fillRect(10, 12, 12, 8); // center grille
               ctx.fillStyle = '#38bdf8';
               ctx.fillRect(22, 19, 2, 2); // power LED
+            } else if (def.id === 'furn_toilet_closed' || def.id === 'furn_toilet_open') {
+              // Crisp white ceramic toilet silhouette (tank + bowl + closed or raised lid!)
+              ctx.fillStyle = '#e2e8f0';
+              ctx.fillRect(6, 4, 10, 14); // rear water tank
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(7, 5, 8, 12);
+              ctx.fillStyle = '#94a3b8';
+              ctx.fillRect(12, 7, 3, 2); // chrome flush handle
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(10, 17, 15, 7); // bowl body
+              ctx.fillRect(11, 24, 11, 5); // pedestal base
+              if (def.id === 'furn_toilet_open') {
+                // Raised lid leaning against tank + blue water glint
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillRect(15, 8, 3, 10);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(17, 17, 6, 2);
+              } else {
+                // Flat closed lid
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillRect(10, 15, 16, 3);
+              }
+              ctx.strokeStyle = '#475569'; ctx.lineWidth = 1.2;
+              ctx.strokeRect(6, 4, 10, 14);
+              ctx.strokeRect(10, 17, 15, 7);
+            } else if (def.id === 'furn_urinal') {
+              // Sleek wall-mounted porcelain urinal + top chrome flush pipe
+              ctx.fillStyle = '#94a3b8';
+              ctx.fillRect(14, 2, 4, 5); // flush pipe
+              ctx.fillRect(12, 3, 8, 2); // flush valve
+              ctx.fillStyle = '#f8fafc';
+              ctx.fillRect(8, 7, 16, 18); // outer ceramic body
+              ctx.fillRect(10, 25, 12, 3); // curved bottom
+              ctx.fillStyle = '#cbd5e1';
+              ctx.fillRect(11, 10, 10, 12); // inner basin shadow
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillRect(14, 19, 4, 2); // drain accent
+              ctx.strokeStyle = '#475569'; ctx.lineWidth = 1.2;
+              ctx.strokeRect(8, 7, 16, 18);
             }
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id.startsWith('btn_')) {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            const cMap = {
+              btn_white:  ['#f8fafc', '#cbd5e1'],
+              btn_red:    ['#ef4444', '#991b1b'],
+              btn_blue:   ['#3b82f6', '#1d4ed8'],
+              btn_yellow: ['#facc15', '#a16207'],
+              btn_green:  ['#22c55e', '#15803d'],
+              btn_metal:  ['#cbd5e1', '#64748b']
+            };
+            const [main, dark] = cMap[def.id] || cMap.btn_metal;
+            // Sleek dark bezel plate + raised glossy colored button cap
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(5, 7, 22, 18);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(6, 8, 20, 16);
+            ctx.fillStyle = dark;
+            ctx.fillRect(9, 11, 14, 11);
+            ctx.fillStyle = main;
+            ctx.fillRect(9, 10, 14, 9);
+            ctx.fillStyle = 'rgba(255,255,255,0.45)';
+            ctx.fillRect(10, 11, 12, 3);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'sign_fixed') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.fillStyle = '#784820';
+            ctx.fillRect(14, 18, 4, 12);
+            ctx.fillStyle = '#d4a36a';
+            ctx.fillRect(3, 5, 26, 15);
+            ctx.strokeStyle = '#5c3f24'; ctx.lineWidth = 2;
+            ctx.strokeRect(3, 5, 26, 15);
+            ctx.fillStyle = '#5c3f24';
+            ctx.fillRect(7, 9, 18, 2);
+            ctx.fillRect(7, 13, 14, 2);
+            // Small cyan "fixed front" pin badge
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(23, 6, 4, 4);
           }, 32);
           this.icons[def.id] = ic.toDataURL();
           this.itemTextures[def.id] = toTexture(ic);

@@ -944,6 +944,94 @@ export class WorldRenderer {
             } else if (blockId === 'furn_ceiling_ac') {
               // Slim 4-way ceiling cassette air conditioner unit
               pushSubBox(blockId, x, y, z, 0.06, 0.78, 0.06, 0.94, 0.99, 0.94, lr, lg, lb, 0.04);
+            } else if (blockId === 'furn_toilet_closed' || blockId === 'furn_toilet_open') {
+              // 4-way white ceramic toilet: pedestal + bowl + rear tank + open/closed lid!
+              const open = blockId === 'furn_toilet_open';
+              if (fDir === 0) {
+                pushSubBox('wool_white', x, y, z, 0.24, 0, 0.68, 0.76, 0.94, 0.96, lr, lg, lb, 0.06); // tank (south)
+                pushSubBox('wool_white', x, y, z, 0.30, 0, 0.20, 0.70, 0.28, 0.68, lr, lg, lb, 0.10); // base
+                pushSubBox(blockId, x, y, z, 0.22, 0.28, 0.14, 0.78, 0.46, 0.68, lr, lg, lb, 0.06);   // bowl
+                if (open) pushSubBox('wool_white', x, y, z, 0.24, 0.46, 0.60, 0.76, 0.96, 0.68, lr, lg, lb, 0.04);
+                else pushSubBox('wool_white', x, y, z, 0.22, 0.46, 0.14, 0.78, 0.54, 0.68, lr, lg, lb, 0.04);
+              } else if (fDir === 1) {
+                pushSubBox('wool_white', x, y, z, 0.04, 0, 0.24, 0.32, 0.94, 0.76, lr, lg, lb, 0.06); // tank (west)
+                pushSubBox('wool_white', x, y, z, 0.32, 0, 0.30, 0.80, 0.28, 0.70, lr, lg, lb, 0.10);
+                pushSubBox(blockId, x, y, z, 0.32, 0.28, 0.22, 0.86, 0.46, 0.78, lr, lg, lb, 0.06);
+                if (open) pushSubBox('wool_white', x, y, z, 0.32, 0.46, 0.24, 0.40, 0.96, 0.76, lr, lg, lb, 0.04);
+                else pushSubBox('wool_white', x, y, z, 0.32, 0.46, 0.22, 0.86, 0.54, 0.78, lr, lg, lb, 0.04);
+              } else if (fDir === 2) {
+                pushSubBox('wool_white', x, y, z, 0.24, 0, 0.04, 0.76, 0.94, 0.32, lr, lg, lb, 0.06); // tank (north)
+                pushSubBox('wool_white', x, y, z, 0.30, 0, 0.32, 0.70, 0.28, 0.80, lr, lg, lb, 0.10);
+                pushSubBox(blockId, x, y, z, 0.22, 0.28, 0.32, 0.78, 0.46, 0.86, lr, lg, lb, 0.06);
+                if (open) pushSubBox('wool_white', x, y, z, 0.24, 0.46, 0.32, 0.76, 0.96, 0.40, lr, lg, lb, 0.04);
+                else pushSubBox('wool_white', x, y, z, 0.22, 0.46, 0.32, 0.78, 0.54, 0.86, lr, lg, lb, 0.04);
+              } else {
+                pushSubBox('wool_white', x, y, z, 0.68, 0, 0.24, 0.96, 0.94, 0.76, lr, lg, lb, 0.06); // tank (east)
+                pushSubBox('wool_white', x, y, z, 0.20, 0, 0.30, 0.68, 0.28, 0.70, lr, lg, lb, 0.10);
+                pushSubBox(blockId, x, y, z, 0.14, 0.28, 0.22, 0.68, 0.46, 0.78, lr, lg, lb, 0.06);
+                if (open) pushSubBox('wool_white', x, y, z, 0.60, 0.46, 0.24, 0.68, 0.96, 0.76, lr, lg, lb, 0.04);
+                else pushSubBox('wool_white', x, y, z, 0.14, 0.46, 0.22, 0.68, 0.54, 0.78, lr, lg, lb, 0.04);
+              }
+            } else if (blockId === 'furn_urinal') {
+              // 4-way wall-mounted white ceramic urinal + chrome flush valve
+              if (fDir === 0) {
+                pushSubBox('wool_white', x, y, z, 0.24, 0.18, 0.74, 0.76, 0.92, 0.98, lr, lg, lb, 0.06);
+                pushSubBox('wool_white', x, y, z, 0.24, 0.18, 0.48, 0.76, 0.34, 0.74, lr, lg, lb, 0.08);
+                pushSubBox('stone', x, y, z, 0.44, 0.92, 0.78, 0.56, 1.0, 0.90, lr, lg, lb, 0.04);
+              } else if (fDir === 1) {
+                pushSubBox('wool_white', x, y, z, 0.02, 0.18, 0.24, 0.26, 0.92, 0.76, lr, lg, lb, 0.06);
+                pushSubBox('wool_white', x, y, z, 0.26, 0.18, 0.24, 0.52, 0.34, 0.76, lr, lg, lb, 0.08);
+                pushSubBox('stone', x, y, z, 0.10, 0.92, 0.44, 0.22, 1.0, 0.56, lr, lg, lb, 0.04);
+              } else if (fDir === 2) {
+                pushSubBox('wool_white', x, y, z, 0.24, 0.18, 0.02, 0.76, 0.92, 0.26, lr, lg, lb, 0.06);
+                pushSubBox('wool_white', x, y, z, 0.24, 0.18, 0.26, 0.76, 0.34, 0.52, lr, lg, lb, 0.08);
+                pushSubBox('stone', x, y, z, 0.44, 0.92, 0.10, 0.56, 1.0, 0.22, lr, lg, lb, 0.04);
+              } else {
+                pushSubBox('wool_white', x, y, z, 0.74, 0.18, 0.24, 0.98, 0.92, 0.76, lr, lg, lb, 0.06);
+                pushSubBox('wool_white', x, y, z, 0.48, 0.18, 0.24, 0.74, 0.34, 0.76, lr, lg, lb, 0.08);
+                pushSubBox('stone', x, y, z, 0.78, 0.92, 0.44, 0.90, 1.0, 0.56, lr, lg, lb, 0.04);
+              }
+            }
+            continue;
+          }
+
+          if (blockId.startsWith('btn_')) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            const fDir = this.facings.get(`${x},${y},${z}`) || 2;
+            // Sleek wall-mounted push button (dark plate + raised colored cap)
+            if (fDir === 0) {
+              pushSubBox('stone', x, y, z, 0.26, 0.30, 0.90, 0.74, 0.70, 1.0, lr, lg, lb, 0.06);
+              pushSubBox(blockId, x, y, z, 0.34, 0.38, 0.80, 0.66, 0.62, 0.90, lr, lg, lb, 0.02);
+            } else if (fDir === 1) {
+              pushSubBox('stone', x, y, z, 0.0, 0.30, 0.26, 0.10, 0.70, 0.74, lr, lg, lb, 0.06);
+              pushSubBox(blockId, x, y, z, 0.10, 0.38, 0.34, 0.20, 0.62, 0.66, lr, lg, lb, 0.02);
+            } else if (fDir === 2) {
+              pushSubBox('stone', x, y, z, 0.26, 0.30, 0.0, 0.74, 0.70, 0.10, lr, lg, lb, 0.06);
+              pushSubBox(blockId, x, y, z, 0.34, 0.38, 0.10, 0.66, 0.62, 0.20, lr, lg, lb, 0.02);
+            } else {
+              pushSubBox('stone', x, y, z, 0.90, 0.30, 0.26, 1.0, 0.70, 0.74, lr, lg, lb, 0.06);
+              pushSubBox(blockId, x, y, z, 0.80, 0.38, 0.34, 0.90, 0.62, 0.66, lr, lg, lb, 0.02);
+            }
+            continue;
+          }
+
+          if (blockId === 'sign_fixed') {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            const fDir = this.facings.get(`${x},${y},${z}`) || 2;
+            // Fixed directional wooden signpost (post + flat board oriented by facing)
+            pushSubBox('wood', x, y, z, 0.44, 0, 0.44, 0.56, 0.48, 0.56, lr, lg, lb, 0.08);
+            if (fDir === 0 || fDir === 2) {
+              pushSubBox('planks', x, y, z, 0.06, 0.46, 0.44, 0.94, 0.96, 0.56, lr, lg, lb, 0.05);
+            } else {
+              pushSubBox('planks', x, y, z, 0.44, 0.46, 0.06, 0.56, 0.96, 0.94, lr, lg, lb, 0.05);
             }
             continue;
           }

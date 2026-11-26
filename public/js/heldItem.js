@@ -57,7 +57,7 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
 
   if (def.kind === 'block') {
     // Render custom silhouette items (furniture, stairs, thin slabs) using their crisp transparent sprite!
-    if (itemId.startsWith('furn_') || itemId.startsWith('stairs_') || itemId.startsWith('slab_')) {
+    if (itemId.startsWith('furn_') || itemId.startsWith('stairs_') || itemId.startsWith('slab_') || itemId.startsWith('btn_') || itemId === 'sign_fixed') {
       const customTex = textures.getItemTexture(itemId);
       if (customTex) {
         const mat = new THREE.MeshBasicMaterial({ map: customTex, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide });
