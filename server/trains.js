@@ -239,6 +239,15 @@ export class TrainManager {
       this.save();
       return { train: t, started: false };
     }
+    // If the stopped train was reversing (후진), always reset to forward gear (전진) when restarting!
+    if (t.reversed) {
+      const active = t.path.slice(0, Math.min(t.cars, t.path.length)).reverse().map((node) => ({
+        x: node.x, y: node.y, z: node.z, dir: (node.dir + 2) & 3
+      }));
+      t.path = active;
+      t.reversed = false;
+      t.prog = 0;
+    }
     // Try moving forward; if blocked at end of track, reverse direction!
     t.nextTile = this._computeNextTile(t);
     if (!t.nextTile) {
@@ -250,6 +259,7 @@ export class TrainManager {
     if (!t.nextTile) return { train: t, started: false, blocked: true };
     t.moving = true;
     t.skipRedOnce = true;
+    t.skipGreenOnce = true;
     this.save();
     return { train: t, started: true };
   }
