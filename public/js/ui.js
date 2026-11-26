@@ -993,6 +993,11 @@ export class GameUI {
         'btn_white', 'btn_red', 'btn_blue', 'btn_yellow', 'btn_green', 'btn_metal',
         'redstone_wire', 'lever_off', 'pressure_plate', 'redstone_lamp_off'
       ],
+      기차: [
+        'rail_straight', 'rail_curve', 'rail_cross', 'rail_branch',
+        'rail_card_red', 'rail_card_yellow',
+        'train_engine', 'train_car'
+      ],
       특수: [
         ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
         'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator',
@@ -1009,6 +1014,7 @@ export class GameUI {
               ...supplyGroups.문계단,
               ...supplyGroups.가구,
               ...supplyGroups.버튼,
+              ...supplyGroups.기차,
               ...supplyGroups.특수.filter(id => id !== 'protect_beacon' && id !== 'stealth_beacon')
             ])
       : ['protect_beacon', 'stealth_beacon'];

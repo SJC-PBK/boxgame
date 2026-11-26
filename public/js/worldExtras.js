@@ -48,8 +48,11 @@ export class WorldExtras {
     this.remoteGroup = new THREE.Group();
     this.beaconGroup = new THREE.Group();
     this.npcGroup = new THREE.Group();
-    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup, this.beaconGroup, this.npcGroup);
+    this.trainGroup = new THREE.Group();
+    this.scene.add(this.signGroup, this.portalGroup, this.remoteGroup, this.beaconGroup, this.npcGroup, this.trainGroup);
     this._npcRigs = [];
+    this._trainMeshes = new Map(); // trainId -> { group, unitMeshes: [], targetUnits: [] }
+    this._trainSteams = [];
 
     this.ignitedTnts = []; // { mesh, mat, light, x, y, z, startTime, endTime, sparkAcc }
     this.explosions = [];  // { flashLight, core, outer, ring, debris, smokes, age, maxAge }
@@ -678,6 +681,7 @@ export class WorldExtras {
     }
 
     this._updateElevator();
+    this._updateTrains(dt);
     // Subtle typing animation for seated office staff NPCs
     if (this._npcRigs && this._npcRigs.length > 0) {
       const t = now * 0.008;
@@ -1074,5 +1078,176 @@ export class WorldExtras {
       this.npcGroup.add(g);
       this._npcRigs.push({ group: g, head, leftArm, rightArm });
     }
+  }
+
+  // ---- 3D Voxel Train & Multi-Car Consist Renderer ----
+  _buildTrainUnitMesh(isEngine, trainId, unitIndex) {
+    const g = new THREE.Group();
+    g.userData = { trainId, isEngine, unitIndex };
+
+    const wheelMat = new THREE.MeshLambertMaterial({ color: '#0f172a' });
+    const rimMat = new THREE.MeshLambertMaterial({ color: '#94a3b8' });
+    const chassisMat = new THREE.MeshLambertMaterial({ color: '#1e293b' });
+    const glassMat = new THREE.MeshLambertMaterial({ color: '#bae6fd' });
+
+    // Undercarriage & 4 steel wheels
+    const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.14, 0.90), chassisMat);
+    chassis.position.set(0, 0.18, 0);
+    g.add(chassis);
+    for (const wx of [-0.36, 0.36]) {
+      for (const wz of [-0.28, 0.28]) {
+        const w = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.20, 0.20), wheelMat);
+        w.position.set(wx, 0.10, wz);
+        const hub = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.08), rimMat);
+        hub.position.set(wx, 0.10, wz);
+        g.add(w, hub);
+      }
+    }
+
+    if (isEngine) {
+      // Classic bright red & dark-navy steam locomotive (+Z is forward!)
+      const redMat = new THREE.MeshLambertMaterial({ color: '#dc2626' });
+      const darkRedMat = new THREE.MeshLambertMaterial({ color: '#991b1b' });
+      const goldMat = new THREE.MeshBasicMaterial({ color: '#facc15' });
+
+      const boiler = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.52, 0.54), redMat);
+      boiler.position.set(0, 0.50, 0.18);
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.74, 0.44), darkRedMat);
+      cab.position.set(0, 0.62, -0.24);
+      const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.08, 0.50), chassisMat);
+      cabRoof.position.set(0, 1.01, -0.24);
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.26, 0.26), glassMat);
+      win.position.set(0, 0.72, -0.24);
+      const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.34, 0.20), chassisMat);
+      chimney.position.set(0, 0.90, 0.28);
+      const headlight = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.06), goldMat);
+      headlight.position.set(0, 0.52, 0.46);
+      const bumper = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.14, 0.10), goldMat);
+      bumper.position.set(0, 0.20, 0.48);
+      g.add(boiler, cab, cabRoof, win, chimney, headlight, bumper);
+    } else {
+      // Cozy blue & white passenger railcar
+      const blueMat = new THREE.MeshLambertMaterial({ color: '#2563eb' });
+      const stripeMat = new THREE.MeshLambertMaterial({ color: '#f8fafc' });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.64, 0.88), blueMat);
+      body.position.set(0, 0.56, 0);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.10, 0.90), stripeMat);
+      stripe.position.set(0, 0.38, 0);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.08, 0.92), chassisMat);
+      roof.position.set(0, 0.92, 0);
+      const win1 = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.24, 0.26), glassMat);
+      win1.position.set(0, 0.64, 0.22);
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.24, 0.26), glassMat);
+      win2.position.set(0, 0.64, -0.22);
+      g.add(body, stripe, roof, win1, win2);
+    }
+
+    // Tag all child meshes for easy raycast lookup
+    g.traverse((obj) => { obj.userData = { trainId, isEngine, unitIndex }; });
+    return g;
+  }
+
+  syncTrains(trainsList) {
+    const incoming = new Set();
+    for (const t of trainsList || []) {
+      incoming.add(t.id);
+      let rec = this._trainMeshes.get(t.id);
+      if (!rec || rec.unitMeshes.length !== t.units.length) {
+        if (rec) this.trainGroup.remove(rec.group);
+        const group = new THREE.Group();
+        const unitMeshes = [];
+        for (let i = 0; i < t.units.length; i++) {
+          const u = t.units[i];
+          const m = this._buildTrainUnitMesh(u.isEngine, t.id, i);
+          m.position.set(u.x, u.y, u.z);
+          m.rotation.y = u.yaw || 0;
+          group.add(m);
+          unitMeshes.push(m);
+        }
+        this.trainGroup.add(group);
+        rec = { group, unitMeshes, targetUnits: t.units, moving: t.moving };
+        this._trainMeshes.set(t.id, rec);
+      } else {
+        rec.targetUnits = t.units;
+        rec.moving = t.moving;
+      }
+    }
+    for (const [id, rec] of [...this._trainMeshes.entries()]) {
+      if (!incoming.has(id)) {
+        this.trainGroup.remove(rec.group);
+        this._trainMeshes.delete(id);
+      }
+    }
+  }
+
+  spawnTrainSteam(x, y, z, count = 6) {
+    for (let i = 0; i < count; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.85, depthWrite: false });
+      const m = new THREE.Mesh(this._sparkGeo, mat);
+      m.position.set(x + (Math.random() - 0.5) * 0.25, y + 1.15, z + (Math.random() - 0.5) * 0.25);
+      m.scale.setScalar(1.1 + Math.random() * 0.8);
+      this.scene.add(m);
+      this._trainSteams.push({
+        mesh: m, mat,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: 1.4 + Math.random() * 1.1,
+        vz: (Math.random() - 0.5) * 0.6,
+        life: 0.75 + Math.random() * 0.45
+      });
+    }
+  }
+
+  _updateTrains(dt) {
+    const lerp = Math.min(1, dt * 14);
+    for (const rec of this._trainMeshes.values()) {
+      for (let i = 0; i < rec.unitMeshes.length; i++) {
+        const m = rec.unitMeshes[i];
+        const t = rec.targetUnits[i];
+        if (!t) continue;
+        m.position.x += (t.x - m.position.x) * lerp;
+        m.position.y += (t.y - m.position.y) * lerp;
+        m.position.z += (t.z - m.position.z) * lerp;
+        // Shortest-angle yaw interpolation
+        let dyaw = (t.yaw || 0) - m.rotation.y;
+        while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+        while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+        m.rotation.y += dyaw * Math.min(1, dt * 12);
+      }
+      // Subtle chimney puff while moving
+      if (rec.moving && rec.unitMeshes[0] && Math.random() < dt * 4.5) {
+        const p = rec.unitMeshes[0].position;
+        this.spawnTrainSteam(p.x, p.y, p.z, 1);
+      }
+    }
+    for (let i = this._trainSteams.length - 1; i >= 0; i--) {
+      const s = this._trainSteams[i];
+      s.life -= dt;
+      if (s.life <= 0) {
+        this.scene.remove(s.mesh);
+        s.mat.dispose();
+        this._trainSteams.splice(i, 1);
+      } else {
+        s.mesh.position.x += s.vx * dt;
+        s.mesh.position.y += s.vy * dt;
+        s.mesh.position.z += s.vz * dt;
+        s.mesh.scale.addScalar(dt * 1.2);
+        s.mat.opacity = Math.max(0, s.life * 0.9);
+      }
+    }
+  }
+
+  raycastTrains(origin, direction, maxDist = 6.0) {
+    if (this.trainGroup.children.length === 0) return null;
+    if (!this._trainRaycaster) this._trainRaycaster = new THREE.Raycaster();
+    this._trainRaycaster.set(origin, direction);
+    this._trainRaycaster.near = 0.1;
+    this._trainRaycaster.far = maxDist;
+    const hits = this._trainRaycaster.intersectObjects(this.trainGroup.children, true);
+    for (const h of hits) {
+      if (h.object?.userData?.trainId) {
+        return { ...h.object.userData, point: h.point };
+      }
+    }
+    return null;
   }
 }

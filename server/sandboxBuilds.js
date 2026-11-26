@@ -637,3 +637,84 @@ export function propagateVillaFrom402(store, origin = SANDBOX_VILLA_ORIGIN) {
   store.saveNow('signs');
   return { updated };
 }
+
+// Build a sample circular train loop right near central spawn (x: -12..8, z: 10..20, y = 37)
+// Showcases: straight, curve, cross, switchable branch, yellow whistle card, red stop card & a 3-car train!
+export function stampSampleTrainLoop(store, trains) {
+  const Y = 37; // rail surface level (solid bed at Y-1 = 36)
+  const setRail = (x, z, id, facing = 0) => {
+    // Ensure flat solid rail bed underneath & clear 3 blocks of air above
+    for (let fy = Y - 3; fy <= Y - 2; fy++) store.setBlock(x, fy, z, 'dirt', 'System');
+    store.setBlock(x, Y - 1, z, 'cobble', 'System');
+    for (let cy = Y + 1; cy <= Y + 3; cy++) store.setBlock(x, cy, z, null, 'System');
+    store.setBlock(x, Y, z, id, 'System');
+    store.setFacing(x, Y, z, facing & 3);
+  };
+
+  // Clear inside platform edge around station sign
+  for (let x = -13; x <= 9; x++) {
+    for (let z = 9; z <= 21; z++) {
+      if (store.getBlock(x, Y - 1, z) === null || store.getBlock(x, Y - 1, z) === 'water') {
+        store.setBlock(x, Y - 1, z, 'grass', 'System');
+      }
+    }
+  }
+
+  // 4 Curve Corners: 0=N<->E, 1=E<->S, 2=S<->W, 3=W<->N
+  setRail(-12, 10, 'rail_curve', 1); // NW corner: E <-> S
+  setRail(8, 10, 'rail_curve', 2);   // NE corner: S <-> W
+  setRail(8, 20, 'rail_curve', 3);   // SE corner: W <-> N
+  setRail(-12, 20, 'rail_curve', 0); // SW corner: N <-> E
+
+  // North & South Straightaways (East-West, facing 1)
+  for (let x = -11; x <= 7; x++) {
+    setRail(x, 10, 'rail_straight', 1);
+    setRail(x, 20, 'rail_straight', 1);
+  }
+  // West & East Straightaways (North-South, facing 0)
+  for (let z = 11; z <= 19; z++) {
+    setRail(-12, z, 'rail_straight', 0);
+    setRail(8, z, 'rail_straight', 0);
+  }
+
+  // Yellow Whistle Card on North straightaway right in front of spawn!
+  setRail(2, 10, 'rail_card_yellow', 1);
+
+  // Switchable Branch Junction at (-2, 10) -> inner siding x = -2, z = 11..19 -> rejoins at (-2, 20)
+  setRail(-2, 10, 'rail_branch', 1); // rear=W, straight=E, branch=S!
+  for (let z = 11; z <= 19; z++) {
+    setRail(-2, z, 'rail_straight', 0);
+  }
+  setRail(-2, 20, 'rail_branch', 3); // rear=E, straight=W, branch=N!
+  // Red Stop Card on the inner siding (switch branch to green to divert and stop here!)
+  setRail(-2, 13, 'rail_card_red', 0);
+  // Crossing rail at (-2, 15) with short decorative cross-track
+  setRail(-2, 15, 'rail_cross', 0);
+  setRail(-4, 15, 'rail_straight', 1);
+  setRail(-3, 15, 'rail_straight', 1);
+  setRail(-1, 15, 'rail_straight', 1);
+  setRail(0, 15, 'rail_straight', 1);
+
+  // Station platform & fixed instruction sign right beside the North track!
+  store.setBlock(-4, Y - 1, 9, 'planks', 'System');
+  store.setBlock(-4, Y, 9, 'sign_fixed', 'System');
+  store.setFacing(-4, Y, 9, 0);
+  store.signs[`-4,${Y},9`] = {
+    x: -4, y: Y, z: 9,
+    text: '🚂 중앙 순환 기차역\n선두 우클릭: 출발/정지\n분기레일 우클릭: 전환',
+    author: 'System', fixed: true, facing: 0
+  };
+  // Cozy station lamp
+  store.setBlock(4, Y - 1, 9, 'stone', 'System');
+  store.setBlock(4, Y, 9, 'stone', 'System');
+  store.setBlock(4, Y + 1, 9, 'lamp', 'System');
+
+  store.saveNow('world');
+  store.saveNow('facings');
+  store.saveNow('signs');
+
+  // Spawn a ready-to-ride 3-car sample train on the North straightaway if none exists nearby
+  if (trains && !trains.findTrainNear(-6, Y, 10, 8)) {
+    trains.spawnTrain(-6, Y, 10, 1, 3, 'System', false);
+  }
+}

@@ -307,4 +307,22 @@ export class SoundEngine {
     this._tone('sine', 659.25, 659.25, 0.22, 0.16, null);
     setTimeout(() => this._tone('sine', 523.25, 523.25, 0.35, 0.16, null), 180);
   }
+
+  // Classic warm dual-tone steam train whistle ("뿌~ 뿌~")!
+  playTrainWhistle(worldPos = null) {
+    const blow = (delayMs, dur) => {
+      setTimeout(() => {
+        this._tone('triangle', 587.33, 580, dur, 0.22, worldPos); // D5
+        this._tone('sine', 739.99, 732, dur, 0.16, worldPos);     // F#5
+        this._noiseBurst(dur * 0.7, 2200, 3.0, 0.05, worldPos);   // gentle steam hiss
+      }, delayMs);
+    };
+    blow(0, 0.32);
+    blow(380, 0.52);
+  }
+
+  playTrainBrake(worldPos = null) {
+    this._noiseBurst(0.28, 1800, 1.4, 0.16, worldPos);
+    this._tone('sawtooth', 190, 95, 0.22, 0.08, worldPos);
+  }
 }

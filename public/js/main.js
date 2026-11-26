@@ -537,6 +537,7 @@ function handleServerMessage(msg) {
       worldExtras.syncElevator(msg.elevator || null);
       worldExtras.syncCenterPylon(msg.centerPylon || null);
       worldExtras.syncCenterNpcs(msg.centerNpcs || []);
+      worldExtras.syncTrains(msg.trains || []);
 
       playerPos.set(selfPlayer.x, selfPlayer.y, selfPlayer.z);
       playerVel.set(0, 0, 0);
@@ -820,6 +821,24 @@ function handleServerMessage(msg) {
       animalRenderer.syncAll(msg.animals);
       break;
 
+    case 'trains_update':
+      worldExtras.syncTrains(msg.trains || []);
+      break;
+
+    case 'train_event': {
+      const pos = { x: (msg.x || 0) + 0.5, y: (msg.y || 0) + 1.0, z: (msg.z || 0) + 0.5 };
+      if (msg.event === 'whistle') {
+        sound.playTrainWhistle(pos);
+        worldExtras.spawnTrainSteam(pos.x, pos.y - 0.5, pos.z, 10);
+      } else if (msg.event === 'stop_red') {
+        sound.playTrainBrake(pos);
+        ui.toast('🟥 빨강 정지 카드 도착! 기차가 정지했습니다. (선두 우클릭: 다시 출발)', 'info');
+      } else if (msg.event === 'stop_end') {
+        sound.playTrainBrake(pos);
+      }
+      break;
+    }
+
     case 'bag_update':
       ui.updateBag(msg.bag);
       break;
@@ -970,6 +989,20 @@ function handleRightClickOrInteract(interactOnly = false) {
     return;
   }
 
+  // 1.5 Check Train interaction on right-click (start/stop lead engine, or couple a passenger car!)
+  const trainHit = worldExtras.raycastTrains(eyePos, lookDir, 6.0);
+  if (trainHit) {
+    fpHand?.triggerSwing();
+    const heldIdNow = ui.getActiveItemId();
+    if (heldIdNow === 'train_car') {
+      send({ type: 'train_couple', trainId: trainHit.trainId, slotIndex: ui.getActiveBagIndex() });
+    } else {
+      sound.playDoor();
+      send({ type: 'train_toggle', trainId: trainHit.trainId });
+    }
+    return;
+  }
+
   // 2. Open Chest, Furnace, Bed, Door, Sign, TNT, Portal, & Job Village Cafe Stations
   if (currentHit) {
     if (currentHit.block === 'job_counter') {
@@ -1040,6 +1073,32 @@ function handleRightClickOrInteract(interactOnly = false) {
       sound.playDoor();
       send({ type: 'toggle_toilet', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
+    }
+    if (currentHit.block.startsWith('rail_')) {
+      const heldNow = ui.getActiveItemId();
+      if (heldNow === 'train_engine') {
+        fpHand?.triggerSwing();
+        const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+        const dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
+        send({ type: 'train_spawn', x: currentHit.x, y: currentHit.y, z: currentHit.z, dir, slotIndex: ui.getActiveBagIndex() });
+        return;
+      }
+      if (heldNow === 'train_car') {
+        fpHand?.triggerSwing();
+        send({ type: 'train_couple_at', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+        return;
+      }
+      if (heldNow === 'rail_card_red' || heldNow === 'rail_card_yellow') {
+        fpHand?.triggerSwing();
+        send({ type: 'rail_apply_card', x: currentHit.x, y: currentHit.y, z: currentHit.z, card: heldNow, slotIndex: ui.getActiveBagIndex() });
+        return;
+      }
+      if (currentHit.block === 'rail_branch' || currentHit.block === 'rail_branch_turn') {
+        fpHand?.triggerSwing();
+        sound.playDoor();
+        send({ type: 'toggle_rail_branch', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+        return;
+      }
     }
     if (currentHit.block === 'tnt' || currentHit.block === 'fill_bomb' || currentHit.block === 'water_bomb' || currentHit.block === 'flatten_bomb') {
       fpHand?.triggerSwing();
@@ -1208,8 +1267,15 @@ canvas.addEventListener('mousedown', (e) => {
       setEyedropperMode(false);
       return;
     }
-    // Check if clicking an animal first
+    // Check if clicking an animal or train first
     const { eyePos, lookDir } = getEyeAndLook();
+    const trainHitL = worldExtras.raycastTrains(eyePos, lookDir, 5.5);
+    if (trainHitL) {
+      fpHand?.triggerSwing();
+      sound.playBreak('stone', trainHitL.point);
+      send({ type: 'train_remove', trainId: trainHitL.trainId });
+      return;
+    }
     const animalHit = animalRenderer.raycast(eyePos, lookDir, 4.8);
     if (animalHit) {
       fpHand?.triggerSwing();

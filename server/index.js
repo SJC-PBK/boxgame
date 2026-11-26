@@ -12,10 +12,11 @@ import {
 } from './blocks.js';
 import { WorldStore } from './worldStore.js';
 import { AnimalManager } from './animals.js';
+import { TrainManager, isRailBlock } from './trains.js';
 import { createJobVillageWorld } from './jobWorld.js';
 import { createCenterWorld } from './centerWorld.js';
 import {
-  stampCenterIntoSandbox, stampVillaIntoSandbox, propagateVillaFrom402, getSandboxCenterPylon,
+  stampCenterIntoSandbox, stampVillaIntoSandbox, propagateVillaFrom402, stampSampleTrainLoop, getSandboxCenterPylon,
   SANDBOX_CENTER_ORIGIN, SANDBOX_VILLA_ORIGIN, SANDBOX_VILLA_BOUNDS
 } from './sandboxBuilds.js';
 
@@ -51,6 +52,7 @@ const DATA_DIR = path.resolve(ROOT_DIR, process.env.DATA_DIR || './data');
 
 const store = new WorldStore(DATA_DIR);
 const animals = new AnimalManager(store);
+const trains = new TrainManager(store, DATA_DIR);
 const jobWorld = createJobVillageWorld();
 let centerWorld = createCenterWorld();
 
@@ -102,25 +104,33 @@ const SANDBOX_CENTER_PYLON = getSandboxCenterPylon(store);
 
 // Auto-stamp Happiness Plus Center clone (-75, 34, 94) and 5F Semi-Basement Villa (-78, 36, -45) into Sandbox once
 // Bump version marker when layout changes so live server re-stamps automatically on restart!
-const SANDBOX_BUILD_VERSION = 'v3-villa-from-402';
+const SANDBOX_BUILD_VERSION = 'v4-sample-train-loop';
 if (store.config.sandboxBuildVersion !== SANDBOX_BUILD_VERSION) {
   if (!store.config.sandboxBuildVersion) {
     const resC = stampCenterIntoSandbox(store, SANDBOX_CENTER_ORIGIN);
     console.log(`[SandboxBuilds] Stamped Happiness Plus Center (${resC.sourceLabel}, 180° rotated): ${resC.placed} blocks.`);
     const resV = stampVillaIntoSandbox(store, SANDBOX_VILLA_ORIGIN);
     console.log(`[SandboxBuilds] Stamped 5F Semi-Basement Villa: ${resV.placed} blocks.`);
-  } else {
-    // Propagate user's live 402호 layout across all 5 floors (101~502호) and fix any floor holes!
-    const resP = propagateVillaFrom402(store, SANDBOX_VILLA_ORIGIN);
-    console.log(`[SandboxBuilds] Propagated live 402호 layout across all 10 villa units (${resP.updated} cells updated).`);
-    if (store.listVillaSnapshots().length === 0) {
-      const saved = store.saveVillaSnapshot('402호기준', 'System', SANDBOX_VILLA_BOUNDS);
-      console.log(`[SandboxBuilds] Auto-saved Villa Snapshot #${saved.number} "${saved.entry.name}".`);
-    }
   }
+  stampSampleTrainLoop(store, trains);
+  console.log('[SandboxBuilds] Stamped sample circular train loop & 3-car train near central spawn (-12..8, 37, 10..20).');
   store.config.sandboxBuildVersion = SANDBOX_BUILD_VERSION;
   store.saveNow('config');
 }
+
+// 10Hz real-time Train Physics & Action-Card Tick Loop
+setInterval(() => {
+  const { anyMoved, events } = trains.tick(0.1);
+  if (anyMoved) {
+    broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+  }
+  for (const ev of events) {
+    broadcast({ type: 'train_event', ...ev }, null, 'sandbox');
+    if (ev.event === 'stop_red' || ev.event === 'stop_end') {
+      broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+    }
+  }
+}, 100);
 
 // Real-time moving elevator state machine for Happiness Plus Center (1F~5F)
 const centerElevator = {
@@ -827,6 +837,7 @@ wss.on('connection', (ws) => {
         elevator: worldMode === 'center' ? getCenterElevatorPayload() : null,
         centerPylon: worldMode === 'center' ? store.centerPylon : (worldMode === 'sandbox' ? SANDBOX_CENTER_PYLON : null),
         centerNpcs: worldMode === 'center' ? CENTER_NPCS : (worldMode === 'sandbox' ? SANDBOX_CENTER_NPCS : []),
+        trains: worldMode === 'sandbox' ? trains.serializeAll() : [],
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
         regions: isStaticZone ? [] : store.regions,
@@ -1140,7 +1151,7 @@ wss.on('connection', (ws) => {
           slot.count -= 1;
           if (slot.count <= 0) player.bag[idx] = null;
         }
-        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId === 'sign_fixed' || blockId === 'ladder';
+        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId.startsWith('rail_') || blockId === 'sign_fixed' || blockId === 'ladder';
         const facingVal = needsFacing ? (Number(msg.facing || 0) & 3) : undefined;
         const prevFacing0 = store.facings[`${x},${y},${z}`];
         store.setBlock(x, y, z, blockId, player.nickname);
@@ -1643,6 +1654,125 @@ wss.on('connection', (ws) => {
           changes.push({ x, y: y - 1, z, block: next });
         }
         broadcast({ type: 'blocks_batch', changes, by: player.nickname }, null, player.world);
+        break;
+      }
+
+      case 'toggle_rail_branch': {
+        if (player.world !== 'sandbox') return;
+        const { x, y, z } = msg;
+        if (!store.inBounds(x, y, z)) return;
+        const cur = store.getBlock(x, y, z);
+        if (cur !== 'rail_branch' && cur !== 'rail_branch_turn') return;
+        const next = cur === 'rail_branch' ? 'rail_branch_turn' : 'rail_branch';
+        const fDir = store.facings[`${x},${y},${z}`] ?? 0;
+        store.setBlock(x, y, z, next, player.nickname);
+        store.setFacing(x, y, z, fDir);
+        broadcast({ type: 'block_update', x, y, z, block: next, facing: fDir, by: player.nickname }, null, 'sandbox');
+        send(ws, {
+          type: 'toast', level: 'info',
+          text: next === 'rail_branch_turn' ? '🔀 분기 레일: 분기(전환) 방향으로 설정됨 (초록)' : '🔀 분기 레일: 직진 방향으로 설정됨 (파랑)'
+        });
+        break;
+      }
+
+      case 'rail_apply_card': {
+        if (player.world !== 'sandbox') return;
+        const { x, y, z, card, slotIndex } = msg;
+        if (card !== 'rail_card_red' && card !== 'rail_card_yellow') return;
+        if (!store.inBounds(x, y, z)) return;
+        const cur = store.getBlock(x, y, z);
+        if (!isRailBlock(cur)) return;
+        const idx = Number(slotIndex);
+        const slot = player.bag[idx];
+        if (!slot || slot.block !== card || slot.count <= 0) return;
+        if (!store.config.unlimitedBlocks) {
+          slot.count -= 1;
+          if (slot.count <= 0) player.bag[idx] = null;
+          send(ws, { type: 'bag_update', bag: player.bag });
+        }
+        const fDir = store.facings[`${x},${y},${z}`] ?? 0;
+        store.setBlock(x, y, z, card, player.nickname);
+        store.setFacing(x, y, z, fDir);
+        broadcast({ type: 'block_update', x, y, z, block: card, facing: fDir, by: player.nickname }, null, 'sandbox');
+        send(ws, {
+          type: 'toast', level: 'success',
+          text: card === 'rail_card_red' ? '🟥 빨강 정지 카드를 레일에 올렸습니다!' : '🟨 노랑 기적 카드를 레일에 올렸습니다!'
+        });
+        break;
+      }
+
+      case 'train_spawn': {
+        if (player.world !== 'sandbox') return;
+        const { x, y, z, dir, slotIndex } = msg;
+        if (!store.inBounds(x, y, z) || !isRailBlock(store.getBlock(x, y, z))) {
+          send(ws, { type: 'toast', level: 'warn', text: '🚂 기차는 레일 위에만 올릴 수 있습니다!' });
+          return;
+        }
+        const idx = Number(slotIndex);
+        const slot = player.bag[idx];
+        if (!slot || slot.block !== 'train_engine' || slot.count <= 0) return;
+        const t = trains.spawnTrain(x, y, z, dir, 1, player.nickname, false);
+        if (!t) return;
+        if (!store.config.unlimitedBlocks) {
+          slot.count -= 1;
+          if (slot.count <= 0) player.bag[idx] = null;
+          send(ws, { type: 'bag_update', bag: player.bag });
+        }
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, { type: 'toast', level: 'success', text: '🚂 기차 기관차를 레일에 올렸습니다! (우클릭: 출발/정지 · 객차로 우클릭: 연결)' });
+        break;
+      }
+
+      case 'train_couple':
+      case 'train_couple_at': {
+        if (player.world !== 'sandbox') return;
+        const idx = Number(msg.slotIndex);
+        const slot = player.bag[idx];
+        if (!slot || slot.block !== 'train_car' || slot.count <= 0) return;
+        const target = msg.trainId
+          ? trains.trains.get(String(msg.trainId))
+          : trains.findTrainNear(Number(msg.x), Number(msg.y), Number(msg.z), 5.0);
+        if (!target) {
+          send(ws, { type: 'toast', level: 'warn', text: '🚃 먼저 레일 위에 기관차(선두)를 올린 뒤 객차를 연결해 주세요!' });
+          return;
+        }
+        const res = trains.coupleCarToTrain(target.id);
+        if (res.error) { send(ws, { type: 'toast', level: 'warn', text: res.error }); return; }
+        if (!store.config.unlimitedBlocks) {
+          slot.count -= 1;
+          if (slot.count <= 0) player.bag[idx] = null;
+          send(ws, { type: 'bag_update', bag: player.bag });
+        }
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, { type: 'toast', level: 'success', text: `🚃 기차 객차 연결 완료! (현재 총 ${res.train.cars}칸 편성)` });
+        break;
+      }
+
+      case 'train_toggle': {
+        if (player.world !== 'sandbox') return;
+        const res = trains.toggleTrain(String(msg.trainId || ''));
+        if (!res) return;
+        if (res.blocked) {
+          send(ws, { type: 'toast', level: 'warn', text: '🚂 앞뒤에 연결된 레일이 없어 출발할 수 없습니다!' });
+          return;
+        }
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, {
+          type: 'toast', level: 'info',
+          text: res.started ? '🚂 칙칙폭폭! 기차가 출발합니다!' : '🛑 기차를 정지했습니다.'
+        });
+        break;
+      }
+
+      case 'train_remove': {
+        if (player.world !== 'sandbox') return;
+        const refund = trains.removeTrain(String(msg.trainId || ''));
+        if (!refund) return;
+        addItemToSlots(player.bag, 'train_engine', refund.engine);
+        if (refund.cars > 0) addItemToSlots(player.bag, 'train_car', refund.cars);
+        send(ws, { type: 'bag_update', bag: player.bag });
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, { type: 'toast', level: 'info', text: `🚂 기차를 회수했습니다. (기관차 1${refund.cars ? `, 객차 ${refund.cars}` : ''})` });
         break;
       }
 

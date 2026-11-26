@@ -1056,6 +1056,62 @@ export class WorldRenderer {
             continue;
           }
 
+          if (blockId.startsWith('rail_')) {
+            let lr = 0, lg = 0, lb = 0;
+            if (hasLight) {
+              const pIdx = this._padIdx(x - minPX, y, z - minPZ);
+              lr = padR[pIdx]; lg = padG[pIdx]; lb = padB[pIdx];
+            }
+            const fDir = this.facings.get(`${x},${y},${z}`) || 0;
+            // Helper to draw a track segment along North/South (Z) or East/West (X)
+            const drawNS = (z0, z1) => {
+              for (let tz = z0 + 0.12; tz < z1 - 0.05; tz += 0.25) {
+                pushSubBox('wood', x, y, z, 0.12, 0, tz, 0.88, 0.04, Math.min(z1, tz + 0.10), lr, lg, lb, 0.06);
+              }
+              pushSubBox('stone', x, y, z, 0.18, 0.04, z0, 0.28, 0.10, z1, lr, lg, lb, 0.04);
+              pushSubBox('stone', x, y, z, 0.72, 0.04, z0, 0.82, 0.10, z1, lr, lg, lb, 0.04);
+            };
+            const drawEW = (x0, x1) => {
+              for (let tx = x0 + 0.12; tx < x1 - 0.05; tx += 0.25) {
+                pushSubBox('wood', x, y, z, tx, 0, 0.12, Math.min(x1, tx + 0.10), 0.04, 0.88, lr, lg, lb, 0.06);
+              }
+              pushSubBox('stone', x, y, z, x0, 0.04, 0.18, x1, 0.10, 0.28, lr, lg, lb, 0.04);
+              pushSubBox('stone', x, y, z, x0, 0.04, 0.72, x1, 0.10, 0.82, lr, lg, lb, 0.04);
+            };
+            if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow') {
+              if (fDir === 0 || fDir === 2) drawNS(0, 1);
+              else drawEW(0, 1);
+              if (blockId === 'rail_card_red') {
+                // Bright Red STOP action card plate between the rails!
+                pushSubBox('wool_red', x, y, z, 0.28, 0.04, 0.22, 0.72, 0.11, 0.78, Math.max(lr, 0.6), lg, lb, 0);
+              } else if (blockId === 'rail_card_yellow') {
+                // Bright Yellow WHISTLE action card plate between the rails!
+                pushSubBox('wool_yellow', x, y, z, 0.28, 0.04, 0.22, 0.72, 0.11, 0.78, Math.max(lr, 0.6), Math.max(lg, 0.5), lb, 0);
+              }
+            } else if (blockId === 'rail_cross') {
+              drawNS(0, 1);
+              drawEW(0, 1);
+            } else if (blockId === 'rail_curve') {
+              // 0: N<->E, 1: E<->S, 2: S<->W, 3: W<->N
+              if (fDir === 0) { drawNS(0, 0.65); drawEW(0.35, 1); }
+              else if (fDir === 1) { drawEW(0.35, 1); drawNS(0.35, 1); }
+              else if (fDir === 2) { drawNS(0.35, 1); drawEW(0, 0.65); }
+              else { drawEW(0, 0.65); drawNS(0, 0.65); }
+            } else if (blockId === 'rail_branch' || blockId === 'rail_branch_turn') {
+              // Straight trunk along fDir + branch to right ((fDir+1)&3) + glowing switch indicator!
+              if (fDir === 0 || fDir === 2) drawNS(0, 1);
+              else drawEW(0, 1);
+              const bDir = (fDir + 1) & 3;
+              if (bDir === 0) drawNS(0, 0.65);
+              else if (bDir === 1) drawEW(0.35, 1);
+              else if (bDir === 2) drawNS(0.35, 1);
+              else drawEW(0, 0.65);
+              const indBlk = blockId === 'rail_branch_turn' ? 'btn_green' : 'btn_blue';
+              pushSubBox(indBlk, x, y, z, 0.38, 0.08, 0.38, 0.62, 0.20, 0.62, Math.max(lr, 0.4), Math.max(lg, 0.6), Math.max(lb, 0.5), 0);
+            }
+            continue;
+          }
+
           if (blockId === 'sign_fixed') {
             let lr = 0, lg = 0, lb = 0;
             if (hasLight) {

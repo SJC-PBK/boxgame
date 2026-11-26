@@ -133,9 +133,9 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
       }
     }
 
-    // 6. Crisp silhouette sprites for furniture, signs, ladder, lever, bed, wire, fuse, sapling!
+    // 6. Crisp silhouette sprites for furniture, rails, trains, signs, ladder, lever, bed, wire, fuse, sapling!
     if (
-      itemId.startsWith('furn_') ||
+      itemId.startsWith('furn_') || itemId.startsWith('rail_') || itemId.startsWith('train_') ||
       itemId === 'sign' || itemId === 'sign_fixed' ||
       itemId === 'ladder' || itemId === 'lever_off' || itemId === 'lever_on' ||
       itemId === 'bed' || itemId === 'redstone_wire' || itemId === 'fuse' || itemId === 'sapling'
