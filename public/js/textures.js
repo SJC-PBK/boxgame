@@ -1384,21 +1384,131 @@ export class TextureLibrary {
           }, 32);
           this.icons[def.id] = ic.toDataURL();
           this.itemTextures[def.id] = toTexture(ic);
-        } else if (def.id === 'sign_fixed') {
+        } else if (def.id === 'sign_fixed' || def.id === 'sign') {
           const ic = makeCanvas((ctx) => {
             ctx.imageSmoothingEnabled = false;
             ctx.fillStyle = '#784820';
             ctx.fillRect(14, 18, 4, 12);
-            ctx.fillStyle = '#d4a36a';
+            ctx.fillStyle = def.id === 'sign_fixed' ? '#d4a36a' : '#c2975f';
             ctx.fillRect(3, 5, 26, 15);
             ctx.strokeStyle = '#5c3f24'; ctx.lineWidth = 2;
             ctx.strokeRect(3, 5, 26, 15);
             ctx.fillStyle = '#5c3f24';
             ctx.fillRect(7, 9, 18, 2);
             ctx.fillRect(7, 13, 14, 2);
-            // Small cyan "fixed front" pin badge
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(23, 6, 4, 4);
+            if (def.id === 'sign_fixed') {
+              // Small cyan "fixed front" pin badge
+              ctx.fillStyle = '#38bdf8';
+              ctx.fillRect(23, 6, 4, 4);
+            }
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'torch') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            // Glowing flame halo & tip + slim vertical wooden torch stick
+            ctx.fillStyle = 'rgba(251, 146, 60, 0.35)';
+            ctx.fillRect(10, 2, 12, 12);
+            ctx.fillStyle = '#f97316';
+            ctx.fillRect(12, 4, 8, 8);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(13, 5, 6, 6);
+            ctx.fillStyle = '#fef9c3';
+            ctx.fillRect(14, 6, 4, 4);
+            ctx.fillStyle = '#5c3818';
+            ctx.fillRect(13, 12, 6, 18);
+            ctx.fillStyle = '#9a6534';
+            ctx.fillRect(14, 12, 4, 17);
+            ctx.fillStyle = '#b8834d';
+            ctx.fillRect(14, 13, 2, 15);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'ladder') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.fillStyle = '#5c3818';
+            ctx.fillRect(6, 1, 5, 30); ctx.fillRect(21, 1, 5, 30);
+            ctx.fillStyle = '#9a6534';
+            ctx.fillRect(7, 2, 3, 28); ctx.fillRect(22, 2, 3, 28);
+            for (const ry of [5, 12, 19, 25]) {
+              ctx.fillStyle = '#5c3818';
+              ctx.fillRect(9, ry, 14, 4);
+              ctx.fillStyle = '#c28d53';
+              ctx.fillRect(10, ry + 1, 12, 2);
+            }
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id.startsWith('door_')) {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            // Tall narrow 1x2 door silhouette centered in 32x32!
+            ctx.drawImage(sideC, 0, 0, 16, 16, 7, 2, 18, 28);
+            ctx.strokeStyle = 'rgba(15,23,42,0.88)'; ctx.lineWidth = 2;
+            ctx.strokeRect(7, 2, 18, 28);
+            // Crisp metallic doorknob on right side
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(20, 15, 3, 3);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'lever_off' || def.id === 'lever_on') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            // Stone base pedestal + tilted switch handle
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(6, 22, 20, 8);
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(8, 23, 16, 5);
+            const on = def.id === 'lever_on';
+            for (let i = 0; i < 12; i++) {
+              const x = on ? (15 - Math.floor(i * 0.6)) : (15 + Math.floor(i * 0.6));
+              const y = 22 - i;
+              ctx.fillStyle = '#784820';
+              ctx.fillRect(x, y, 4, 3);
+            }
+            ctx.fillStyle = on ? '#ef4444' : '#cbd5e1';
+            ctx.fillRect(on ? 6 : 20, 8, 6, 5);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'pressure_plate') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.fillStyle = '#5c3818';
+            ctx.fillRect(3, 21, 26, 7);
+            ctx.fillStyle = '#b8834d';
+            ctx.fillRect(4, 21, 24, 5);
+            ctx.fillStyle = '#e0b07a';
+            ctx.fillRect(5, 22, 22, 2);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'bed') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            // Unmistakable side-view bed: wooden legs + frame + white pillow + red blanket!
+            ctx.fillStyle = '#784820';
+            ctx.fillRect(3, 19, 26, 5); // wood frame
+            ctx.fillRect(3, 24, 4, 5); ctx.fillRect(25, 24, 4, 5); // legs
+            ctx.fillRect(3, 12, 3, 8); // headboard
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(6, 13, 7, 6); // pillow
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(12, 14, 17, 6); // red blanket
+            ctx.fillStyle = '#f87171';
+            ctx.fillRect(13, 14, 15, 2); // blanket highlight
+            ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.2;
+            ctx.strokeRect(3, 12, 26, 12);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'redstone_wire' || def.id === 'fuse' || def.id === 'sapling') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(sideC, 0, 0, 32, 32);
           }, 32);
           this.icons[def.id] = ic.toDataURL();
           this.itemTextures[def.id] = toTexture(ic);

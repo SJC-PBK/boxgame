@@ -56,12 +56,94 @@ export function buildHeldItemMesh(itemId, catalog, textures) {
   }
 
   if (def.kind === 'block') {
-    // Render custom silhouette items (furniture, stairs, thin slabs) using their crisp transparent sprite!
-    if (itemId.startsWith('furn_') || itemId.startsWith('stairs_') || itemId.startsWith('slab_') || itemId.startsWith('btn_') || itemId === 'sign_fixed' || itemId === 'ladder') {
+    // 1. Real slim 3D Torch in hand (matches placed 0.16 x 0.72 x 0.16 proportion!)
+    if (itemId === 'torch') {
+      const g = new THREE.Group();
+      const stick = new THREE.Mesh(
+        new THREE.BoxGeometry(0.055, 0.28, 0.055),
+        new THREE.MeshLambertMaterial({ color: '#8b5a2b' })
+      );
+      stick.position.set(0, 0.14, 0);
+      const flame = new THREE.Mesh(
+        new THREE.BoxGeometry(0.07, 0.085, 0.07),
+        new THREE.MeshBasicMaterial({ color: '#fde047' })
+      );
+      flame.position.set(0, 0.30, 0);
+      const ember = new THREE.Mesh(
+        new THREE.BoxGeometry(0.085, 0.05, 0.085),
+        new THREE.MeshBasicMaterial({ color: '#f97316', transparent: true, opacity: 0.75 })
+      );
+      ember.position.set(0, 0.28, 0);
+      g.add(stick, flame, ember);
+      g.position.set(0, 0.02, -0.04);
+      g.rotation.set(-0.22, 0.15, 0.08);
+      return g;
+    }
+
+    // 2. Real 2-step 3D Stair mini-mesh in hand (matches placed stair!)
+    if (itemId.startsWith('stairs_')) {
+      const mats = textures.getBoxMaterials(itemId);
+      if (mats) {
+        const g = new THREE.Group();
+        const low = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.12, 0.24), mats);
+        low.position.set(0, 0.06, 0);
+        const hi = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.12, 0.12), mats);
+        hi.position.set(0, 0.18, -0.06);
+        g.add(low, hi);
+        g.position.set(0, 0.04, -0.04);
+        g.rotation.set(0.15, 0.65, 0);
+        return g;
+      }
+    }
+
+    // 3. Real thin 3D Slab or Pressure Plate in hand (matches placed flat tile!)
+    if (itemId.startsWith('slab_') || itemId === 'pressure_plate') {
+      const mats = textures.getBoxMaterials(itemId);
+      if (mats) {
+        const slab = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.055, 0.26), mats);
+        slab.position.set(0, 0.08, -0.04);
+        slab.rotation.set(0.22, 0.65, 0);
+        return slab;
+      }
+    }
+
+    // 4. Real thin 3D Door panel in hand (matches placed 1x2 door!)
+    if (itemId.startsWith('door_')) {
+      const mats = textures.getBoxMaterials(itemId);
+      if (mats) {
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.30, 0.045), mats);
+        door.position.set(0, 0.15, -0.04);
+        door.rotation.set(0.08, 0.55, 0);
+        return door;
+      }
+    }
+
+    // 5. Real compact 3D Button in hand (matches placed wall button!)
+    if (itemId.startsWith('btn_')) {
+      const mats = textures.getBoxMaterials(itemId);
+      if (mats) {
+        const g = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.04), new THREE.MeshLambertMaterial({ color: '#334155' }));
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.04), mats);
+        cap.position.set(0, 0, 0.035);
+        g.add(base, cap);
+        g.position.set(0, 0.12, -0.04);
+        g.rotation.set(0.12, 0.45, 0);
+        return g;
+      }
+    }
+
+    // 6. Crisp silhouette sprites for furniture, signs, ladder, lever, bed, wire, fuse, sapling!
+    if (
+      itemId.startsWith('furn_') ||
+      itemId === 'sign' || itemId === 'sign_fixed' ||
+      itemId === 'ladder' || itemId === 'lever_off' || itemId === 'lever_on' ||
+      itemId === 'bed' || itemId === 'redstone_wire' || itemId === 'fuse' || itemId === 'sapling'
+    ) {
       const customTex = textures.getItemTexture(itemId);
       if (customTex) {
         const mat = new THREE.MeshBasicMaterial({ map: customTex, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide });
-        const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.32), mat);
+        const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.30), mat);
         plane.position.set(0, 0.16, -0.05);
         plane.rotation.y = Math.PI / 5;
         return plane;
