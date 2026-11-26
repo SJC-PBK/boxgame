@@ -130,14 +130,20 @@ export const BLOCKS = {
   train_car:         { numId: 100,id: 'train_car',         name: '🚃 기차 객차 (연결)',   transparent: true,  solid: true,  hardness: 0.5,  preferredTool: 'pickaxe', minTier: 0, drop: 'train_car',       sound: 'stone', stackable: 16, category: '기차' },
   rail_xbranch:      { numId: 101,id: 'rail_xbranch',      name: '✖️ X분기 레일 (L)',    transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_xbranch',    sound: 'stone', stackable: 64, category: '기차' },
   rail_xbranch_turn: { numId: 102,id: 'rail_xbranch_turn', name: '✖️ X분기 레일 (R)',    transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_xbranch',    sound: 'stone', stackable: 64, category: '기차' },
-  rail_card_green:   { numId: 103,id: 'rail_card_green',   name: '🟩 초록 역주행 카드 레일',transparent: true, solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_card_green', sound: 'stone', stackable: 64, category: '기차' }
+  rail_card_green:   { numId: 103,id: 'rail_card_green',   name: '🟩 초록 역주행 카드 레일',transparent: true, solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_card_green', sound: 'stone', stackable: 64, category: '기차' },
+  rail_up:           { numId: 104,id: 'rail_up',           name: '📈 상승 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_up',         sound: 'stone', stackable: 64, category: '기차' },
+  rail_down:         { numId: 105,id: 'rail_down',         name: '📉 하강 레일',         transparent: true,  solid: false, hardness: 0.35, preferredTool: 'pickaxe', minTier: 0, drop: 'rail_down',       sound: 'stone', stackable: 64, category: '기차' },
+  rail_signal:       { numId: 106,id: 'rail_signal',       name: '🚦 기차용 신호등',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_signal',     sound: 'stone', stackable: 16, category: '기차' },
+  rail_gate_open:    { numId: 107,id: 'rail_gate_open',    name: '🚧 자동 건널목 차단봉',transparent: true,  solid: false, hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' },
+  rail_gate_closed:  { numId: 108,id: 'rail_gate_closed',  name: '🚧 차단봉 (닫힘)',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' }
 };
 
 export const RAIL_IDS = [
   'rail_straight', 'rail_curve', 'rail_cross',
   'rail_branch', 'rail_branch_turn',
   'rail_xbranch', 'rail_xbranch_turn',
-  'rail_card_red', 'rail_card_yellow', 'rail_card_green'
+  'rail_card_red', 'rail_card_yellow', 'rail_card_green',
+  'rail_up', 'rail_down'
 ];
 
 export const BUTTON_IDS = ['btn_white', 'btn_red', 'btn_blue', 'btn_yellow', 'btn_green', 'btn_metal'];
@@ -307,6 +313,10 @@ export const RECIPES = [
   { id: 'r-rail-red', category: '특수', out: { item: 'rail_card_red', count: 4 }, in: [{ item: 'iron_ingot', count: 1 }, { item: 'wool_red', count: 1 }] },
   { id: 'r-rail-yel', category: '특수', out: { item: 'rail_card_yellow', count: 4 }, in: [{ item: 'iron_ingot', count: 1 }, { item: 'wool_yellow', count: 1 }] },
   { id: 'r-rail-grn', category: '특수', out: { item: 'rail_card_green', count: 4 }, in: [{ item: 'iron_ingot', count: 1 }, { item: 'leaves', count: 1 }] },
+  { id: 'r-rail-up',  category: '특수', out: { item: 'rail_up', count: 6 },         in: [{ item: 'iron_ingot', count: 2 }, { item: 'planks', count: 2 }] },
+  { id: 'r-rail-dn',  category: '특수', out: { item: 'rail_down', count: 6 },       in: [{ item: 'iron_ingot', count: 2 }, { item: 'planks', count: 2 }] },
+  { id: 'r-rail-sig', category: '특수', out: { item: 'rail_signal', count: 2 },     in: [{ item: 'iron_ingot', count: 2 }, { item: 'lamp', count: 1 }] },
+  { id: 'r-rail-gat', category: '특수', out: { item: 'rail_gate_open', count: 2 },  in: [{ item: 'iron_ingot', count: 2 }, { item: 'wool_red', count: 1 }, { item: 'wool_yellow', count: 1 }] },
   { id: 'r-train-eng',category: '특수', out: { item: 'train_engine', count: 1 },  in: [{ item: 'iron_ingot', count: 4 }, { item: 'coal', count: 2 }] },
   { id: 'r-train-car',category: '특수', out: { item: 'train_car', count: 2 },     in: [{ item: 'iron_ingot', count: 3 }, { item: 'planks', count: 2 }] },
   { id: 'r-tnt',          category: '특수', out: { item: 'tnt', count: 1 },          in: [{ item: 'sand', count: 4 }, { item: 'coal', count: 4 }] },

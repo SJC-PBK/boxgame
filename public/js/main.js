@@ -1078,7 +1078,7 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'toggle_toilet', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
-    if (currentHit.block.startsWith('rail_')) {
+    if (currentHit.block.startsWith('rail_') && currentHit.block !== 'rail_signal' && !currentHit.block.startsWith('rail_gate_')) {
       const heldNow = ui.getActiveItemId();
       if (heldNow === 'train_engine') {
         fpHand?.triggerSwing();
@@ -1105,7 +1105,7 @@ function handleRightClickOrInteract(interactOnly = false) {
         return;
       }
       // Prevent stacking a rail on top of another rail!
-      if (heldNow && heldNow.startsWith('rail_')) {
+      if (heldNow && heldNow.startsWith('rail_') && heldNow !== 'rail_signal' && !heldNow.startsWith('rail_gate_')) {
         return;
       }
     }
@@ -1619,6 +1619,11 @@ function updatePhysics(dt) {
         onGround = false;
       }
     }
+  }
+
+  // Solid Train Riding & Side-Collision Physics (Sandbox World)
+  if (currentWorldMode === 'sandbox' && worldExtras.applyTrainPhysics(playerPos, playerVel, flyMode)) {
+    onGround = true;
   }
 
   // Real moving elevator cab riding physics (Happiness Plus Center)

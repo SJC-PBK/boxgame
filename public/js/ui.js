@@ -995,7 +995,9 @@ export class GameUI {
       ],
       기차: [
         'rail_straight', 'rail_curve', 'rail_cross', 'rail_branch', 'rail_xbranch',
+        'rail_up', 'rail_down',
         'rail_card_red', 'rail_card_yellow', 'rail_card_green',
+        'rail_signal', 'rail_gate_open',
         'train_engine', 'train_car'
       ],
       특수: [

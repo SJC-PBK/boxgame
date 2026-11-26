@@ -1078,7 +1078,61 @@ export class WorldRenderer {
               pushSubBox('stone', x, y, z, x0, 0.04, 0.18, x1, 0.10, 0.28, lr, lg, lb, 0.04);
               pushSubBox('stone', x, y, z, x0, 0.04, 0.72, x1, 0.10, 0.82, lr, lg, lb, 0.04);
             };
-            if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
+            if (blockId === 'rail_up' || blockId === 'rail_down') {
+              // 4-step inclined slope rail rising (rail_up) or descending (rail_down) along fDir!
+              const climbDir = blockId === 'rail_up' ? fDir : ((fDir + 2) & 3);
+              for (let s = 0; s < 4; s++) {
+                const y0 = s * 0.25, y1 = y0 + 0.12;
+                const t0 = s * 0.25, t1 = t0 + 0.25;
+                if (climbDir === 0) { // rises toward North (-Z: z goes 1 -> 0)
+                  const z0 = 1 - t1, z1 = 1 - t0;
+                  pushSubBox('wood', x, y, z, 0.12, y0, z0, 0.88, y0 + 0.06, z1, lr, lg, lb, 0.06);
+                  pushSubBox('stone', x, y, z, 0.18, y0 + 0.06, z0, 0.28, y1, z1, lr, lg, lb, 0.04);
+                  pushSubBox('stone', x, y, z, 0.72, y0 + 0.06, z0, 0.82, y1, z1, lr, lg, lb, 0.04);
+                } else if (climbDir === 1) { // rises toward East (+X: x goes 0 -> 1)
+                  pushSubBox('wood', x, y, z, t0, y0, 0.12, t1, y0 + 0.06, 0.88, lr, lg, lb, 0.06);
+                  pushSubBox('stone', x, y, z, t0, y0 + 0.06, 0.18, t1, y1, 0.28, lr, lg, lb, 0.04);
+                  pushSubBox('stone', x, y, z, t0, y0 + 0.06, 0.72, t1, y1, 0.82, lr, lg, lb, 0.04);
+                } else if (climbDir === 2) { // rises toward South (+Z: z goes 0 -> 1)
+                  pushSubBox('wood', x, y, z, 0.12, y0, t0, 0.88, y0 + 0.06, t1, lr, lg, lb, 0.06);
+                  pushSubBox('stone', x, y, z, 0.18, y0 + 0.06, t0, 0.28, y1, t1, lr, lg, lb, 0.04);
+                  pushSubBox('stone', x, y, z, 0.72, y0 + 0.06, t0, 0.82, y1, t1, lr, lg, lb, 0.04);
+                } else { // rises toward West (-X: x goes 1 -> 0)
+                  const x0 = 1 - t1, x1 = 1 - t0;
+                  pushSubBox('wood', x, y, z, x0, y0, 0.12, x1, y0 + 0.06, 0.88, lr, lg, lb, 0.06);
+                  pushSubBox('stone', x, y, z, x0, y0 + 0.06, 0.18, x1, y1, 0.28, lr, lg, lb, 0.04);
+                  pushSubBox('stone', x, y, z, x0, y0 + 0.06, 0.72, x1, y1, 0.82, lr, lg, lb, 0.04);
+                }
+              }
+            } else if (blockId === 'rail_signal') {
+              // Tall railway traffic signal post (pole + dark housing + glowing Red & Green lights!)
+              pushSubBox('stone', x, y, z, 0.42, 0, 0.42, 0.58, 1.15, 0.58, lr, lg, lb, 0.08);
+              pushSubBox('coal_ore', x, y, z, 0.30, 1.10, 0.30, 0.70, 1.95, 0.70, lr, lg, lb, 0.05);
+              pushSubBox('btn_red', x, y, z, 0.36, 1.58, 0.26, 0.64, 1.84, 0.74, 1.0, 0.2, 0.2, 0);
+              pushSubBox('btn_green', x, y, z, 0.36, 1.20, 0.26, 0.64, 1.46, 0.74, 0.2, 1.0, 0.3, 0);
+            } else if (blockId === 'rail_gate_open' || blockId === 'rail_gate_closed') {
+              // Automatic Railway Crossing Barrier Gate (yellow-black base + raising/lowering red-white boom arm!)
+              pushSubBox('wool_yellow', x, y, z, 0.28, 0, 0.28, 0.72, 0.45, 0.72, lr, lg, lb, 0.08);
+              pushSubBox('coal_ore', x, y, z, 0.32, 0.45, 0.32, 0.68, 0.92, 0.68, lr, lg, lb, 0.06);
+              const closed = blockId === 'rail_gate_closed';
+              pushSubBox(closed ? 'btn_red' : 'btn_yellow', x, y, z, 0.38, 0.92, 0.38, 0.62, 1.14, 0.62, closed ? 1.1 : 0.5, closed ? 0.15 : 0.5, 0.1, 0);
+              if (closed) {
+                // Lowered horizontal red-white striped barrier arm extending 2.6 blocks across the crossing!
+                for (let s = 0; s < 5; s++) {
+                  const col = (s % 2 === 0) ? 'wool_red' : 'wool_white';
+                  const a0 = 0.5 + s * 0.45, a1 = a0 + 0.45;
+                  if (fDir === 0 || fDir === 2) pushSubBox(col, x, y, z, a0, 0.68, 0.44, a1, 0.84, 0.56, lr, lg, lb, 0.02);
+                  else pushSubBox(col, x, y, z, 0.44, 0.68, a0, 0.56, 0.84, a1, lr, lg, lb, 0.02);
+                }
+              } else {
+                // Raised upright vertical barrier arm (players & cars pass freely!)
+                for (let s = 0; s < 5; s++) {
+                  const col = (s % 2 === 0) ? 'wool_red' : 'wool_white';
+                  const y0 = 0.80 + s * 0.40, y1 = y0 + 0.40;
+                  pushSubBox(col, x, y, z, 0.44, y0, 0.44, 0.56, y1, 0.56, lr, lg, lb, 0.02);
+                }
+              }
+            } else if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
               if (fDir === 0 || fDir === 2) drawNS(0, 1);
               else drawEW(0, 1);
               if (blockId === 'rail_card_red') {

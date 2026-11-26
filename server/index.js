@@ -118,15 +118,83 @@ if (store.config.sandboxBuildVersion !== SANDBOX_BUILD_VERSION) {
   store.saveNow('config');
 }
 
-// 10Hz real-time Train Physics & Action-Card Tick Loop
+// Track placed automatic railway crossing gates (rail_gate_open / rail_gate_closed) for O(1) proximity sensing
+const railGateKeys = new Set();
+for (const [k, v] of store.deltas.entries()) {
+  if (v === 'rail_gate_open' || v === 'rail_gate_closed') railGateKeys.add(k);
+}
+
+// 10Hz real-time Train Physics, Action-Card, Auto Crossing Gate & Animal Push Tick Loop
 setInterval(() => {
   const { anyMoved, events } = trains.tick(0.1);
-  if (anyMoved) {
-    broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+  const allTrains = (anyMoved || railGateKeys.size > 0) ? trains.serializeAll() : null;
+
+  if (anyMoved && allTrains) {
+    broadcast({ type: 'trains_update', trains: allTrains }, null, 'sandbox');
+
+    // Gently push nearby animals out of the path of moving train cars!
+    let animalPushed = false;
+    for (const tr of allTrains) {
+      if (!tr.moving) continue;
+      for (const u of tr.units) {
+        for (const a of animals.animals.values()) {
+          const dx = a.x - u.x;
+          const dy = Math.abs(a.y - u.y);
+          const dz = a.z - u.z;
+          const distSq = dx * dx + dz * dz;
+          if (dy < 1.6 && distSq < 2.25) {
+            const dist = Math.max(0.05, Math.sqrt(distSq));
+            const nx = a.x + (dx / dist) * 0.95;
+            const nz = a.z + (dz / dist) * 0.95;
+            if (store.inBounds(Math.floor(nx), Math.floor(a.y), Math.floor(nz))) {
+              a.x = nx;
+              a.z = nz;
+              animalPushed = true;
+            }
+          }
+        }
+      }
+    }
+    if (animalPushed) broadcast({ type: 'animals_update', animals: animals.serializeAll() }, null, 'sandbox');
   }
+
+  // Auto-lower / auto-raise railway crossing barrier gates when trains approach or leave!
+  if (railGateKeys.size > 0 && allTrains) {
+    const gateChanges = [];
+    for (const gk of [...railGateKeys]) {
+      const [gx, gy, gz] = gk.split(',').map(Number);
+      const cur = store.getBlock(gx, gy, gz);
+      if (cur !== 'rail_gate_open' && cur !== 'rail_gate_closed') {
+        railGateKeys.delete(gk);
+        continue;
+      }
+      let minDistSq = Infinity;
+      for (const tr of allTrains) {
+        for (const u of tr.units) {
+          const dx = u.x - (gx + 0.5), dy = u.y - gy, dz = u.z - (gz + 0.5);
+          const d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 < minDistSq) minDistSq = d2;
+        }
+      }
+      const fDir = store.facings[gk] ?? 0;
+      if (cur === 'rail_gate_open' && minDistSq <= 6.5 * 6.5) {
+        store.setBlock(gx, gy, gz, 'rail_gate_closed', 'System');
+        store.setFacing(gx, gy, gz, fDir);
+        gateChanges.push({ x: gx, y: gy, z: gz, block: 'rail_gate_closed', facing: fDir });
+      } else if (cur === 'rail_gate_closed' && minDistSq > 7.5 * 7.5) {
+        store.setBlock(gx, gy, gz, 'rail_gate_open', 'System');
+        store.setFacing(gx, gy, gz, fDir);
+        gateChanges.push({ x: gx, y: gy, z: gz, block: 'rail_gate_open', facing: fDir });
+      }
+    }
+    if (gateChanges.length > 0) {
+      broadcast({ type: 'blocks_batch', changes: gateChanges, by: 'RailGate' }, null, 'sandbox');
+    }
+  }
+
   for (const ev of events) {
     broadcast({ type: 'train_event', ...ev }, null, 'sandbox');
-    if (ev.event === 'stop_red' || ev.event === 'stop_end') {
+    if (ev.event === 'stop_red' || ev.event === 'stop_end' || ev.event === 'reverse') {
       broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
     }
   }
@@ -1121,12 +1189,15 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 설치할 수 있습니다.' });
           return;
         }
-        if (blockId.startsWith('rail_')) {
+        if (isRailBlock(blockId)) {
           const below = store.getBlock(x, y - 1, z);
           if (isRailBlock(below)) {
             send(ws, { type: 'toast', level: 'warn', text: '🛤️ 레일 위에는 레일을 겹쳐 설치할 수 없습니다.' });
             return;
           }
+        }
+        if (blockId === 'rail_gate_open' || blockId === 'rail_gate_closed') {
+          railGateKeys.add(`${x},${y},${z}`);
         }
         if (blockId === 'sapling') {
           const below = store.getBlock(x, y - 1, z);

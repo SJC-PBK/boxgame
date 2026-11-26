@@ -1204,14 +1204,20 @@ export class WorldExtras {
         const m = rec.unitMeshes[i];
         const t = rec.targetUnits[i];
         if (!t) continue;
+        const prevX = m.position.x, prevY = m.position.y, prevZ = m.position.z;
         m.position.x += (t.x - m.position.x) * lerp;
         m.position.y += (t.y - m.position.y) * lerp;
         m.position.z += (t.z - m.position.z) * lerp;
-        // Shortest-angle yaw interpolation
+        m.userData.frameDx = m.position.x - prevX;
+        m.userData.frameDy = m.position.y - prevY;
+        m.userData.frameDz = m.position.z - prevZ;
+        // Shortest-angle yaw interpolation + smooth slope pitch tilt!
         let dyaw = (t.yaw || 0) - m.rotation.y;
         while (dyaw > Math.PI) dyaw -= Math.PI * 2;
         while (dyaw < -Math.PI) dyaw += Math.PI * 2;
         m.rotation.y += dyaw * Math.min(1, dt * 12);
+        const targetPitch = t.pitch || 0;
+        m.rotation.x += (targetPitch - m.rotation.x) * Math.min(1, dt * 10);
       }
       // Subtle chimney puff while moving
       if (rec.moving && rec.unitMeshes[0] && Math.random() < dt * 4.5) {
@@ -1234,6 +1240,39 @@ export class WorldExtras {
         s.mat.opacity = Math.max(0, s.life * 0.9);
       }
     }
+  }
+
+  // Solid Train Physics: lets players jump on & ride moving locomotives/cars, and prevents clipping through sides!
+  applyTrainPhysics(playerPos, playerVel, flyMode) {
+    if (flyMode || this._trainMeshes.size === 0) return false;
+    let riding = false;
+    for (const rec of this._trainMeshes.values()) {
+      for (const m of rec.unitMeshes) {
+        const ux = m.position.x, uy = m.position.y, uz = m.position.z;
+        const dx = playerPos.x - ux;
+        const dz = playerPos.z - uz;
+        const topY = uy + 0.96;
+        // 1. Standing / riding on top of the locomotive or passenger car!
+        if (Math.abs(dx) < 0.62 && Math.abs(dz) < 0.62 && playerPos.y >= topY - 0.42 && playerPos.y <= topY + 0.32 && playerVel.y <= 0.6) {
+          playerPos.x += (m.userData.frameDx || 0);
+          playerPos.z += (m.userData.frameDz || 0);
+          playerPos.y = topY;
+          playerVel.y = 0;
+          riding = true;
+          continue;
+        }
+        // 2. Solid body collision on the ground -> gently push player outward!
+        if (Math.abs(dx) < 0.68 && Math.abs(dz) < 0.68 && playerPos.y >= uy - 0.25 && playerPos.y < topY - 0.42) {
+          const dist = Math.max(0.05, Math.hypot(dx, dz));
+          const push = (0.70 - dist);
+          if (push > 0) {
+            playerPos.x += (dx / dist) * push;
+            playerPos.z += (dz / dist) * push;
+          }
+        }
+      }
+    }
+    return riding;
   }
 
   raycastTrains(origin, direction, maxDist = 6.0) {

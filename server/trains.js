@@ -17,7 +17,7 @@ export function isRailBlock(id) {
 
 function getRailConnections(blockId, facing) {
   const f = Number(facing || 0) & 3;
-  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
+  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green' || blockId === 'rail_up' || blockId === 'rail_down') {
     return (f === 0 || f === 2) ? [0, 2] : [1, 3];
   }
   if (blockId === 'rail_cross' || blockId === 'rail_xbranch' || blockId === 'rail_xbranch_turn') {
@@ -40,7 +40,7 @@ function chooseExitDir(blockId, facing, enterFrom) {
   const f = Number(facing || 0) & 3;
   const opp = (enterFrom + 2) & 3;
   if (blockId === 'rail_cross') return opp;
-  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green') {
+  if (blockId === 'rail_straight' || blockId === 'rail_card_red' || blockId === 'rail_card_yellow' || blockId === 'rail_card_green' || blockId === 'rail_up' || blockId === 'rail_down') {
     const conns = getRailConnections(blockId, f);
     if (conns.includes(opp)) return opp;
     return conns.find(c => c !== enterFrom) ?? opp;
@@ -168,14 +168,25 @@ export class TrainManager {
     if (!head) return null;
     const dir = head.dir;
     const nx = head.x + DX[dir];
-    const ny = head.y;
     const nz = head.z + DZ[dir];
-    const nextBlk = this.store.getBlock(nx, ny, nz);
-    if (!isRailBlock(nextBlk)) return null;
-    const nextFacing = this.store.facings[`${nx},${ny},${nz}`] || 0;
-    const enterFrom = (dir + 2) & 3;
-    const exitDir = chooseExitDir(nextBlk, nextFacing, enterFrom);
-    return { x: nx, y: ny, z: nz, dir: exitDir, block: nextBlk };
+    const curBlk = this.store.getBlock(head.x, head.y, head.z);
+    const curF = this.store.facings[`${head.x},${head.y},${head.z}`] || 0;
+    // Check elevation change for ascending/descending slope rails (rail_up / rail_down)
+    let yOrder = [head.y, head.y + 1, head.y - 1];
+    if (curBlk === 'rail_up') {
+      yOrder = (dir === curF) ? [head.y + 1, head.y, head.y - 1] : [head.y, head.y - 1, head.y + 1];
+    } else if (curBlk === 'rail_down') {
+      yOrder = (dir === curF) ? [head.y - 1, head.y, head.y + 1] : [head.y + 1, head.y, head.y - 1];
+    }
+    for (const ny of yOrder) {
+      const nextBlk = this.store.getBlock(nx, ny, nz);
+      if (!isRailBlock(nextBlk)) continue;
+      const nextFacing = this.store.facings[`${nx},${ny},${nz}`] || 0;
+      const enterFrom = (dir + 2) & 3;
+      const exitDir = chooseExitDir(nextBlk, nextFacing, enterFrom);
+      return { x: nx, y: ny, z: nz, dir: exitDir, block: nextBlk };
+    }
+    return null;
   }
 
   coupleCarToTrain(trainId) {
@@ -317,11 +328,14 @@ export class TrainManager {
         const y = cur.y + 0.10 + (target.y - cur.y) * useP;
         const z = cur.z + 0.5 + (target.z - cur.z) * useP;
         const moveDx = target.x - cur.x;
+        const moveDy = target.y - cur.y;
         const moveDz = target.z - cur.z;
         const yaw = (moveDx !== 0 || moveDz !== 0)
           ? Math.atan2(moveDx, moveDz)
           : (YAW_FOR_DIR[cur.dir & 3] || 0);
-        units.push({ x, y, z, yaw, isEngine: i === 0 });
+        const curBlk = this.store.getBlock(cur.x, cur.y, cur.z);
+        const pitch = moveDy > 0 ? -0.42 : (moveDy < 0 ? 0.42 : (curBlk === 'rail_up' ? -0.35 : (curBlk === 'rail_down' ? 0.35 : 0)));
+        units.push({ x, y, z, yaw, pitch, isEngine: i === 0 });
       }
       out.push({ id: t.id, moving: t.moving, cars: t.cars, units });
     }

@@ -662,7 +662,12 @@ function drawBlockFace(blockId, face) {
       case 'rail_xbranch_turn':
       case 'rail_card_red':
       case 'rail_card_yellow':
-      case 'rail_card_green': {
+      case 'rail_card_green':
+      case 'rail_up':
+      case 'rail_down':
+      case 'rail_signal':
+      case 'rail_gate_open':
+      case 'rail_gate_closed': {
         if ((blockId === 'rail_branch' || blockId === 'rail_xbranch') && face === 'top') {
           // Crisp Blue badge with bold white 'L' (facing North -Z upright!)
           ctx.fillStyle = '#1d4ed8';
@@ -1585,7 +1590,54 @@ export class TextureLibrary {
             const tie = '#8b5a2b';
             const rail = '#cbd5e1';
             const railDark = '#475569';
-            if (def.id === 'rail_straight' || def.id === 'rail_card_red' || def.id === 'rail_card_yellow' || def.id === 'rail_card_green') {
+            if (def.id === 'rail_up' || def.id === 'rail_down') {
+              // Sloped ascending / descending rail icon (matches stairs!)
+              const isUp = def.id === 'rail_up';
+              ctx.fillStyle = '#5c3818';
+              for (let i = 0; i < 4; i++) {
+                const x = isUp ? (4 + i * 6) : (22 - i * 6);
+                const y = 24 - i * 6;
+                ctx.fillRect(x, y, 6, 4);
+              }
+              ctx.strokeStyle = railDark; ctx.lineWidth = 5;
+              ctx.beginPath();
+              if (isUp) { ctx.moveTo(3, 27); ctx.lineTo(29, 5); }
+              else { ctx.moveTo(3, 5); ctx.lineTo(29, 27); }
+              ctx.stroke();
+              ctx.strokeStyle = rail; ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              if (isUp) { ctx.moveTo(3, 27); ctx.lineTo(29, 5); }
+              else { ctx.moveTo(3, 5); ctx.lineTo(29, 27); }
+              ctx.stroke();
+              ctx.fillStyle = isUp ? '#38bdf8' : '#f97316';
+              ctx.font = 'bold 12px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.fillText(isUp ? '▲' : '▼', isUp ? 9 : 23, isUp ? 13 : 13);
+            } else if (def.id === 'rail_signal') {
+              // Railway traffic signal post (red + yellow + green lights)
+              ctx.fillStyle = '#334155'; ctx.fillRect(14, 18, 4, 12);
+              ctx.fillStyle = '#0f172a'; ctx.fillRect(10, 2, 12, 18);
+              ctx.fillStyle = '#ef4444'; ctx.fillRect(13, 4, 6, 4);
+              ctx.fillStyle = '#facc15'; ctx.fillRect(13, 9, 6, 4);
+              ctx.fillStyle = '#22c55e'; ctx.fillRect(13, 14, 6, 4);
+              ctx.fillStyle = '#475569'; ctx.fillRect(10, 28, 12, 3);
+            } else if (def.id === 'rail_gate_open' || def.id === 'rail_gate_closed') {
+              // Yellow-black striped crossing base + red-white striped barrier boom!
+              ctx.fillStyle = '#facc15'; ctx.fillRect(4, 18, 8, 12);
+              ctx.fillStyle = '#0f172a'; ctx.fillRect(4, 21, 8, 3); ctx.fillRect(4, 27, 8, 3);
+              ctx.fillStyle = '#ef4444'; ctx.fillRect(6, 13, 4, 4); // warning light
+              if (def.id === 'rail_gate_closed') {
+                for (let x = 10; x < 30; x += 4) {
+                  ctx.fillStyle = ((x / 4) % 2 === 0) ? '#ef4444' : '#ffffff';
+                  ctx.fillRect(x, 19, 4, 4);
+                }
+              } else {
+                for (let y = 3; y < 21; y += 4) {
+                  ctx.fillStyle = (((y - 3) / 4) % 2 === 0) ? '#ef4444' : '#ffffff';
+                  ctx.fillRect(11, y, 4, 4);
+                }
+              }
+            } else if (def.id === 'rail_straight' || def.id === 'rail_card_red' || def.id === 'rail_card_yellow' || def.id === 'rail_card_green') {
               for (const y of [4, 11, 18, 25]) { ctx.fillStyle = tie; ctx.fillRect(5, y, 22, 3); }
               ctx.fillStyle = railDark; ctx.fillRect(7, 1, 5, 30); ctx.fillRect(20, 1, 5, 30);
               ctx.fillStyle = rail; ctx.fillRect(8, 1, 3, 30); ctx.fillRect(21, 1, 3, 30);
