@@ -66,10 +66,18 @@ function chooseExitDir(blockId, facing, enterFrom) {
     return opp;
   }
   if (blockId === 'rail_xbranch' || blockId === 'rail_xbranch_turn') {
-    // X-branch (4-way switchable): Blue (L) turns Left from approaching direction, Green (R) turns Right!
-    const fwd = opp;
+    // X-branch (Double-Slip 4-way switch relative to facing f):
+    // A = rear (f+2)&3, D = front (f), B = left (f+3)&3, C = right (f+1)&3
+    // - From A or D: L -> B, R -> C
+    // - From B or C: L -> A, R -> D
+    const A = (f + 2) & 3;
+    const D = f;
+    const B = (f + 3) & 3;
+    const C = (f + 1) & 3;
     const isR = blockId === 'rail_xbranch_turn';
-    return isR ? ((fwd + 1) & 3) : ((fwd + 3) & 3);
+    if (enterFrom === A || enterFrom === D) return isR ? C : B;
+    if (enterFrom === B || enterFrom === C) return isR ? D : A;
+    return opp;
   }
   return opp;
 }
