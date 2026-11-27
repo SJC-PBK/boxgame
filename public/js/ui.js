@@ -453,6 +453,30 @@ export class GameUI {
       this._requestSkinSave(skin, name, () => { document.getElementById('sk-publish-name').value = ''; });
     });
 
+    // Staff NPC editor modal actions
+    document.getElementById('btn-npc-save')?.addEventListener('click', () => {
+      if (!this.currentNpc) return;
+      this.cb.send({
+        type: 'npc_update',
+        id: this.currentNpc.id,
+        name: document.getElementById('npc-name-input').value.trim(),
+        pose: document.getElementById('npc-pose-select').value,
+        facing: Number(document.getElementById('npc-facing-select').value) & 3,
+        roundGlasses: !!document.getElementById('npc-glasses-check').checked,
+        shirtColor: document.getElementById('npc-shirt-color').value,
+        pantsColor: document.getElementById('npc-pants-color').value,
+        hairColor: document.getElementById('npc-hair-color').value
+      });
+      this.closeModal();
+    });
+    document.getElementById('btn-npc-delete')?.addEventListener('click', () => {
+      if (!this.currentNpc) return;
+      if (confirm(`"${this.currentNpc.name}" NPC를 삭제하시겠습니까?`)) {
+        this.cb.send({ type: 'npc_remove', id: this.currentNpc.id });
+        this.closeModal();
+      }
+    });
+
     // Chest rename
     document.getElementById('btn-chest-rename').addEventListener('click', () => {
       if (!this.currentChest) return;
@@ -1226,6 +1250,19 @@ export class GameUI {
       });
       bagGrid.appendChild(el);
     }
+  }
+
+  openNpcEditor(npc) {
+    if (!npc) return;
+    this.currentNpc = npc;
+    document.getElementById('npc-name-input').value = npc.name || '';
+    document.getElementById('npc-pose-select').value = npc.pose === 'standing' ? 'standing' : 'seated';
+    document.getElementById('npc-facing-select').value = String((npc.facing ?? 0) & 3);
+    document.getElementById('npc-glasses-check').checked = !!npc.roundGlasses;
+    document.getElementById('npc-shirt-color').value = npc.shirtColor || '#1f2937';
+    document.getElementById('npc-pants-color').value = npc.pantsColor || '#111827';
+    document.getElementById('npc-hair-color').value = npc.hairColor || '#18181b';
+    this.openModal('modal-npc');
   }
 
   openChestData(chest) {

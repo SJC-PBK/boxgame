@@ -51,6 +51,7 @@ export class WorldStore {
       signOverrides: path.join(this.dataDir, 'sign_overrides.json'),
       centerFurn: path.join(this.dataDir, 'center_furn.json'),
       centerPylon: path.join(this.dataDir, 'center_pylon.json'),
+      centerNpcs: path.join(this.dataDir, 'center_npcs.json'),
       portals: path.join(this.dataDir, 'portals.json'),
       beacons: path.join(this.dataDir, 'beacons.json'),
       facings: path.join(this.dataDir, 'facings.json'),
@@ -70,6 +71,20 @@ export class WorldStore {
     this.signOverrides = {};
     this.centerFurn = {};
     this.centerPylon = { x: -25.5, y: 5.0, z: 2.2, rotY: 0 };
+    this.centerNpcs = [
+      {
+        id: 'park-bugyu',
+        name: '💻 야근하는 박부규',
+        x: -10, y: 23, z: 7,
+        facing: 0,
+        pose: 'seated',
+        roundGlasses: true,
+        shirtColor: '#1f2937',
+        pantsColor: '#111827',
+        hairColor: '#18181b',
+        skinColor: '#f1c69c'
+      }
+    ];
     this.portals = {};
     this.beacons = {};
     this.facings = {};
@@ -116,6 +131,7 @@ export class WorldStore {
       else if (kind === 'signOverrides') this._writeJsonAtomic(this.files.signOverrides, this.signOverrides);
       else if (kind === 'centerFurn') this._writeJsonAtomic(this.files.centerFurn, this.centerFurn);
       else if (kind === 'centerPylon') this._writeJsonAtomic(this.files.centerPylon, this.centerPylon);
+      else if (kind === 'centerNpcs') this._writeJsonAtomic(this.files.centerNpcs, this.centerNpcs);
       else if (kind === 'portals') this._writeJsonAtomic(this.files.portals, this.portals);
       else if (kind === 'beacons') this._writeJsonAtomic(this.files.beacons, this.beacons);
       else if (kind === 'facings') this._writeJsonAtomic(this.files.facings, this.facings);
@@ -149,6 +165,8 @@ export class WorldStore {
     this.centerFurn = (savedCenterFurn && typeof savedCenterFurn === 'object') ? savedCenterFurn : {};
     const savedPylon = this._readJson(this.files.centerPylon);
     if (savedPylon && typeof savedPylon.x === 'number') this.centerPylon = savedPylon;
+    const savedNpcs = this._readJson(this.files.centerNpcs);
+    if (Array.isArray(savedNpcs) && savedNpcs.length > 0) this.centerNpcs = savedNpcs;
     const savedPortals = this._readJson(this.files.portals);
     const savedBeacons = this._readJson(this.files.beacons);
     const savedFacings = this._readJson(this.files.facings);
@@ -553,6 +571,49 @@ export class WorldStore {
     };
     this._scheduleSave('centerPylon', 100);
     return this.centerPylon;
+  }
+
+  addCenterNpc(npcData) {
+    const npc = {
+      id: `npc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: String(npcData.name || '직원 NPC').trim().slice(0, 40) || '직원 NPC',
+      x: Math.round(Number(npcData.x) || 0),
+      y: Math.round(Number(npcData.y) || 5),
+      z: Math.round(Number(npcData.z) || 0),
+      facing: Number(npcData.facing || 0) & 3,
+      pose: npcData.pose === 'standing' ? 'standing' : 'seated',
+      roundGlasses: !!npcData.roundGlasses,
+      shirtColor: String(npcData.shirtColor || '#1f2937').slice(0, 16),
+      pantsColor: String(npcData.pantsColor || '#111827').slice(0, 16),
+      hairColor: String(npcData.hairColor || '#18181b').slice(0, 16),
+      skinColor: String(npcData.skinColor || '#f1c69c').slice(0, 16)
+    };
+    this.centerNpcs.push(npc);
+    this.saveNow('centerNpcs');
+    return npc;
+  }
+
+  updateCenterNpc(id, patch) {
+    const npc = this.centerNpcs.find(n => n.id === id);
+    if (!npc) return null;
+    if (patch.name !== undefined) npc.name = String(patch.name || '').trim().slice(0, 40) || npc.name;
+    if (patch.facing !== undefined) npc.facing = Number(patch.facing) & 3;
+    if (patch.pose !== undefined) npc.pose = patch.pose === 'standing' ? 'standing' : 'seated';
+    if (patch.roundGlasses !== undefined) npc.roundGlasses = !!patch.roundGlasses;
+    if (patch.shirtColor) npc.shirtColor = String(patch.shirtColor).slice(0, 16);
+    if (patch.pantsColor) npc.pantsColor = String(patch.pantsColor).slice(0, 16);
+    if (patch.hairColor) npc.hairColor = String(patch.hairColor).slice(0, 16);
+    if (patch.skinColor) npc.skinColor = String(patch.skinColor).slice(0, 16);
+    this.saveNow('centerNpcs');
+    return npc;
+  }
+
+  removeCenterNpc(id) {
+    const idx = this.centerNpcs.findIndex(n => n.id === id);
+    if (idx === -1) return false;
+    this.centerNpcs.splice(idx, 1);
+    this.saveNow('centerNpcs');
+    return true;
   }
 
   // ---- Named World Snapshots (/저장, /구조, /복구) ----

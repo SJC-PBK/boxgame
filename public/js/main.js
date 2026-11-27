@@ -780,6 +780,15 @@ function handleServerMessage(msg) {
       worldExtras.syncCenterPylon(msg.centerPylon);
       break;
 
+    case 'npcs_update':
+      worldExtras.syncCenterNpcs(msg.centerNpcs || []);
+      break;
+
+    case 'npc_edit_open':
+      if (document.pointerLockElement) document.exitPointerLock();
+      ui.openNpcEditor(msg.npc);
+      break;
+
     case 'pick_select_slot':
       if (typeof msg.slotIndex === 'number') ui.setActiveSlot(msg.slotIndex);
       break;
@@ -990,6 +999,20 @@ function handleRightClickOrInteract(interactOnly = false) {
     fpHand?.triggerSwing();
     sound.playAnimal('sheep', animalHit.point);
     send({ type: 'animal_interact', id: animalHit.id, action: 'shear' });
+    return;
+  }
+
+  // 1.2 Check Staff NPC interaction on right-click (admin opens NPC editor modal; regular player sees greeting!)
+  const npcHit = worldExtras.raycastNpcs(eyePos, lookDir, 5.5);
+  if (npcHit) {
+    fpHand?.triggerSwing();
+    if (selfPlayer?.isAdmin) {
+      if (document.pointerLockElement) document.exitPointerLock();
+      sound.playOpen();
+      ui.openNpcEditor(npcHit.npc);
+    } else {
+      ui.toast(`🧑‍💼 ${npcHit.npc?.name || '직원 NPC'}`, 'info');
+    }
     return;
   }
 

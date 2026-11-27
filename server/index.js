@@ -79,27 +79,34 @@ function applyPersistedCenterState() {
 }
 applyPersistedCenterState();
 
-// Seated office staff NPCs (4F "야근하는 박부규" at chair (-10, 23, 7) facing PC desk (-10, 23, 6)!)
-const CENTER_NPCS = [
-  {
-    id: 'park-bugyu',
-    name: '💻 야근하는 박부규',
-    x: -10, y: 23, z: 7,
-    facing: 0, // North (-Z) toward PC desk
-    roundGlasses: true,
-    shirtColor: '#1f2937',
-    pantsColor: '#111827',
-    hairColor: '#18181b',
-    skinColor: '#f1c69c'
+// Dynamic persisted Staff NPCs (stored in data/center_npcs.json, mirrored 180° into Sandbox Center clone!)
+function getNpcsForWorld(worldMode) {
+  if (worldMode === 'center') {
+    return (store.centerNpcs || []).filter(n => !n.world || n.world === 'center');
   }
-];
-const SANDBOX_CENTER_NPCS = CENTER_NPCS.map((n) => ({
-  ...n,
-  x: SANDBOX_CENTER_ORIGIN.x - n.x, // 180° rotated to match cloned center!
-  y: n.y + (SANDBOX_CENTER_ORIGIN.y - 4),
-  z: SANDBOX_CENTER_ORIGIN.z - n.z,
-  facing: (n.facing + 2) & 3
-}));
+  if (worldMode === 'sandbox') {
+    const out = [];
+    for (const n of (store.centerNpcs || [])) {
+      if (n.world === 'sandbox') {
+        out.push(n);
+      } else {
+        out.push({
+          ...n,
+          x: SANDBOX_CENTER_ORIGIN.x - n.x,
+          y: n.y + (SANDBOX_CENTER_ORIGIN.y - 4),
+          z: SANDBOX_CENTER_ORIGIN.z - n.z,
+          facing: (n.facing + 2) & 3
+        });
+      }
+    }
+    return out;
+  }
+  return [];
+}
+function broadcastAllNpcs() {
+  broadcast({ type: 'npcs_update', centerNpcs: getNpcsForWorld('center') }, null, 'center');
+  broadcast({ type: 'npcs_update', centerNpcs: getNpcsForWorld('sandbox') }, null, 'sandbox');
+}
 const SANDBOX_CENTER_PYLON = getSandboxCenterPylon(store);
 
 // Auto-stamp Happiness Plus Center clone (-75, 34, 94) and 5F Semi-Basement Villa (-78, 36, -45) into Sandbox once
@@ -907,7 +914,7 @@ wss.on('connection', (ws) => {
         facings: worldMode === 'job' ? {} : (worldMode === 'center' ? centerWorld.facings : store.facings),
         elevator: worldMode === 'center' ? getCenterElevatorPayload() : null,
         centerPylon: worldMode === 'center' ? store.centerPylon : (worldMode === 'sandbox' ? SANDBOX_CENTER_PYLON : null),
-        centerNpcs: worldMode === 'center' ? CENTER_NPCS : (worldMode === 'sandbox' ? SANDBOX_CENTER_NPCS : []),
+        centerNpcs: getNpcsForWorld(worldMode),
         trains: worldMode === 'sandbox' ? trains.serializeAll() : [],
         serverConfig: store.config,
         players: sameWorldPlayers.map(serializePlayer),
@@ -1885,6 +1892,39 @@ wss.on('connection', (ws) => {
         send(ws, { type: 'bag_update', bag: player.bag });
         broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
         send(ws, { type: 'toast', level: 'info', text: `🚂 기차를 회수했습니다. (기관차 1${refund.cars ? `, 객차 ${refund.cars}` : ''})` });
+        break;
+      }
+
+      case 'npc_update': {
+        if (!player.isAdmin) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 NPC 수정은 /관리자 모드에서만 가능합니다.' });
+          return;
+        }
+        const updated = store.updateCenterNpc(String(msg.id || ''), {
+          name: msg.name,
+          facing: msg.facing,
+          pose: msg.pose,
+          roundGlasses: msg.roundGlasses,
+          shirtColor: msg.shirtColor,
+          pantsColor: msg.pantsColor,
+          hairColor: msg.hairColor,
+          skinColor: msg.skinColor
+        });
+        if (!updated) return;
+        broadcastAllNpcs();
+        send(ws, { type: 'toast', level: 'success', text: `🧑‍💼 NPC "${updated.name}" 설정이 저장되었습니다!` });
+        break;
+      }
+
+      case 'npc_remove': {
+        if (!player.isAdmin) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 NPC 삭제는 /관리자 모드에서만 가능합니다.' });
+          return;
+        }
+        if (store.removeCenterNpc(String(msg.id || ''))) {
+          broadcastAllNpcs();
+          send(ws, { type: 'toast', level: 'info', text: '🗑️ 직원 NPC를 삭제했습니다.' });
+        }
         break;
       }
 
@@ -2932,7 +2972,7 @@ wss.on('connection', (ws) => {
               signs: centerWorld.signs,
               facings: centerWorld.facings,
               centerPylon: store.centerPylon,
-              centerNpcs: CENTER_NPCS
+              centerNpcs: getNpcsForWorld('center')
             }, null, 'center');
           } else {
             store.restoreSandboxSnapshot(snap.data);
@@ -2945,7 +2985,7 @@ wss.on('connection', (ws) => {
               facings: store.facings,
               regions: store.regions,
               centerPylon: SANDBOX_CENTER_PYLON,
-              centerNpcs: SANDBOX_CENTER_NPCS
+              centerNpcs: getNpcsForWorld('sandbox')
             }, null, 'sandbox');
           }
           send(ws, { type: 'toast', level: 'success', text: `♻️ [${num}번] "${snap.entry.name}" 복원 완료!` });
@@ -2971,7 +3011,7 @@ wss.on('connection', (ws) => {
               signs: centerWorld.signs,
               facings: centerWorld.facings,
               centerPylon: store.centerPylon,
-              centerNpcs: CENTER_NPCS
+              centerNpcs: getNpcsForWorld('center')
             }, null, 'center');
             send(ws, { type: 'toast', level: 'success', text: '🏢 행복플러스센터를 초기 상태로 복구했습니다!' });
           } else if (player.world === 'sandbox') {
@@ -2985,7 +3025,7 @@ wss.on('connection', (ws) => {
               facings: store.facings,
               regions: store.regions,
               centerPylon: SANDBOX_CENTER_PYLON,
-              centerNpcs: SANDBOX_CENTER_NPCS
+              centerNpcs: getNpcsForWorld('sandbox')
             }, null, 'sandbox');
             send(ws, { type: 'toast', level: 'success', text: `🏢 자유 월드 행복플러스센터 복구 완료! (${res.placed.toLocaleString()}블록)` });
             broadcast({
@@ -3066,6 +3106,37 @@ wss.on('connection', (ws) => {
           }, null, 'sandbox');
           send(ws, { type: 'toast', level: 'success', text: toastMsg });
           broadcast({ type: 'chat', system: true, text: `🏠 관리자(${player.nickname})님이 빌라를 복구했습니다! (${toastMsg})` }, null, 'sandbox');
+          return;
+        }
+        if (text === '/npc' || text.startsWith('/npc ')) {
+          if (!player.isAdmin) {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /npc 명령어는 /관리자 모드에서만 사용할 수 있습니다.' });
+            return;
+          }
+          if (player.world === 'job') return;
+          const npcName = text.slice(4).trim() || '💻 근무 중인 직원';
+          const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+          const facing = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
+          const npc = store.addCenterNpc({
+            name: npcName,
+            x: Math.floor(player.x),
+            y: Math.floor(player.y),
+            z: Math.floor(player.z),
+            facing,
+            pose: 'seated',
+            roundGlasses: false,
+            shirtColor: '#334155',
+            pantsColor: '#1e293b',
+            hairColor: '#18181b',
+            skinColor: '#f1c69c'
+          });
+          if (player.world === 'sandbox') {
+            npc.world = 'sandbox';
+            store.saveNow('centerNpcs');
+          }
+          broadcastAllNpcs();
+          send(ws, { type: 'npc_edit_open', npc });
+          send(ws, { type: 'toast', level: 'success', text: `🧑‍💼 "${npc.name}" NPC를 현재 위치에 배치했습니다! (우클릭으로 언제든 수정 가능)` });
           return;
         }
         if (text === '/간판이동' || text === '/간판회전') {

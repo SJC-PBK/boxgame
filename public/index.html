@@ -602,6 +602,61 @@
     </div>
   </div>
 
+  <!-- Modal: Staff NPC Customizer & Editor -->
+  <div id="modal-npc" class="modal hidden">
+    <div class="modal-box" style="width:min(420px,94vw);">
+      <div class="modal-header">
+        <h2>🧑‍💼 직원 NPC 설정</h2>
+        <button class="modal-close" data-close="modal-npc">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">
+        <label style="font-size:13px;font-weight:700;">이름 / 멘트 (줄바꿈 가능)</label>
+        <textarea id="npc-name-input" rows="2" maxlength="40" placeholder="예: 💻 야근하는 박부규" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-soft);color:var(--text);font-size:14px;resize:none;"></textarea>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:12px;color:var(--muted);">자세</label>
+            <select id="npc-pose-select" style="width:100%;padding:6px;border-radius:6px;background:var(--bg-soft);color:var(--text);border:1px solid var(--border);">
+              <option value="seated">💺 앉아서 타이핑</option>
+              <option value="standing">🧍 서서 근무</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--muted);">바라보는 방향</label>
+            <select id="npc-facing-select" style="width:100%;padding:6px;border-radius:6px;background:var(--bg-soft);color:var(--text);border:1px solid var(--border);">
+              <option value="0">⬆️ 북쪽 (-Z)</option>
+              <option value="1">➡️ 동쪽 (+X)</option>
+              <option value="2">⬇️ 남쪽 (+Z)</option>
+              <option value="3">⬅️ 서쪽 (-X)</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="toggle-label" style="margin-top:2px;">
+          <input id="npc-glasses-check" type="checkbox" /> 👓 동그란 까만 안경 착용
+        </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <label style="font-size:12px;display:flex;flex-direction:column;gap:4px;">상의 색
+            <input id="npc-shirt-color" type="color" value="#1f2937" style="width:100%;height:32px;border:none;border-radius:6px;cursor:pointer;" />
+          </label>
+          <label style="font-size:12px;display:flex;flex-direction:column;gap:4px;">하의 색
+            <input id="npc-pants-color" type="color" value="#111827" style="width:100%;height:32px;border:none;border-radius:6px;cursor:pointer;" />
+          </label>
+          <label style="font-size:12px;display:flex;flex-direction:column;gap:4px;">머리 색
+            <input id="npc-hair-color" type="color" value="#18181b" style="width:100%;height:32px;border:none;border-radius:6px;cursor:pointer;" />
+          </label>
+        </div>
+
+        <div class="btn-row" style="justify-content:space-between;margin-top:6px;">
+          <button id="btn-npc-delete" type="button" class="btn-sm danger">🗑️ NPC 삭제</button>
+          <button id="btn-npc-save" type="button" class="btn-sm accent">💾 저장하기</button>
+        </div>
+        <div class="small-note">💡 새 직원 배치: 채팅창에 <b>/npc 이름</b> 입력 (현재 서있는 위치에 생성)</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Emotes -->
   <div id="modal-emote" class="modal hidden">
     <div class="modal-box" style="width:min(400px,92vw);">

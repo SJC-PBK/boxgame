@@ -682,15 +682,22 @@ export class WorldExtras {
 
     this._updateElevator();
     this._updateTrains(dt);
-    // Subtle typing animation for seated office staff NPCs
+    // Subtle typing / idle animation for staff NPCs
     if (this._npcRigs && this._npcRigs.length > 0) {
       const t = now * 0.008;
       for (let i = 0; i < this._npcRigs.length; i++) {
         const rig = this._npcRigs[i];
-        rig.leftArm.rotation.x = -1.15 + Math.sin(t * 2.4 + i) * 0.14;
-        rig.rightArm.rotation.x = -1.15 + Math.cos(t * 2.7 + i) * 0.14;
-        rig.head.rotation.y = Math.sin(t * 0.35 + i) * 0.12;
-        rig.head.rotation.x = 0.12 + Math.sin(t * 0.5 + i) * 0.04;
+        if (rig.pose === 'standing') {
+          rig.leftArm.rotation.x = Math.sin(t * 0.8 + i) * 0.12;
+          rig.rightArm.rotation.x = -Math.sin(t * 0.8 + i) * 0.12;
+          rig.head.rotation.y = Math.sin(t * 0.35 + i) * 0.18;
+          rig.head.rotation.x = Math.sin(t * 0.4 + i) * 0.04;
+        } else {
+          rig.leftArm.rotation.x = -1.15 + Math.sin(t * 2.4 + i) * 0.14;
+          rig.rightArm.rotation.x = -1.15 + Math.cos(t * 2.7 + i) * 0.14;
+          rig.head.rotation.y = Math.sin(t * 0.35 + i) * 0.12;
+          rig.head.rotation.x = 0.12 + Math.sin(t * 0.5 + i) * 0.04;
+        }
       }
     }
   }
@@ -1019,65 +1026,98 @@ export class WorldExtras {
       const pantsMat = new THREE.MeshLambertMaterial({ color: npc.pantsColor || '#111827' });
       const shoeMat = new THREE.MeshLambertMaterial({ color: '#09090b' });
 
+      const isStanding = npc.pose === 'standing';
+      const yOff = isStanding ? 0.16 : 0;
+
       // Head (+Z is front face in local coords; we rotate group by rotY so +Z faces the PC monitor!)
       const head = new THREE.Mesh(
         new THREE.BoxGeometry(0.46, 0.46, 0.46),
         [hairMat, hairMat, hairMat, skinMat, faceMat, hairMat]
       );
-      head.position.set(0, 1.32, 0.02);
+      head.position.set(0, 1.32 + yOff, 0.02);
       g.add(head);
 
-      // Torso (dark jacket/shirt, seated on chair cushion y ~ 0.50)
+      // Torso (dark jacket/shirt)
       const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.58, 0.26), shirtMat);
-      torso.position.set(0, 0.80, 0);
+      torso.position.set(0, 0.80 + yOff, 0);
       g.add(torso);
 
-      // Seated thighs extending forward (+Z) + bent lower legs
-      const thighL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.19, 0.44), pantsMat);
-      thighL.position.set(-0.12, 0.54, 0.22);
-      const thighR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.19, 0.44), pantsMat);
-      thighR.position.set(0.12, 0.54, 0.22);
-      const shinL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), pantsMat);
-      shinL.position.set(-0.12, 0.28, 0.38);
-      const shinR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), pantsMat);
-      shinR.position.set(0.12, 0.28, 0.38);
-      const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
-      shoeL.position.set(-0.12, 0.06, 0.41);
-      const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
-      shoeR.position.set(0.12, 0.06, 0.41);
-      g.add(thighL, thighR, shinL, shinR, shoeL, shoeR);
+      if (isStanding) {
+        const legL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.62, 0.19), pantsMat);
+        legL.position.set(-0.12, 0.36, 0);
+        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.62, 0.19), pantsMat);
+        legR.position.set(0.12, 0.36, 0);
+        const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
+        shoeL.position.set(-0.12, 0.05, 0.02);
+        const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
+        shoeR.position.set(0.12, 0.05, 0.02);
+        g.add(legL, legR, shoeL, shoeR);
+      } else {
+        // Seated thighs extending forward (+Z) + bent lower legs
+        const thighL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.19, 0.44), pantsMat);
+        thighL.position.set(-0.12, 0.54, 0.22);
+        const thighR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.19, 0.44), pantsMat);
+        thighR.position.set(0.12, 0.54, 0.22);
+        const shinL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), pantsMat);
+        shinL.position.set(-0.12, 0.28, 0.38);
+        const shinR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.18), pantsMat);
+        shinR.position.set(0.12, 0.28, 0.38);
+        const shoeL = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
+        shoeL.position.set(-0.12, 0.06, 0.41);
+        const shoeR = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.10, 0.24), shoeMat);
+        shoeR.position.set(0.12, 0.06, 0.41);
+        g.add(thighL, thighR, shinL, shinR, shoeL, shoeR);
+      }
 
-      // Left & right arms pivoted at shoulders, reaching forward to type on keyboard!
+      // Left & right arms pivoted at shoulders
       const makeArm = (sx) => {
         const pivot = new THREE.Group();
-        pivot.position.set(sx, 1.04, 0.02);
+        pivot.position.set(sx, 1.04 + yOff, 0.02);
         const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.42, 0.16), shirtMat);
         sleeve.position.set(0, -0.18, 0);
         const hand = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.14, 0.15), skinMat);
         hand.position.set(0, -0.44, 0);
         pivot.add(sleeve, hand);
-        pivot.rotation.x = -1.15;
+        pivot.rotation.x = isStanding ? 0 : -1.15;
         return pivot;
       };
       const leftArm = makeArm(-0.31);
       const rightArm = makeArm(0.31);
       g.add(leftArm, rightArm);
 
-      // Floating name tag above seated staff member
+      // Floating name tag above staff member
       if (npc.name) {
-        const tag = makeBillboardSprite([npc.name], 'rgba(15, 23, 42, 0.85)', '#38bdf8', '#f8fafc', 1.45, 0.42);
-        tag.position.set(0, 1.88, 0);
+        const tag = makeBillboardSprite(String(npc.name).split('\n'), 'rgba(15, 23, 42, 0.85)', '#38bdf8', '#f8fafc', 1.65, 0.50);
+        tag.position.set(0, 1.88 + yOff, 0);
         g.add(tag);
       }
 
-      // Position on chair & rotate to face desk (facing: 0=N(-Z)->rotY=Math.PI, 1=E(+X)->Math.PI/2, 2=S(+Z)->0, 3=W(-X)->-Math.PI/2)
+      // Tag meshes for raycast right-click editing!
+      g.traverse((obj) => { obj.userData = { npcId: npc.id, npcData: npc }; });
+
+      // Position & rotate
       const f = Number(npc.facing ?? 0) & 3;
       const rotMap = [Math.PI, Math.PI / 2, 0, -Math.PI / 2];
       g.rotation.y = rotMap[f];
       g.position.set(npc.x + 0.5, npc.y, npc.z + 0.5);
       this.npcGroup.add(g);
-      this._npcRigs.push({ group: g, head, leftArm, rightArm });
+      this._npcRigs.push({ group: g, head, leftArm, rightArm, pose: npc.pose || 'seated', npc });
     }
+  }
+
+  raycastNpcs(origin, direction, maxDist = 5.5) {
+    if (this.npcGroup.children.length === 0) return null;
+    if (!this._npcRaycaster) this._npcRaycaster = new THREE.Raycaster();
+    this._npcRaycaster.set(origin, direction);
+    this._npcRaycaster.near = 0.1;
+    this._npcRaycaster.far = maxDist;
+    const hits = this._npcRaycaster.intersectObjects(this.npcGroup.children, true);
+    for (const h of hits) {
+      if (h.object?.userData?.npcId) {
+        return { npcId: h.object.userData.npcId, npc: h.object.userData.npcData, point: h.point };
+      }
+    }
+    return null;
   }
 
   // ---- 3D Voxel Train & Multi-Car Consist Renderer ----
