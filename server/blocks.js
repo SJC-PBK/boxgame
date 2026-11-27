@@ -136,7 +136,8 @@ export const BLOCKS = {
   rail_signal:       { numId: 106,id: 'rail_signal',       name: '🚦 기차용 신호등',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_signal',     sound: 'stone', stackable: 16, category: '기차' },
   rail_gate_open:    { numId: 107,id: 'rail_gate_open',    name: '🚧 자동 건널목 차단봉',transparent: true,  solid: false, hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' },
   rail_gate_closed:  { numId: 108,id: 'rail_gate_closed',  name: '🚧 차단봉 (닫힘)',     transparent: true,  solid: true,  hardness: 0.4,  preferredTool: 'pickaxe', minTier: 0, drop: 'rail_gate_open',  sound: 'stone', stackable: 16, category: '기차' },
-  invisible_block:   { numId: 109,id: 'invisible_block',   name: '👻 투명 블록',         transparent: true,  solid: true,  hardness: 0.3,  preferredTool: null,      minTier: 0, drop: 'invisible_block', sound: 'glass', stackable: 64, category: '건축' }
+  invisible_block:   { numId: 109,id: 'invisible_block',   name: '👻 투명 블록',         transparent: true,  solid: true,  hardness: 0.3,  preferredTool: null,      minTier: 0, drop: 'invisible_block', sound: 'glass', stackable: 64, category: '건축' },
+  npc_beacon:        { numId: 110,id: 'npc_beacon',        name: '🧑‍💼 NPC 비컨',         transparent: true,  solid: false, hardness: 0.3,  preferredTool: null,      minTier: 0, drop: 'npc_beacon',      sound: 'glass', stackable: 64, category: '관리자' }
 };
 
 export const RAIL_IDS = [

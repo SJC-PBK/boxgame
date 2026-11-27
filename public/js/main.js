@@ -1157,6 +1157,15 @@ function handleRightClickOrInteract(interactOnly = false) {
       send({ type: 'fuse_ignite', x: currentHit.x, y: currentHit.y, z: currentHit.z });
       return;
     }
+    if (currentHit.block === 'npc_beacon') {
+      if (selfPlayer?.isAdmin) {
+        if (document.pointerLockElement) document.exitPointerLock();
+        fpHand?.triggerSwing();
+        sound.playOpen();
+        send({ type: 'npc_beacon_open', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+      }
+      return;
+    }
     if (currentHit.block === 'sign' || currentHit.block === 'sign_fixed') {
       if (document.pointerLockElement) document.exitPointerLock();
       fpHand?.triggerSwing();
@@ -1224,7 +1233,7 @@ function handleRightClickOrInteract(interactOnly = false) {
   const px = currentHit.placeX, py = currentHit.placeY, pz = currentHit.placeZ;
 
   const brushPositions = computeBrushPositions(px, py, pz);
-  if (brushPositions && !['chest', 'furnace', 'bed', 'sign', 'sign_fixed', 'portal', 'tnt', 'sapling'].includes(heldDef.id)) {
+  if (brushPositions && !['chest', 'furnace', 'bed', 'sign', 'sign_fixed', 'portal', 'tnt', 'sapling', 'npc_beacon'].includes(heldDef.id)) {
     fpHand?.triggerSwing();
     send({ type: 'block_place_brush', positions: brushPositions, slotIndex: activeIdx });
     return;
@@ -1858,7 +1867,7 @@ function animate(now) {
           const b = currentHit.block;
           const isInteractive = b === 'chest' || b === 'furnace' || b === 'bed' || b === 'sign' || b === 'sign_fixed' ||
             b === 'portal' || b === 'lever_off' || b === 'lever_on' || b === 'tnt' || b === 'fill_bomb' ||
-            b === 'water_bomb' || b === 'flatten_bomb' || b === 'fuse' ||
+            b === 'water_bomb' || b === 'flatten_bomb' || b === 'fuse' || b === 'npc_beacon' ||
             b.startsWith('door_') || b.startsWith('btn_') || b.startsWith('job_') ||
             b === 'furn_toilet_closed' || b === 'furn_toilet_open';
           const heldNow = catalog[ui.getActiveItemId()];

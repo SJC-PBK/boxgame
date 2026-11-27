@@ -588,6 +588,8 @@ export class WorldStore {
       hairColor: String(npcData.hairColor || '#18181b').slice(0, 16),
       skinColor: String(npcData.skinColor || '#f1c69c').slice(0, 16)
     };
+    if (npcData.beaconKey) npc.beaconKey = String(npcData.beaconKey).slice(0, 40);
+    if (npcData.world) npc.world = String(npcData.world).slice(0, 16);
     this.centerNpcs.push(npc);
     this.saveNow('centerNpcs');
     return npc;

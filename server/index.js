@@ -1195,8 +1195,8 @@ wss.on('connection', (ws) => {
 
         const blockId = slot.block;
         const isBeaconBlock = blockId === 'protect_beacon' || blockId === 'stealth_beacon';
-        if (isBeaconBlock && !player.isAdmin) {
-          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 설치할 수 있습니다.' });
+        if ((isBeaconBlock || blockId === 'npc_beacon') && !player.isAdmin) {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 관리자 전용 비콘은 /관리자 모드에서만 설치할 수 있습니다.' });
           return;
         }
         if (isRailBlock(blockId)) {
@@ -1239,7 +1239,7 @@ wss.on('connection', (ws) => {
           slot.count -= 1;
           if (slot.count <= 0) player.bag[idx] = null;
         }
-        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId.startsWith('rail_') || blockId === 'sign_fixed' || blockId === 'ladder';
+        const needsFacing = blockId.startsWith('stairs_') || isDoorBlock || blockId.startsWith('furn_') || blockId.startsWith('btn_') || blockId.startsWith('rail_') || blockId === 'sign_fixed' || blockId === 'ladder' || blockId === 'npc_beacon';
         const facingVal = needsFacing ? (Number(msg.facing || 0) & 3) : undefined;
         const prevFacing0 = store.facings[`${x},${y},${z}`];
         store.setBlock(x, y, z, blockId, player.nickname);
@@ -1317,7 +1317,7 @@ wss.on('connection', (ws) => {
         const slot = player.bag[idx];
         if (!slot || slot.count <= 0 || !BLOCKS[slot.block]) return;
         const blockId = slot.block;
-        if (blockId.startsWith('door_') || ['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'flatten_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'sapling'].includes(blockId)) return;
+        if (blockId.startsWith('door_') || ['chest', 'furnace', 'bed', 'sign', 'portal', 'tnt', 'fill_bomb', 'water_bomb', 'flatten_bomb', 'fuse', 'protect_beacon', 'stealth_beacon', 'npc_beacon', 'sapling'].includes(blockId)) return;
 
         const changes = [];
         for (const p of positions) {
@@ -1604,7 +1604,7 @@ wss.on('connection', (ws) => {
           }
         } else {
           store.setBlock(x, y, z, blockId, player.nickname);
-          if (blockId.startsWith('stairs_') || isDoor) store.setFacing(x, y, z, fDir);
+          if (blockId.startsWith('stairs_') || isDoor || blockId === 'npc_beacon') store.setFacing(x, y, z, fDir);
           if (isDoor) {
             store.setBlock(x, y + 1, z, blockId, player.nickname);
             store.setFacing(x, y + 1, z, fDir);
@@ -1892,6 +1892,80 @@ wss.on('connection', (ws) => {
         send(ws, { type: 'bag_update', bag: player.bag });
         broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
         send(ws, { type: 'toast', level: 'info', text: `🚂 기차를 회수했습니다. (기관차 1${refund.cars ? `, 객차 ${refund.cars}` : ''})` });
+        break;
+      }
+
+      case 'npc_beacon_open': {
+        if (!player.isAdmin || player.world === 'job') {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 NPC 비컨은 /관리자 모드에서만 사용할 수 있습니다.' });
+          return;
+        }
+        const x = Math.floor(Number(msg.x)), y = Math.floor(Number(msg.y)), z = Math.floor(Number(msg.z));
+        const isCenter = player.world === 'center';
+        const targetStore = isCenter ? centerWorld : store;
+        if (!targetStore.inBounds(x, y, z) || targetStore.getBlock(x, y, z) !== 'npc_beacon') return;
+        const k = `${x},${y},${z}`;
+        const fDir = Number((isCenter ? centerWorld.facings[k] : store.facings[k]) || 0) & 3;
+        const below = targetStore.inBounds(x, y - 1, z) ? targetStore.getBlock(x, y - 1, z) : null;
+        const onChair = below === 'furn_office_chair' || below === 'furn_sofa';
+        const targetY = onChair ? (y - 1) : y;
+        const defaultPose = onChair ? 'seated' : 'standing';
+        const existing = (store.centerNpcs || []).find((n) => {
+          const sameWorld = isCenter ? (!n.world || n.world === 'center') : (n.world === 'sandbox');
+          if (!sameWorld) return false;
+          if (n.beaconKey === k) return true;
+          return n.x === x && n.z === z && (n.y === targetY || n.y === y);
+        });
+        if (existing) {
+          send(ws, { type: 'npc_edit_open', npc: existing });
+        } else {
+          send(ws, {
+            type: 'npc_edit_open',
+            npc: {
+              isNew: true,
+              beaconX: x, beaconY: y, beaconZ: z,
+              x, y: targetY, z,
+              facing: fDir,
+              pose: defaultPose,
+              name: '',
+              roundGlasses: false,
+              shirtColor: '#334155',
+              pantsColor: '#1e293b',
+              hairColor: '#18181b',
+              skinColor: '#f1c69c',
+              world: player.world
+            }
+          });
+        }
+        break;
+      }
+
+      case 'npc_create': {
+        if (!player.isAdmin || player.world === 'job') {
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 NPC 배치는 /관리자 모드에서만 가능합니다.' });
+          return;
+        }
+        const x = Math.floor(Number(msg.x ?? player.x));
+        const y = Math.floor(Number(msg.y ?? player.y));
+        const z = Math.floor(Number(msg.z ?? player.z));
+        const npcData = {
+          name: String(msg.name || '').trim() || '💻 근무 중인 직원',
+          x, y, z,
+          facing: Number(msg.facing ?? 0) & 3,
+          pose: msg.pose === 'standing' ? 'standing' : 'seated',
+          roundGlasses: !!msg.roundGlasses,
+          shirtColor: msg.shirtColor || '#334155',
+          pantsColor: msg.pantsColor || '#1e293b',
+          hairColor: msg.hairColor || '#18181b',
+          skinColor: msg.skinColor || '#f1c69c'
+        };
+        if (msg.beaconX !== undefined && msg.beaconY !== undefined && msg.beaconZ !== undefined) {
+          npcData.beaconKey = `${Math.floor(Number(msg.beaconX))},${Math.floor(Number(msg.beaconY))},${Math.floor(Number(msg.beaconZ))}`;
+        }
+        if (player.world === 'sandbox') npcData.world = 'sandbox';
+        const created = store.addCenterNpc(npcData);
+        broadcastAllNpcs();
+        send(ws, { type: 'toast', level: 'success', text: `🧑‍💼 "${created.name}" NPC를 배치했습니다!` });
         break;
       }
 
@@ -2575,9 +2649,9 @@ wss.on('connection', (ws) => {
         const itemId = String(msg.block || '');
         const def = CATALOG[itemId];
         if (!def) return;
-        const isBeacon = itemId === 'protect_beacon' || itemId === 'stealth_beacon';
+        const isBeacon = itemId === 'protect_beacon' || itemId === 'stealth_beacon' || itemId === 'npc_beacon';
         if (isBeacon && !player.isAdmin) {
-          send(ws, { type: 'toast', level: 'warn', text: '🔒 보호 비콘은 관리자만 받을 수 있습니다.' });
+          send(ws, { type: 'toast', level: 'warn', text: '🔒 관리자 전용 비콘은 관리자만 받을 수 있습니다.' });
           return;
         }
         if (!isBeacon && !store.config.supplyEnabled) {
@@ -3102,10 +3176,49 @@ wss.on('connection', (ws) => {
             facings: store.facings,
             regions: store.regions,
             centerPylon: SANDBOX_CENTER_PYLON,
-            centerNpcs: SANDBOX_CENTER_NPCS
+            centerNpcs: getNpcsForWorld('sandbox')
           }, null, 'sandbox');
           send(ws, { type: 'toast', level: 'success', text: toastMsg });
           broadcast({ type: 'chat', system: true, text: `🏠 관리자(${player.nickname})님이 빌라를 복구했습니다! (${toastMsg})` }, null, 'sandbox');
+          return;
+        }
+        if (text === '/비컨목록' || text === '/npc비컨') {
+          if (!player.isAdmin || player.world === 'job') {
+            send(ws, { type: 'toast', level: 'warn', text: '🔒 /비컨목록 명령어는 /관리자 모드에서만 사용할 수 있습니다.' });
+            return;
+          }
+          const dirNames = ['북(-Z)', '동(+X)', '남(+Z)', '서(-X)'];
+          const isCenter = player.world === 'center';
+          const list = [];
+          if (isCenter) {
+            for (const [k, v] of Object.entries(store.centerFurn || {})) {
+              if (v && v.block === 'npc_beacon') {
+                const [bx, by, bz] = k.split(',').map(Number);
+                const f = Number(v.facing || 0) & 3;
+                const npc = (store.centerNpcs || []).find(n => (!n.world || n.world === 'center') && (n.beaconKey === k || (n.x === bx && n.z === bz && (n.y === by || n.y === by - 1))));
+                list.push({ x: bx, y: by, z: bz, facing: f, npcName: npc?.name || null });
+              }
+            }
+          } else {
+            for (const [k, val] of store.deltas.entries()) {
+              if (val === 'npc_beacon') {
+                const [bx, by, bz] = k.split(',').map(Number);
+                const f = Number(store.facings[k] || 0) & 3;
+                const npc = (store.centerNpcs || []).find(n => n.world === 'sandbox' && (n.beaconKey === k || (n.x === bx && n.z === bz && (n.y === by || n.y === by - 1))));
+                list.push({ x: bx, y: by, z: bz, facing: f, npcName: npc?.name || null });
+              }
+            }
+          }
+          if (list.length === 0) {
+            send(ws, { type: 'chat', system: true, text: '📍 현재 구역에 설치된 NPC 비컨이 없습니다. (가방 보급함에서 🧑‍💼 NPC 비컨을 꺼내 설치해 보세요!)' });
+          } else {
+            list.sort((a, b) => a.y - b.y || a.z - b.z || a.x - b.x);
+            send(ws, { type: 'chat', system: true, text: `📍 설치된 NPC 비컨 목록 (총 ${list.length}개):` });
+            list.forEach((b, i) => {
+              const status = b.npcName ? `✅ ${b.npcName}` : '⬜ 비어 있음';
+              send(ws, { type: 'chat', system: true, text: `  ${i + 1}. (${b.x}, ${b.y}, ${b.z}) · 방향: ${dirNames[b.facing]} · ${status}` });
+            });
+          }
           return;
         }
         if (text === '/npc' || text.startsWith('/npc ')) {

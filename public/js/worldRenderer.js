@@ -115,6 +115,7 @@ export class WorldRenderer {
       this.idToNum['door_glass_closed'], this.idToNum['door_glass_open']
     ].filter(Boolean));
     this.stealthBeaconNum = this.idToNum['stealth_beacon'] || -1;
+    this.npcBeaconNum = this.idToNum['npc_beacon'] || -1;
     this.invisibleBlockNum = this.idToNum['invisible_block'] || -1;
     this.showAdminBlocks = false;
 
@@ -803,10 +804,50 @@ export class WorldRenderer {
             ? cData[this._chunkLocalIdx(x - baseX, y, z - baseZ)]
             : this.grid[this.flatIndex(x, y, z)];
           if (num === 0) continue;
-          if (num === this.stealthBeaconNum && !this.showAdminBlocks) continue;
+          if ((num === this.stealthBeaconNum || num === this.npcBeaconNum) && !this.showAdminBlocks) continue;
           if (num === this.invisibleBlockNum) continue;
           const blockId = this.numToId[num];
           if (!blockId) continue;
+
+          if (num === this.npcBeaconNum) {
+            const fDir = this.facings.get(`${x},${y},${z}`) || 0;
+            // Translucent emerald beacon base with rotated top arrow texture (pointing along fDir!)
+            const x0 = 0.08, y0 = 0.02, z0 = 0.08, x1 = 0.92, y1 = 0.16, z1 = 0.92;
+            for (let f = 0; f < 6; f++) {
+              const face = FACES[f];
+              const buf = getBucket(blockId, face.faceKind);
+              const base = buf.positions.length / 3;
+              for (let i = 0; i < 4; i++) {
+                const c = face.corners[i];
+                buf.positions.push(x + (c[0] ? x1 : x0), y + (c[1] ? y1 : y0), z + (c[2] ? z1 : z0));
+                buf.normals.push(face.dir[0], face.dir[1], face.dir[2]);
+                const uv = (f === 2) ? UVS[(i + fDir) & 3] : UVS[i];
+                buf.uvs.push(uv[0], uv[1]);
+                buf.lights.push(0.45, 0.95, 0.72);
+                buf.aoDarks.push(0);
+              }
+              buf.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+            }
+            // Raised 3D yellow-gold directional arrow pointing strictly in fDir (0=N/-Z, 1=E/+X, 2=S/+Z, 3=W/-X)
+            if (fDir === 0) {
+              pushSubBox('wool_yellow', x, y, z, 0.43, 0.16, 0.30, 0.57, 0.28, 0.80, 0.9, 0.85, 0.2, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.28, 0.16, 0.20, 0.72, 0.30, 0.36, 1.0, 0.95, 0.3, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.38, 0.16, 0.08, 0.62, 0.30, 0.20, 1.0, 0.95, 0.3, 0);
+            } else if (fDir === 1) {
+              pushSubBox('wool_yellow', x, y, z, 0.20, 0.16, 0.43, 0.70, 0.28, 0.57, 0.9, 0.85, 0.2, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.64, 0.16, 0.28, 0.80, 0.30, 0.72, 1.0, 0.95, 0.3, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.80, 0.16, 0.38, 0.92, 0.30, 0.62, 1.0, 0.95, 0.3, 0);
+            } else if (fDir === 2) {
+              pushSubBox('wool_yellow', x, y, z, 0.43, 0.16, 0.20, 0.57, 0.28, 0.70, 0.9, 0.85, 0.2, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.28, 0.16, 0.64, 0.72, 0.30, 0.80, 1.0, 0.95, 0.3, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.38, 0.16, 0.80, 0.62, 0.30, 0.92, 1.0, 0.95, 0.3, 0);
+            } else {
+              pushSubBox('wool_yellow', x, y, z, 0.30, 0.16, 0.43, 0.80, 0.28, 0.57, 0.9, 0.85, 0.2, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.20, 0.16, 0.28, 0.36, 0.30, 0.72, 1.0, 0.95, 0.3, 0);
+              pushSubBox('wool_yellow', x, y, z, 0.08, 0.16, 0.38, 0.20, 0.30, 0.62, 1.0, 0.95, 0.3, 0);
+            }
+            continue;
+          }
 
           if (num === this.torchNum) {
             let lr = 1.0, lg = 0.85, lb = 0.55;
@@ -1368,7 +1409,7 @@ export class WorldRenderer {
 
     while (dist <= maxDist) {
       const num = this.getNum(x, y, z);
-      if (num !== 0 && (includeWater || num !== waterNum) && !(num === this.stealthBeaconNum && !this.showAdminBlocks)) {
+      if (num !== 0 && (includeWater || num !== waterNum) && !((num === this.stealthBeaconNum || num === this.npcBeaconNum) && !this.showAdminBlocks)) {
         return { x, y, z, block: this.numToId[num], placeX: x + nx, placeY: y + ny, placeZ: z + nz };
       }
       if (tMaxX < tMaxY && tMaxX < tMaxZ) {

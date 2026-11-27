@@ -456,9 +456,7 @@ export class GameUI {
     // Staff NPC editor modal actions
     document.getElementById('btn-npc-save')?.addEventListener('click', () => {
       if (!this.currentNpc) return;
-      this.cb.send({
-        type: 'npc_update',
-        id: this.currentNpc.id,
+      const payload = {
         name: document.getElementById('npc-name-input').value.trim(),
         pose: document.getElementById('npc-pose-select').value,
         facing: Number(document.getElementById('npc-facing-select').value) & 3,
@@ -466,11 +464,29 @@ export class GameUI {
         shirtColor: document.getElementById('npc-shirt-color').value,
         pantsColor: document.getElementById('npc-pants-color').value,
         hairColor: document.getElementById('npc-hair-color').value
-      });
+      };
+      if (this.currentNpc.isNew) {
+        this.cb.send({
+          type: 'npc_create',
+          x: this.currentNpc.x,
+          y: this.currentNpc.y,
+          z: this.currentNpc.z,
+          beaconX: this.currentNpc.beaconX,
+          beaconY: this.currentNpc.beaconY,
+          beaconZ: this.currentNpc.beaconZ,
+          ...payload
+        });
+      } else {
+        this.cb.send({
+          type: 'npc_update',
+          id: this.currentNpc.id,
+          ...payload
+        });
+      }
       this.closeModal();
     });
     document.getElementById('btn-npc-delete')?.addEventListener('click', () => {
-      if (!this.currentNpc) return;
+      if (!this.currentNpc || this.currentNpc.isNew) return;
       if (confirm(`"${this.currentNpc.name}" NPC를 삭제하시겠습니까?`)) {
         this.cb.send({ type: 'npc_remove', id: this.currentNpc.id });
         this.closeModal();
@@ -1026,7 +1042,7 @@ export class GameUI {
         'train_engine', 'train_car'
       ],
       특수: [
-        ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
+        ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon', 'npc_beacon'] : []),
         'tnt', 'flatten_bomb', 'fill_bomb', 'water_bomb', 'fuse', 'detonator',
         'portal', 'jumppad', 'sapling', 'wheat_seeds'
       ]
@@ -1036,15 +1052,15 @@ export class GameUI {
       ? (this.supplyCat && this.supplyCat !== '전체' && supplyGroups[this.supplyCat]
           ? supplyGroups[this.supplyCat]
           : [
-              ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon'] : []),
+              ...(this.isAdmin ? ['protect_beacon', 'stealth_beacon', 'npc_beacon'] : []),
               ...supplyGroups.건축,
               ...supplyGroups.문계단,
               ...supplyGroups.가구,
               ...supplyGroups.버튼,
               ...supplyGroups.기차,
-              ...supplyGroups.특수.filter(id => id !== 'protect_beacon' && id !== 'stealth_beacon')
+              ...supplyGroups.특수.filter(id => id !== 'protect_beacon' && id !== 'stealth_beacon' && id !== 'npc_beacon')
             ])
-      : ['protect_beacon', 'stealth_beacon'];
+      : ['protect_beacon', 'stealth_beacon', 'npc_beacon'];
     for (const id of supplyAllow) {
       const def = this.catalog[id];
       if (!def) continue;
@@ -1255,7 +1271,12 @@ export class GameUI {
   openNpcEditor(npc) {
     if (!npc) return;
     this.currentNpc = npc;
-    document.getElementById('npc-name-input').value = npc.name || '';
+    const titleEl = document.querySelector('#modal-npc h2');
+    if (titleEl) titleEl.textContent = npc.isNew ? '🧑‍💼 새 직원 NPC 배치 (비컨)' : '🧑‍💼 직원 NPC 설정';
+    const delBtn = document.getElementById('btn-npc-delete');
+    if (delBtn) delBtn.style.visibility = npc.isNew ? 'hidden' : 'visible';
+    const nameInp = document.getElementById('npc-name-input');
+    nameInp.value = npc.name || '';
     document.getElementById('npc-pose-select').value = npc.pose === 'standing' ? 'standing' : 'seated';
     document.getElementById('npc-facing-select').value = String((npc.facing ?? 0) & 3);
     document.getElementById('npc-glasses-check').checked = !!npc.roundGlasses;
@@ -1263,6 +1284,7 @@ export class GameUI {
     document.getElementById('npc-pants-color').value = npc.pantsColor || '#111827';
     document.getElementById('npc-hair-color').value = npc.hairColor || '#18181b';
     this.openModal('modal-npc');
+    setTimeout(() => nameInp?.focus(), 30);
   }
 
   openChestData(chest) {

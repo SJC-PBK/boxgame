@@ -858,6 +858,30 @@ function drawBlockFace(blockId, face) {
         ctx.fillRect(0, 13, 16, 3);
         break;
       }
+      case 'npc_beacon': {
+        if (face === 'top') {
+          // Crisp emerald pad with bold bright-yellow forward arrow pointing North (-Z, y=0)
+          ctx.fillStyle = '#064e3b';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(1, 1, 14, 14);
+          ctx.fillStyle = '#065f46';
+          ctx.fillRect(2, 2, 12, 12);
+          // Upward arrow (tip at y=2, shaft down to y=13)
+          ctx.fillStyle = '#fde047';
+          ctx.fillRect(7, 2, 2, 12);
+          ctx.fillRect(5, 4, 6, 2);
+          ctx.fillRect(4, 6, 8, 2);
+        } else {
+          ctx.fillStyle = '#064e3b';
+          ctx.fillRect(0, 0, 16, 16);
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(1, 1, 14, 14);
+          ctx.fillStyle = '#a7f3d0';
+          ctx.fillRect(0, 13, 16, 3);
+        }
+        break;
+      }
       case 'flatten_bomb': {
         if (face === 'top' || face === 'bottom') {
           ctx.fillStyle = '#f59e0b';
@@ -1732,6 +1756,26 @@ export class TextureLibrary {
           }, 32);
           this.icons[def.id] = ic.toDataURL();
           this.itemTextures[def.id] = toTexture(ic);
+        } else if (def.id === 'npc_beacon') {
+          const ic = makeCanvas((ctx) => {
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, 32, 32);
+            // Emerald glowing beacon tile with crisp yellow forward arrow!
+            ctx.fillStyle = '#064e3b';
+            ctx.fillRect(3, 3, 26, 26);
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(5, 5, 22, 22);
+            ctx.fillStyle = '#065f46';
+            ctx.fillRect(7, 7, 18, 18);
+            ctx.fillStyle = '#fde047';
+            ctx.fillRect(14, 8, 4, 16);
+            ctx.fillRect(11, 10, 10, 3);
+            ctx.fillRect(9, 13, 14, 3);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(15, 7, 2, 2);
+          }, 32);
+          this.icons[def.id] = ic.toDataURL();
+          this.itemTextures[def.id] = toTexture(ic);
         } else if (def.id === 'invisible_block') {
           const ic = makeCanvas((ctx) => {
             ctx.imageSmoothingEnabled = false;
@@ -1767,10 +1811,10 @@ export class TextureLibrary {
         const isStair = def.id.startsWith('stairs_');
         const opts = {
           transparent: isTransparent && !isStair,
-          opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : (def.id === 'stealth_beacon' ? 0.58 : 1.0)),
-          depthWrite: def.id !== 'water' && def.id !== 'stealth_beacon',
+          opacity: def.id === 'water' ? 0.72 : (def.id === 'portal' ? 0.78 : (def.id === 'stealth_beacon' ? 0.58 : (def.id === 'npc_beacon' ? 0.74 : 1.0))),
+          depthWrite: def.id !== 'water' && def.id !== 'stealth_beacon' && def.id !== 'npc_beacon',
           alphaTest: (def.id === 'leaves' || isCross || isDoor) ? 0.25 : 0,
-          side: (isCross || def.id === 'water' || def.id === 'stealth_beacon' || isDoor || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
+          side: (isCross || def.id === 'water' || def.id === 'stealth_beacon' || def.id === 'npc_beacon' || isDoor || def.id === 'portal') ? THREE.DoubleSide : THREE.FrontSide,
           emissive: def.id === 'lamp' || def.id === 'redstone_lamp_on' ? new THREE.Color('#fef08a')
             : def.id === 'torch' ? new THREE.Color('#fb923c')
             : def.id === 'redstone_wire' || def.id === 'lever_on' ? new THREE.Color('#ef4444')
@@ -1779,9 +1823,10 @@ export class TextureLibrary {
             : def.id === 'jumppad' ? new THREE.Color('#22d3ee')
             : def.id === 'protect_beacon' ? new THREE.Color('#38bdf8')
             : def.id === 'stealth_beacon' ? new THREE.Color('#c084fc')
+            : def.id === 'npc_beacon' ? new THREE.Color('#10b981')
             : new THREE.Color('#000000'),
           emissiveIntensity: def.id === 'torch' ? 0.82
-            : (def.id === 'lamp' || def.id === 'redstone_lamp_on' ? 0.8 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' ? 0.65 : (def.id === 'redstone_wire' || def.id === 'lever_on' ? 0.45 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))))
+            : (def.id === 'lamp' || def.id === 'redstone_lamp_on' ? 0.8 : (def.id === 'portal' || def.id === 'protect_beacon' || def.id === 'stealth_beacon' || def.id === 'npc_beacon' ? 0.65 : (def.id === 'redstone_wire' || def.id === 'lever_on' ? 0.45 : (def.id === 'furnace' ? 0.24 : (def.id === 'jumppad' ? 0.35 : 0)))))
         };
 
         const applyBlockLightShader = (mat) => {
