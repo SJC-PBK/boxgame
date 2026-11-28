@@ -1420,7 +1420,7 @@ window.addEventListener('keydown', (e) => {
     handleCutActionC();
     return;
   }
-  if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(true); return; }
+  if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(false); return; }
 
   if (e.code === 'F3') {
     e.preventDefault();

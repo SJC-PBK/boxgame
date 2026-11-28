@@ -172,13 +172,22 @@ export class TouchControls {
   _bindTapBtn(id, onTap) {
     const el = document.getElementById(id);
     if (!el) return;
+    let lastTouchAt = 0;
+    const flash = () => {
+      el.classList.add('pressed');
+      setTimeout(() => el.classList.remove('pressed'), 120);
+    };
     el.addEventListener('touchstart', (e) => {
       e.preventDefault(); e.stopPropagation();
+      lastTouchAt = performance.now();
+      flash();
       onTap();
     }, { passive: false });
     el.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (!this.isTouchDevice) onTap();
+      if (performance.now() - lastTouchAt < 450) return;
+      flash();
+      onTap();
     });
   }
 
