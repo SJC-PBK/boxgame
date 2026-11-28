@@ -1878,6 +1878,34 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'train_reverse': {
+        if (player.world !== 'sandbox') return;
+        const res = trains.reverseTrain(String(msg.trainId || ''));
+        if (!res) return;
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        if (res.blocked) {
+          send(ws, { type: 'toast', level: 'warn', text: '🚂 뒤쪽 레일이 없어 후진할 수 없습니다!' });
+        } else {
+          send(ws, {
+            type: 'toast', level: 'info',
+            text: res.reversed ? '🔙 기차가 후진합니다!' : '▶️ 기차가 다시 앞으로 전진합니다!'
+          });
+        }
+        break;
+      }
+
+      case 'train_uturn': {
+        if (player.world !== 'sandbox') return;
+        const res = trains.uturnTrain(String(msg.trainId || ''));
+        if (!res) return;
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, {
+          type: 'toast', level: 'success',
+          text: '🔄 기차와 객차가 모두 180° 유턴했습니다!'
+        });
+        break;
+      }
+
       case 'train_uncouple': {
         if (player.world !== 'sandbox') return;
         const tid = String(msg.trainId || '');

@@ -496,6 +496,7 @@ document.querySelectorAll('#elev-floor-btns .elev-btn').forEach((btn) => {
 let ridingTrain = null; // { trainId, unitIndex }
 let activeNearbyTrain = null;
 let _lastTrainHudSig = '';
+let _backquoteTimer = null;
 
 function boardTrainUnit(trainId, unitIndex) {
   const pose = worldExtras.getTrainUnitPose(trainId, unitIndex);
@@ -1517,6 +1518,27 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(false); return; }
+  if (e.code === 'Backquote') {
+    e.preventDefault();
+    if (!e.repeat && !ui.openModalId && !ui.chatOpen && currentWorldMode === 'sandbox' && ridingTrain && ridingTrain.unitIndex === 0) {
+      const tid = ridingTrain.trainId;
+      if (_backquoteTimer) {
+        clearTimeout(_backquoteTimer);
+        _backquoteTimer = null;
+        sound.playDoor();
+        send({ type: 'train_uturn', trainId: tid });
+      } else {
+        _backquoteTimer = setTimeout(() => {
+          _backquoteTimer = null;
+          if (ridingTrain && ridingTrain.trainId === tid && ridingTrain.unitIndex === 0) {
+            sound.playDoor();
+            send({ type: 'train_reverse', trainId: tid });
+          }
+        }, 260);
+      }
+    }
+    return;
+  }
   if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
     e.preventDefault();
     if (!ui.openModalId && !ui.chatOpen) {

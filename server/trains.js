@@ -313,6 +313,42 @@ export class TrainManager {
     return { train: t, removedIndex: lastIdx };
   }
 
+  reverseTrain(trainId) {
+    const t = this.trains.get(trainId);
+    if (!t) return null;
+    const active = t.path.slice(0, Math.min(t.cars, t.path.length)).reverse().map((node) => ({
+      x: node.x, y: node.y, z: node.z, dir: (node.dir + 2) & 3
+    }));
+    t.path = active;
+    t.reversed = !t.reversed;
+    t.prog = 0;
+    t.nextTile = this._computeNextTile(t);
+    t.moving = !!t.nextTile;
+    t.skipRedOnce = true;
+    t.skipGreenOnce = true;
+    this.save();
+    return { train: t, reversed: t.reversed, blocked: !t.nextTile };
+  }
+
+  uturnTrain(trainId) {
+    const t = this.trains.get(trainId);
+    if (!t) return null;
+    if (!t.reversed) {
+      const active = t.path.slice(0, Math.min(t.cars, t.path.length)).reverse().map((node) => ({
+        x: node.x, y: node.y, z: node.z, dir: (node.dir + 2) & 3
+      }));
+      t.path = active;
+    }
+    t.reversed = false;
+    t.prog = 0;
+    t.nextTile = this._computeNextTile(t);
+    if (!t.nextTile) t.moving = false;
+    t.skipRedOnce = true;
+    t.skipGreenOnce = true;
+    this.save();
+    return { train: t, blocked: !t.nextTile };
+  }
+
   // Advance all moving trains by dt seconds; returns list of triggered card/stop/switch events
   tick(dt) {
     const events = [];
