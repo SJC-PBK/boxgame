@@ -1374,18 +1374,24 @@ export class WorldExtras {
     };
   }
 
-  raycastTrains(origin, direction, maxDist = 6.0) {
+  raycastTrains(origin, direction, maxDist = 6.0, ridingUnit = null) {
     if (this.trainGroup.children.length === 0) return null;
     if (!this._trainRaycaster) this._trainRaycaster = new THREE.Raycaster();
     this._trainRaycaster.set(origin, direction);
     this._trainRaycaster.near = 0.1;
     this._trainRaycaster.far = maxDist;
     const hits = this._trainRaycaster.intersectObjects(this.trainGroup.children, true);
+    let fallback = null;
     for (const h of hits) {
-      if (h.object?.userData?.trainId) {
-        return { ...h.object.userData, point: h.point };
+      const ud = h.object?.userData;
+      if (!ud?.trainId) continue;
+      // When seated inside a passenger car, prefer hitting the locomotive or another car ahead over our own car!
+      if (ridingUnit && ud.trainId === ridingUnit.trainId && ud.unitIndex === ridingUnit.unitIndex) {
+        if (!fallback) fallback = { ...ud, point: h.point };
+        continue;
       }
+      return { ...ud, point: h.point };
     }
-    return null;
+    return fallback;
   }
 }

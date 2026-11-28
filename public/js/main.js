@@ -8,7 +8,7 @@ import { RegionVisualizer } from './regions.js';
 import { SkySystem } from './sky.js';
 import { SoundEngine } from './sound.js';
 import { AnimalRenderer } from './animals.js';
-import { WorldExtras } from './worldExtras.js?v=20261128d';
+import { WorldExtras } from './worldExtras.js?v=20261128f';
 import { TouchControls } from './touchControls.js?v=20261128b';
 import { GameUI } from './ui.js';
 import { getBiomeAt, getBiomeLabel } from '../shared/terrainGen.js';
@@ -1087,7 +1087,7 @@ function handleRightClickOrInteract(interactOnly = false) {
   }
 
   // 1.5 Check Train interaction on right-click (lead engine: start/stop, passenger car: open cargo storage, holding car: couple!)
-  const trainHit = worldExtras.raycastTrains(eyePos, lookDir, 6.0);
+  const trainHit = worldExtras.raycastTrains(eyePos, lookDir, 6.0, ridingTrain);
   if (trainHit) {
     fpHand?.triggerSwing();
     const heldIdNow = ui.getActiveItemId();
@@ -1503,7 +1503,35 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(false); return; }
-  if (e.code === 'Semicolon') {
+  if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+    e.preventDefault();
+    if (!ui.openModalId && !ui.chatOpen) {
+      if (ui.usingTool || ui.usingCut) {
+        // Return immediately to the last selected hotbar slot (e.g. slot 5 after using Q tool!)
+        ui.setActiveSlot(ui.activeSlot);
+      } else {
+        const delta = e.code === 'BracketLeft' ? -1 : 1;
+        ui.setActiveSlot(ui.activeSlot + delta);
+      }
+    }
+    return;
+  }
+  if (e.code === 'KeyL') {
+    e.preventDefault();
+    if (!e.repeat && !ui.openModalId && !ui.chatOpen && currentWorldMode === 'sandbox') {
+      const { eyePos, lookDir } = getEyeAndLook();
+      const hit = worldExtras.raycastTrains(eyePos, lookDir, 7.5, ridingTrain);
+      if (hit) {
+        boardTrainUnit(hit.trainId, hit.unitIndex);
+      } else if (ridingTrain) {
+        dismountTrain(true);
+      } else {
+        ui.toast('🚂 탑승할 기차나 객차를 화면 가운데 커서로 바라보고 L 키를 눌러주세요!', 'info');
+      }
+    }
+    return;
+  }
+  if (e.code === 'Semicolon' || e.code === 'KeyH') {
     e.preventDefault();
     if (!e.repeat && !ui.openModalId && !ui.chatOpen) {
       if (cutMode && currentHit) {
@@ -1537,7 +1565,7 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (e.code === 'Quote') {
+  if (e.code === 'Quote' || e.code === 'KeyJ') {
     e.preventDefault();
     if (!e.repeat && !ui.openModalId && !ui.chatOpen) {
       if (cutMode && currentHit) {
@@ -1575,12 +1603,11 @@ window.addEventListener('keydown', (e) => {
       send({ type: 'elevator_call', floor: n });
       return;
     }
-    const trainCtx = ridingTrain
-      ? { trainId: ridingTrain.trainId, unitCount: worldExtras.getTrainUnitPose(ridingTrain.trainId, 0)?.unitCount || 1 }
-      : (activeNearbyTrain && activeNearbyTrain.dist <= 4.5 ? activeNearbyTrain : null);
-    if (currentWorldMode === 'sandbox' && trainCtx) {
-      if (n === 0 || (n >= 1 && n < trainCtx.unitCount)) {
-        boardTrainUnit(trainCtx.trainId, n);
+    // Only intercept 0..9 for car switching AFTER boarding a train (so building near trains never hijacks hotbar slots!)
+    if (currentWorldMode === 'sandbox' && ridingTrain) {
+      const unitCount = worldExtras.getTrainUnitPose(ridingTrain.trainId, 0)?.unitCount || 1;
+      if (n === 0 || (n >= 1 && n < unitCount)) {
+        boardTrainUnit(ridingTrain.trainId, n);
         return;
       }
     }
@@ -1617,8 +1644,8 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('keyup', (e) => {
   keys.delete(e.code);
-  if (e.code === 'Semicolon') { isKeyLeftDown = false; resetMining(); }
-  if (e.code === 'Quote') { isKeyRightDown = false; }
+  if (e.code === 'Semicolon' || e.code === 'KeyH') { isKeyLeftDown = false; resetMining(); }
+  if (e.code === 'Quote' || e.code === 'KeyJ') { isKeyRightDown = false; }
   if (!keys.has('KeyW') && !keys.has('KeyA') && !keys.has('KeyS') && !keys.has('KeyD')) {
     doubleTapSprint = false;
   }
