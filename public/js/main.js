@@ -206,6 +206,7 @@ function toggleBrushMode(delta = 1) {
 }
 
 function computeBrushPositions(px, py, pz) {
+  if (currentWorldMode === 'center') return null;
   const mode = BRUSH_MODES[brushModeIdx].id;
   if (mode === 'single') return null;
   const out = [];
