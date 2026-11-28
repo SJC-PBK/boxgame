@@ -298,6 +298,21 @@ export class TrainManager {
     return { engine: 1, cars: Math.max(0, t.cars - 1) };
   }
 
+  uncoupleLastCar(trainId) {
+    const t = this.trains.get(trainId);
+    if (!t) return { error: '기차를 찾을 수 없습니다.' };
+    if (t.cars <= 1) return { error: '🚃 회수할 객차가 없습니다. (기관차만 남아 있음 · 전체 회수는 🗑️ 기차 회수 버튼 사용)' };
+    const lastIdx = t.cars - 1;
+    const st = t.carStorages?.[lastIdx];
+    if (st?.slots?.some(s => s && s.count > 0)) {
+      return { error: `🚃 ${lastIdx}번 객차 안에 아이템이 남아 있어 회수할 수 없습니다. 먼저 비워주세요!` };
+    }
+    if (t.carStorages) delete t.carStorages[lastIdx];
+    t.cars -= 1;
+    this.save();
+    return { train: t, removedIndex: lastIdx };
+  }
+
   // Advance all moving trains by dt seconds; returns list of triggered card/stop/switch events
   tick(dt) {
     const events = [];

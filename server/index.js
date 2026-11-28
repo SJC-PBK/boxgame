@@ -1878,6 +1878,21 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'train_uncouple': {
+        if (player.world !== 'sandbox') return;
+        const tid = String(msg.trainId || '');
+        const res = trains.uncoupleLastCar(tid);
+        if (res.error) {
+          send(ws, { type: 'toast', level: 'warn', text: res.error });
+          return;
+        }
+        addItemToSlots(player.bag, 'train_car', 1);
+        send(ws, { type: 'bag_update', bag: player.bag });
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, { type: 'toast', level: 'info', text: `🚃 가장 끝 ${res.removedIndex}번 객차를 회수했습니다! (남은 객차: ${res.train.cars - 1}칸)` });
+        break;
+      }
+
       case 'train_remove': {
         if (player.world !== 'sandbox') return;
         const tid = String(msg.trainId || '');

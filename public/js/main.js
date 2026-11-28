@@ -1086,12 +1086,12 @@ function handleRightClickOrInteract(interactOnly = false) {
     return;
   }
 
-  // 1.5 Check Train interaction on right-click (lead engine: start/stop, passenger car: open cargo storage, holding car: couple!)
+  // 1.5 Check Train interaction on right-click (lead engine: start/stop, passenger car: open cargo storage, holding car when not riding: couple!)
   const trainHit = worldExtras.raycastTrains(eyePos, lookDir, 6.0, ridingTrain);
   if (trainHit) {
     fpHand?.triggerSwing();
     const heldIdNow = ui.getActiveItemId();
-    if (heldIdNow === 'train_car') {
+    if (heldIdNow === 'train_car' && !ridingTrain) {
       send({ type: 'train_couple', trainId: trainHit.trainId, slotIndex: ui.getActiveBagIndex() });
     } else if (!trainHit.isEngine && trainHit.unitIndex >= 1) {
       if (document.pointerLockElement) document.exitPointerLock();
@@ -1177,16 +1177,22 @@ function handleRightClickOrInteract(interactOnly = false) {
     }
     if (currentHit.block.startsWith('rail_') && currentHit.block !== 'rail_signal' && !currentHit.block.startsWith('rail_gate_')) {
       const heldNow = ui.getActiveItemId();
-      if (heldNow === 'train_engine') {
+      if (heldNow === 'train_engine' && !ridingTrain) {
         fpHand?.triggerSwing();
         const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
         const dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
         send({ type: 'train_spawn', x: currentHit.x, y: currentHit.y, z: currentHit.z, dir, slotIndex: ui.getActiveBagIndex() });
         return;
       }
-      if (heldNow === 'train_car') {
+      if (heldNow === 'train_car' && !ridingTrain) {
         fpHand?.triggerSwing();
         send({ type: 'train_couple_at', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+        return;
+      }
+      if ((heldNow === 'train_engine' || heldNow === 'train_car') && ridingTrain) {
+        fpHand?.triggerSwing();
+        sound.playDoor();
+        send({ type: 'train_toggle', trainId: ridingTrain.trainId });
         return;
       }
       if (heldNow === 'rail_card_red' || heldNow === 'rail_card_yellow' || heldNow === 'rail_card_green') {
@@ -1603,10 +1609,17 @@ window.addEventListener('keydown', (e) => {
       send({ type: 'elevator_call', floor: n });
       return;
     }
-    // Only intercept 0..9 for car switching AFTER boarding a train (so building near trains never hijacks hotbar slots!)
+    // Only intercept 0..9 AFTER boarding a train: 0 uncouples & retrieves the last passenger car, 1..9 switches cars!
     if (currentWorldMode === 'sandbox' && ridingTrain) {
       const unitCount = worldExtras.getTrainUnitPose(ridingTrain.trainId, 0)?.unitCount || 1;
-      if (n === 0 || (n >= 1 && n < unitCount)) {
+      if (n === 0) {
+        if (unitCount > 1 && ridingTrain.unitIndex >= unitCount - 1) {
+          ridingTrain.unitIndex = Math.max(0, unitCount - 2);
+        }
+        send({ type: 'train_uncouple', trainId: ridingTrain.trainId });
+        return;
+      }
+      if (n >= 1 && n < unitCount) {
         boardTrainUnit(ridingTrain.trainId, n);
         return;
       }
