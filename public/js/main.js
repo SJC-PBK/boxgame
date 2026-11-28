@@ -8,7 +8,7 @@ import { RegionVisualizer } from './regions.js';
 import { SkySystem } from './sky.js';
 import { SoundEngine } from './sound.js';
 import { AnimalRenderer } from './animals.js';
-import { WorldExtras } from './worldExtras.js';
+import { WorldExtras } from './worldExtras.js?v=20261128c';
 import { TouchControls } from './touchControls.js?v=20261128b';
 import { GameUI } from './ui.js';
 import { getBiomeAt, getBiomeLabel } from '../shared/terrainGen.js';

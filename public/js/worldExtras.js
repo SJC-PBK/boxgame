@@ -1089,6 +1089,7 @@ export class WorldExtras {
       if (npc.name) {
         const tag = makeBillboardSprite(String(npc.name).split('\n'), 'rgba(15, 23, 42, 0.85)', '#38bdf8', '#f8fafc', 1.65, 0.50);
         tag.position.set(0, 1.88 + yOff, 0);
+        tag.raycast = () => {};
         g.add(tag);
       }
 
@@ -1107,11 +1108,16 @@ export class WorldExtras {
 
   raycastNpcs(origin, direction, maxDist = 5.5) {
     if (this.npcGroup.children.length === 0) return null;
+    const meshes = [];
+    this.npcGroup.traverse((obj) => {
+      if (obj.isMesh && obj.userData?.npcId) meshes.push(obj);
+    });
+    if (meshes.length === 0) return null;
     if (!this._npcRaycaster) this._npcRaycaster = new THREE.Raycaster();
     this._npcRaycaster.set(origin, direction);
     this._npcRaycaster.near = 0.1;
     this._npcRaycaster.far = maxDist;
-    const hits = this._npcRaycaster.intersectObjects(this.npcGroup.children, true);
+    const hits = this._npcRaycaster.intersectObjects(meshes, false);
     for (const h of hits) {
       if (h.object?.userData?.npcId) {
         return { npcId: h.object.userData.npcId, npc: h.object.userData.npcData, point: h.point };
