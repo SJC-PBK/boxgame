@@ -183,7 +183,8 @@ export class TouchControls {
       flash();
       onTap();
     }, { passive: false });
-    el.addEventListener('click', (e) => {
+    el.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
       e.preventDefault(); e.stopPropagation();
       if (performance.now() - lastTouchAt < 450) return;
       flash();
