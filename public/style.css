@@ -133,6 +133,34 @@ html, body {
   border: 1px solid var(--border); font-size: 12px; display: flex; align-items: center; gap: 6px;
 }
 .player-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.player-chip.warpable { cursor: pointer; pointer-events: auto; transition: background 0.15s, border-color 0.15s; }
+.player-chip.warpable:hover { background: rgba(56, 189, 248, 0.25); border-color: #38bdf8; }
+
+/* Non-blocking Floating Popups (Minimap M & Emotes G) */
+.floating-popup {
+  position: fixed;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  z-index: 42;
+}
+.map-popup {
+  top: 60px;
+  right: 14px;
+  width: min(300px, 92vw);
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+.emote-popup {
+  bottom: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, 94vw);
+  z-index: 43;
+}
 .debug-hud {
   position: fixed; top: 56px; left: 14px; z-index: 40;
   padding: 8px 11px; border-radius: 10px;

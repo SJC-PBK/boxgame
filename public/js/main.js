@@ -10,7 +10,7 @@ import { SoundEngine } from './sound.js';
 import { AnimalRenderer } from './animals.js';
 import { WorldExtras } from './worldExtras.js?v=20261128f';
 import { TouchControls } from './touchControls.js?v=20261128b';
-import { GameUI } from './ui.js';
+import { GameUI } from './ui.js?v=20261128j';
 import { getBiomeAt, getBiomeLabel } from '../shared/terrainGen.js';
 
 // Global contextmenu suppression (fixes right-click browser menu when opening chests/furnaces!)
@@ -1485,6 +1485,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (ui.chatOpen) { ui.closeChat(); return; }
     if (ui.openModalId) { ui.closeModal(); return; }
+    if (ui.emotePopupOpen) { ui.closeEmotePopup(); return; }
+    if (ui.mapPopupOpen) { ui.closeMapPopup(); return; }
   }
   const tag = document.activeElement?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;

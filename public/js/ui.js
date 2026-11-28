@@ -65,7 +65,16 @@ export class GameUI {
 
   _bindEvents() {
     document.querySelectorAll('.modal-close').forEach((btn) => {
-      btn.addEventListener('click', () => this.closeModal());
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.close;
+        if (target === 'modal-map') this.closeMapPopup();
+        else if (target === 'modal-emote') this.closeEmotePopup();
+        else this.closeModal();
+      });
+    });
+    document.querySelectorAll('.floating-popup').forEach((el) => {
+      el.addEventListener('mousedown', (e) => e.stopPropagation());
+      el.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
     });
     document.querySelectorAll('.modal').forEach((m) => {
       let downOnBackdrop = false;
@@ -178,21 +187,19 @@ export class GameUI {
       }
     });
 
-    // Quick warp buttons in Minimap modal
+    // Quick warp buttons in Minimap popup
     document.querySelectorAll('[data-warp]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const [x, y, z] = btn.dataset.warp.split(',').map(Number);
         this.cb.onWarp(x, y, z, btn.textContent);
-        this.closeModal();
       });
     });
 
-    // Emote buttons
+    // Emote buttons (non-blocking popup — keeps character moving!)
     document.querySelectorAll('#emote-btns [data-em]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const [emoji, label] = btn.dataset.em.split('|');
         this.cb.send({ type: 'emote', emoji, label });
-        this.closeModal();
       });
     });
 
@@ -641,8 +648,48 @@ export class GameUI {
   }
 
   toggleModal(id) {
+    if (id === 'modal-map') { this.toggleMapPopup(); return; }
+    if (id === 'modal-emote') { this.toggleEmotePopup(); return; }
     if (this.openModalId === id) this.closeModal();
     else this.openModal(id);
+  }
+
+  toggleMapPopup() {
+    if (this.mapPopupOpen) this.closeMapPopup();
+    else this.openMapPopup();
+  }
+
+  openMapPopup() {
+    this.mapPopupOpen = true;
+    if (document.pointerLockElement) document.exitPointerLock();
+    document.getElementById('modal-map')?.classList.remove('hidden');
+    this.renderMinimap();
+    if (this._mapTimer) clearInterval(this._mapTimer);
+    this._mapTimer = setInterval(() => {
+      if (this.mapPopupOpen) this.renderMinimap();
+    }, 350);
+  }
+
+  closeMapPopup() {
+    this.mapPopupOpen = false;
+    document.getElementById('modal-map')?.classList.add('hidden');
+    if (this._mapTimer) { clearInterval(this._mapTimer); this._mapTimer = null; }
+  }
+
+  toggleEmotePopup() {
+    if (this.emotePopupOpen) this.closeEmotePopup();
+    else this.openEmotePopup();
+  }
+
+  openEmotePopup() {
+    this.emotePopupOpen = true;
+    if (document.pointerLockElement) document.exitPointerLock();
+    document.getElementById('modal-emote')?.classList.remove('hidden');
+  }
+
+  closeEmotePopup() {
+    this.emotePopupOpen = false;
+    document.getElementById('modal-emote')?.classList.add('hidden');
   }
 
   openModal(id) {
@@ -1434,16 +1481,25 @@ export class GameUI {
     list.innerHTML = '';
     for (const p of all) {
       const chip = document.createElement('div');
-      chip.className = 'player-chip';
+      const isOther = p.id !== self.id;
+      chip.className = 'player-chip' + (isOther ? ' warpable' : '');
       const dot = document.createElement('span');
       dot.className = 'player-dot';
       dot.style.background = p.skin?.shirtColor || p.color || '#38bdf8';
       const name = document.createElement('span');
-      name.textContent = `${p.isAdmin ? '🛡️ ' : ''}${p.nickname}${p.id === self.id ? ' (나)' : ''}`;
+      name.textContent = `${p.isAdmin ? '🛡️ ' : ''}${p.nickname}${isOther ? '' : ' (나)'}`;
       chip.append(dot, name);
+      if (isOther) {
+        chip.title = '더블클릭하면 이 친구 옆으로 워프!';
+        chip.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          this.cb.send({ type: 'warp_to_player', targetId: p.id });
+        });
+      }
       list.appendChild(chip);
     }
     if (this.openModalId === 'modal-admin') this.renderAdminPlayers();
+    if (this.mapPopupOpen) this.renderMinimap();
   }
 
   renderAdminPlayers() {
@@ -1545,12 +1601,50 @@ export class GameUI {
       warpRow.appendChild(btn);
     }
 
-    for (const r of remotes) {
-      const rx = (r.x - minX) * sx, rz = (r.z - minZ) * sz;
-      if (rx >= 0 && rx <= canvas.width && rz >= 0 && rz <= canvas.height) {
-        ctx.fillStyle = '#22c55e';
-        ctx.beginPath(); ctx.arc(rx, rz, 4, 0, Math.PI * 2); ctx.fill();
+    // Populate clickable Friend Warp list inside Map Popup!
+    const friendRow = document.getElementById('map-friend-warps');
+    if (friendRow) {
+      friendRow.innerHTML = '';
+      if (!remotes || remotes.length === 0) {
+        friendRow.innerHTML = '<div class="small-note" style="margin:0;">현재 같은 구역에 접속 중인 친구가 없습니다.</div>';
+      } else {
+        for (const r of remotes) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn-sm accent';
+          btn.style.display = 'inline-flex';
+          btn.style.alignItems = 'center';
+          btn.style.gap = '5px';
+          const rx = Math.round(r.x || 0), ry = Math.round(r.y || 0), rz = Math.round(r.z || 0);
+          btn.innerHTML = `<span class="player-dot" style="background:${this._esc(r.skin?.shirtColor || r.color || '#22c55e')}"></span>${this._esc(r.nickname)} (${rx},${rz})`;
+          btn.title = `${r.nickname}님 위치 (${rx}, ${ry}, ${rz}) 옆으로 워프!`;
+          btn.addEventListener('click', () => {
+            this.cb.send({ type: 'warp_to_player', targetId: r.id });
+          });
+          friendRow.appendChild(btn);
+        }
       }
+    }
+
+    // Draw all remote friends on minimap (with nickname labels; clamp off-screen friends to map edge!)
+    ctx.font = 'bold 10px Pretendard, Malgun Gothic, sans-serif';
+    ctx.textAlign = 'center';
+    for (const r of (remotes || [])) {
+      const rawX = (r.x - minX) * sx;
+      const rawZ = (r.z - minZ) * sz;
+      const offMap = rawX < 6 || rawX > canvas.width - 6 || rawZ < 6 || rawZ > canvas.height - 6;
+      const rx = Math.max(8, Math.min(canvas.width - 8, rawX));
+      const rz = Math.max(14, Math.min(canvas.height - 8, rawZ));
+      ctx.fillStyle = offMap ? '#facc15' : '#22c55e';
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(rx, rz, offMap ? 4.5 : 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      const tag = String(r.nickname || '친구').slice(0, 8);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+      const tw = ctx.measureText(tag).width + 6;
+      ctx.fillRect(rx - tw / 2, rz - 18, tw, 12);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(tag, rx, rz - 9);
     }
 
     ctx.fillStyle = '#38bdf8';

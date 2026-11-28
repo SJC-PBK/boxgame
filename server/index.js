@@ -2394,7 +2394,25 @@ wss.on('connection', (ws) => {
       case 'emote': {
         const emoji = String(msg.emoji || '👋').slice(0, 6);
         const label = String(msg.label || '').slice(0, 12);
-        broadcast({ type: 'player_emote', id: player.id, nickname: player.nickname, emoji, label });
+        broadcast({ type: 'player_emote', id: player.id, nickname: player.nickname, emoji, label }, null, player.world);
+        break;
+      }
+
+      case 'warp_to_player': {
+        const target = players.get(String(msg.targetId || ''));
+        if (!target || target.id === player.id || target.world !== player.world) {
+          send(ws, { type: 'toast', level: 'warn', text: '❌ 해당 친구를 같은 구역에서 찾을 수 없습니다.' });
+          return;
+        }
+        const tx = Number((target.x + 1.0).toFixed(2));
+        const ty = Number((target.y + 0.15).toFixed(2));
+        const tz = Number((target.z + 1.0).toFixed(2));
+        player.x = tx;
+        player.y = ty;
+        player.z = tz;
+        send(ws, { type: 'warp_to', x: tx, y: ty, z: tz, label: `${target.nickname}님 옆` });
+        broadcast({ type: 'player_move', id: player.id, x: tx, y: ty, z: tz, yaw: player.yaw, pitch: player.pitch }, player.id, player.world);
+        send(target.ws, { type: 'toast', level: 'info', text: `✨ ${player.nickname}님이 내 옆으로 순간이동했습니다!` });
         break;
       }
 

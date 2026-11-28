@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Boxworld — 웹 3D 멀티플레이 블록 월드</title>
-  <link rel="stylesheet" href="./style.css?v=20261128d" />
+  <link rel="stylesheet" href="./style.css?v=20261128j" />
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
@@ -594,26 +594,26 @@
     </div>
   </div>
 
-  <!-- Modal: Live Minimap & Quick Warp -->
-  <div id="modal-map" class="modal hidden">
-    <div class="modal-box">
-      <div class="modal-header">
-        <h2>🗺️ 실시간 월드 지도 & 빠른 워프</h2>
-        <button class="modal-close" data-close="modal-map">✕</button>
+  <!-- Floating Non-Blocking Popup: Live Minimap, Friend Warp & Quick Warp -->
+  <div id="modal-map" class="floating-popup map-popup hidden">
+    <div class="modal-header" style="padding:10px 14px;">
+      <h2 style="font-size:14px;">🗺️ 실시간 지도 · 친구 워프 [M]</h2>
+      <button class="modal-close" data-close="modal-map">✕</button>
+    </div>
+    <div class="modal-body" style="padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:9px;">
+      <canvas id="minimap-canvas" width="240" height="240" style="width:240px;height:240px;border-radius:10px;border:2px solid var(--border);image-rendering:pixelated;"></canvas>
+      <div class="small-note" style="margin:0;">🔵 나 · 🟢 친구 · 🟣 포털 · 🟨 광장 (이동 가능!)</div>
+      <div class="section-title" style="align-self:flex-start;margin:2px 0 0;">👥 친구에게 워프 (클릭)</div>
+      <div id="map-friend-warps" class="btn-row" style="width:100%;"></div>
+      <div class="section-title" style="align-self:flex-start;margin:2px 0 0;">⚡ 빠른 워프</div>
+      <div class="btn-row" style="width:100%;">
+        <button class="btn-sm accent" data-warp="0.5,37.2,0.5">🏛️ 광장</button>
+        <button class="btn-sm accent" data-warp="-21.5,8.2,-8.5">⛏️ 광산</button>
+        <button class="btn-sm accent" data-warp="8.5,37.2,-2.5">🌾 농장</button>
+        <button class="btn-sm" data-warp="140,44,120">🌲 숲</button>
+        <button class="btn-sm" data-warp="-160,52,-140">❄️ 설원</button>
       </div>
-      <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
-        <canvas id="minimap-canvas" width="256" height="256" style="border-radius:10px;border:2px solid var(--border);image-rendering:pixelated;"></canvas>
-        <div class="small-note">🔵 나 · 🟢 친구들 · 🟣 포털 · 🟨 광장</div>
-        <div class="section-title" style="align-self:flex-start;margin:0;">⚡ 빠른 워프</div>
-        <div class="btn-row" style="width:100%;">
-          <button class="btn-sm accent" data-warp="0.5,37.2,0.5">🏛️ 중앙 광장</button>
-          <button class="btn-sm accent" data-warp="-21.5,8.2,-8.5">⛏️ 심층 광산 (Y=8)</button>
-          <button class="btn-sm accent" data-warp="8.5,37.2,-2.5">🌾 농장 & 연못</button>
-          <button class="btn-sm" data-warp="140,44,120">🌲 깊은 숲</button>
-          <button class="btn-sm" data-warp="-160,52,-140">❄️ 설원 산맥</button>
-        </div>
-        <div id="map-portal-warps" class="btn-row" style="width:100%;"></div>
-      </div>
+      <div id="map-portal-warps" class="btn-row" style="width:100%;"></div>
     </div>
   </div>
 
@@ -672,22 +672,20 @@
     </div>
   </div>
 
-  <!-- Modal: Emotes -->
-  <div id="modal-emote" class="modal hidden">
-    <div class="modal-box" style="width:min(400px,92vw);">
-      <div class="modal-header">
-        <h2>😊 이모트 표현 (주변 친구들에게 표시)</h2>
-        <button class="modal-close" data-close="modal-emote">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="btn-row" id="emote-btns" style="justify-content:center;gap:10px;">
-          <button class="btn-sm accent" data-em="👋|안녕!">👋 안녕!</button>
-          <button class="btn-sm accent" data-em="❤️|좋아요">❤️ 좋아요</button>
-          <button class="btn-sm accent" data-em="🎉|축하해!">🎉 축하해!</button>
-          <button class="btn-sm accent" data-em="💃|신난다!">💃 신난다!</button>
-          <button class="btn-sm accent" data-em="⛏️|채굴 중">⛏️ 채굴 중</button>
-          <button class="btn-sm accent" data-em="😂|하하하">😂 하하하</button>
-        </div>
+  <!-- Floating Non-Blocking Popup: Emotes -->
+  <div id="modal-emote" class="floating-popup emote-popup hidden">
+    <div class="modal-header" style="padding:8px 12px;">
+      <h2 style="font-size:13.5px;">😊 감정표현 [G] (이동하며 사용 가능)</h2>
+      <button class="modal-close" data-close="modal-emote">✕</button>
+    </div>
+    <div class="modal-body" style="padding:10px 12px;">
+      <div class="btn-row" id="emote-btns" style="justify-content:center;gap:8px;">
+        <button class="btn-sm accent" data-em="👋|안녕!">👋 안녕!</button>
+        <button class="btn-sm accent" data-em="❤️|좋아요">❤️ 좋아요</button>
+        <button class="btn-sm accent" data-em="🎉|축하해!">🎉 축하해!</button>
+        <button class="btn-sm accent" data-em="💃|신난다!">💃 신난다!</button>
+        <button class="btn-sm accent" data-em="⛏️|채굴 중">⛏️ 채굴 중</button>
+        <button class="btn-sm accent" data-em="😂|하하하">😂 하하하</button>
       </div>
     </div>
   </div>
@@ -839,6 +837,6 @@
     </div>
   </div>
 
-  <script type="module" src="./js/main.js?v=20261128i"></script>
+  <script type="module" src="./js/main.js?v=20261128j"></script>
 </body>
 </html>
