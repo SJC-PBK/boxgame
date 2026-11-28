@@ -1126,8 +1126,8 @@ export class WorldExtras {
     return null;
   }
 
-  // ---- 3D Voxel Train & Multi-Car Consist Renderer ----
-  _buildTrainUnitMesh(isEngine, trainId, unitIndex) {
+  // ---- 3D Voxel Train & Multi-Car Consist Renderer (Classic Steam + Seoul Subway Lines!) ----
+  _buildTrainUnitMesh(isEngine, trainId, unitIndex, lineId = 'classic', lineColor = '#dc2626') {
     const g = new THREE.Group();
     g.userData = { trainId, isEngine, unitIndex };
 
@@ -1150,7 +1150,49 @@ export class WorldExtras {
       }
     }
 
-    if (isEngine) {
+    const isMetro = lineId && lineId !== 'classic';
+    if (isMetro) {
+      // Sleek Seoul Metro Electric Train (stainless silver body + vivid official subway line color band!)
+      const silverMat = new THREE.MeshLambertMaterial({ color: '#e2e8f0' });
+      const lineMat = new THREE.MeshLambertMaterial({ color: lineColor || '#00A84D' });
+      const darkWinMat = new THREE.MeshLambertMaterial({ color: '#1e293b' });
+      const roofMat = new THREE.MeshLambertMaterial({ color: '#475569' });
+
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.68, 0.90), silverMat);
+      body.position.set(0, 0.58, 0);
+      // Wide signature Seoul subway color stripe along both sides & front/back
+      const midBand = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.22, 0.92), lineMat);
+      midBand.position.set(0, 0.44, 0);
+      const topTrim = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.09, 0.92), lineMat);
+      topTrim.position.set(0, 0.88, 0);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.06, 0.88), roofMat);
+      roof.position.set(0, 0.95, 0);
+      const win1 = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.22, 0.28), glassMat);
+      win1.position.set(0, 0.70, 0.22);
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(0.80, 0.22, 0.28), glassMat);
+      win2.position.set(0, 0.70, -0.22);
+      g.add(body, midBand, topTrim, roof, win1, win2);
+
+      if (isEngine) {
+        // Sleek metro front windshield + glowing destination sign + headlights + night PointLight!
+        const frontFace = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.34, 0.06), darkWinMat);
+        frontFace.position.set(0, 0.68, 0.45);
+        const frontStripe = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.14, 0.07), lineMat);
+        frontStripe.position.set(0, 0.42, 0.45);
+        const hlL = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.10, 0.07), new THREE.MeshBasicMaterial({ color: '#fef9c3' }));
+        hlL.position.set(-0.22, 0.34, 0.46);
+        const hlR = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.10, 0.07), new THREE.MeshBasicMaterial({ color: '#fef9c3' }));
+        hlR.position.set(0.22, 0.34, 0.46);
+        const halo = new THREE.Mesh(
+          new THREE.BoxGeometry(0.62, 0.16, 0.04),
+          new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.38, depthWrite: false })
+        );
+        halo.position.set(0, 0.34, 0.49);
+        const headLightSrc = new THREE.PointLight(0xfff1a8, 3.4, 16, 1.35);
+        headLightSrc.position.set(0, 0.75, 1.45);
+        g.add(frontFace, frontStripe, hlL, hlR, halo, headLightSrc);
+      }
+    } else if (isEngine) {
       // Classic bright red & dark-navy steam locomotive (+Z is forward!)
       const redMat = new THREE.MeshLambertMaterial({ color: '#dc2626' });
       const darkRedMat = new THREE.MeshLambertMaterial({ color: '#991b1b' });
@@ -1209,24 +1251,27 @@ export class WorldExtras {
     for (const t of trainsList || []) {
       incoming.add(t.id);
       let rec = this._trainMeshes.get(t.id);
-      if (!rec || rec.unitMeshes.length !== t.units.length) {
+      const lineId = t.lineId || 'classic';
+      const lineColor = t.lineColor || '#dc2626';
+      if (!rec || rec.unitMeshes.length !== t.units.length || rec.lineId !== lineId) {
         if (rec) this.trainGroup.remove(rec.group);
         const group = new THREE.Group();
         const unitMeshes = [];
         for (let i = 0; i < t.units.length; i++) {
           const u = t.units[i];
-          const m = this._buildTrainUnitMesh(u.isEngine, t.id, i);
+          const m = this._buildTrainUnitMesh(u.isEngine, t.id, i, lineId, lineColor);
           m.position.set(u.x, u.y, u.z);
           m.rotation.y = u.yaw || 0;
           group.add(m);
           unitMeshes.push(m);
         }
         this.trainGroup.add(group);
-        rec = { group, unitMeshes, targetUnits: t.units, moving: t.moving };
+        rec = { group, unitMeshes, targetUnits: t.units, moving: t.moving, lineId, lineColor, lineName: t.lineName || '기본 증기' };
         this._trainMeshes.set(t.id, rec);
       } else {
         rec.targetUnits = t.units;
         rec.moving = t.moving;
+        rec.lineName = t.lineName || rec.lineName;
       }
     }
     for (const [id, rec] of [...this._trainMeshes.entries()]) {
@@ -1350,6 +1395,9 @@ export class WorldExtras {
             unitCount: rec.unitMeshes.length,
             carCount: Math.max(0, rec.unitMeshes.length - 1),
             moving: !!rec.moving,
+            lineId: rec.lineId || 'classic',
+            lineColor: rec.lineColor || '#dc2626',
+            lineName: rec.lineName || '기본 증기',
             dist: Math.sqrt(dSq)
           };
         }
@@ -1370,6 +1418,9 @@ export class WorldExtras {
       z: m.position.z,
       yaw: m.rotation.y,
       moving: !!rec.moving,
+      lineId: rec.lineId || 'classic',
+      lineColor: rec.lineColor || '#dc2626',
+      lineName: rec.lineName || '기본 증기',
       unitCount: rec.unitMeshes.length
     };
   }

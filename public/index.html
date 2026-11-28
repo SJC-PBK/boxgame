@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Boxworld — 웹 3D 멀티플레이 블록 월드</title>
-  <link rel="stylesheet" href="./style.css?v=20261128j" />
+  <link rel="stylesheet" href="./style.css?v=20261128k" />
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
@@ -120,7 +120,7 @@
     <!-- Sandbox World: Nearby Train Boarding & Control HUD (Elevator-style!) -->
     <div id="train-hud" class="elevator-hud hidden">
       <div class="elev-hud-header">
-        <span>🚂 기차 탑승</span>
+        <span id="train-hud-title">🚂 기차 탑승</span>
         <span id="train-hud-status" class="elev-led">정지</span>
       </div>
       <div class="train-btn-row" id="train-car-btns"></div>
@@ -129,7 +129,14 @@
         <button type="button" id="btn-train-dismount" class="elev-btn hidden">🚶 하차</button>
         <button type="button" id="btn-train-retrieve" class="elev-btn danger-btn">🗑️ 기차 회수</button>
       </div>
+      <div class="subway-line-grid" id="train-hud-lines"></div>
       <div class="elev-hud-tip" id="train-hud-tip">우클릭 탑승 · 기관차 우클릭 출발 · [`] 후진 / [``] 유턴 · [0] 끝 객차 회수 · [Space] 하차</div>
+    </div>
+
+    <!-- Seoul Subway Line Picker Bar (auto-shown when holding Train Engine!) -->
+    <div id="train-line-bar" class="train-line-bar hidden">
+      <div class="train-line-bar-title">🚇 배치할 기차/지하철 노선 선택: <strong id="train-line-cur">기본 증기</strong></div>
+      <div class="subway-line-grid" id="train-spawn-lines"></div>
     </div>
 
     <!-- Active Blueprint Mini HUD -->
@@ -837,6 +844,6 @@
     </div>
   </div>
 
-  <script type="module" src="./js/main.js?v=20261128j"></script>
+  <script type="module" src="./js/main.js?v=20261128k"></script>
 </body>
 </html>

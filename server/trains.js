@@ -11,6 +11,24 @@ const DX = [0, 1, 0, -1];
 const DZ = [-1, 0, 1, 0];
 const YAW_FOR_DIR = [Math.PI, Math.PI / 2, 0, -Math.PI / 2];
 
+export const SEOUL_SUBWAY_LINES = {
+  classic:     { id: 'classic',     name: '기본 증기',   short: '기본', color: '#dc2626' },
+  line1:       { id: 'line1',       name: '1호선',       short: '1',    color: '#0052A4' },
+  line2:       { id: 'line2',       name: '2호선',       short: '2',    color: '#00A84D' },
+  line3:       { id: 'line3',       name: '3호선',       short: '3',    color: '#EF7C1C' },
+  line4:       { id: 'line4',       name: '4호선',       short: '4',    color: '#00A5DE' },
+  line5:       { id: 'line5',       name: '5호선',       short: '5',    color: '#996CAC' },
+  line6:       { id: 'line6',       name: '6호선',       short: '6',    color: '#CD7C2F' },
+  line7:       { id: 'line7',       name: '7호선',       short: '7',    color: '#747F00' },
+  line8:       { id: 'line8',       name: '8호선',       short: '8',    color: '#E6186C' },
+  line9:       { id: 'line9',       name: '9호선',       short: '9',    color: '#BDB092' },
+  gyeongui:    { id: 'gyeongui',    name: '경의·중앙선', short: '경의', color: '#77C4A3' },
+  gyeongchun:  { id: 'gyeongchun',  name: '경춘선',      short: '경춘', color: '#0C8E72' },
+  suin:        { id: 'suin',        name: '수인·분당선', short: '수인', color: '#F5A200' },
+  shinbundang: { id: 'shinbundang', name: '신분당선',    short: '신분', color: '#D4003B' },
+  arex:        { id: 'arex',        name: '공항철도',    short: '공항', color: '#0090D2' }
+};
+
 export function isRailBlock(id) {
   return !!id && RAIL_SET.has(id);
 }
@@ -148,7 +166,7 @@ export class TrainManager {
     return pathTiles;
   }
 
-  spawnTrain(x, y, z, dir = 1, cars = 1, owner = 'System', autoMove = false) {
+  spawnTrain(x, y, z, dir = 1, cars = 1, owner = 'System', autoMove = false, lineId = 'classic') {
     if (!isRailBlock(this.store.getBlock(x, y, z))) return null;
     const id = `train-${this.nextId++}`;
     const d = Number(dir) & 3;
@@ -157,9 +175,11 @@ export class TrainManager {
     const railF = this.store.facings[`${x},${y},${z}`] || 0;
     const conns = getRailConnections(railBlk, railF);
     const useDir = conns.includes(d) ? d : (conns[0] ?? d);
+    const validLine = SEOUL_SUBWAY_LINES[lineId] ? lineId : 'classic';
     const train = {
       id,
       owner,
+      lineId: validLine,
       cars: cCount,
       moving: !!autoMove,
       reversed: false,
@@ -434,6 +454,15 @@ export class TrainManager {
     return { anyMoved, events, switchChanges };
   }
 
+  setTrainLine(trainId, lineId) {
+    const t = this.trains.get(trainId);
+    const line = SEOUL_SUBWAY_LINES[lineId];
+    if (!t || !line) return null;
+    t.lineId = line.id;
+    this.save();
+    return { train: t, line };
+  }
+
   // Serialize interpolated car positions & orientations for all trains
   serializeAll() {
     const out = [];
@@ -463,7 +492,17 @@ export class TrainManager {
       }
       // Keep engine always at index 0 in serialized units so client mesh indices never swap!
       if (t.reversed) units.reverse();
-      out.push({ id: t.id, moving: t.moving, reversed: !!t.reversed, cars: t.cars, units });
+      const line = SEOUL_SUBWAY_LINES[t.lineId] || SEOUL_SUBWAY_LINES.classic;
+      out.push({
+        id: t.id,
+        moving: t.moving,
+        reversed: !!t.reversed,
+        cars: t.cars,
+        lineId: line.id,
+        lineColor: line.color,
+        lineName: line.name,
+        units
+      });
     }
     return out;
   }

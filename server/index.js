@@ -1811,7 +1811,7 @@ wss.on('connection', (ws) => {
         const idx = Number(slotIndex);
         const slot = player.bag[idx];
         if (!slot || slot.block !== 'train_engine' || slot.count <= 0) return;
-        const t = trains.spawnTrain(x, y, z, dir, 1, player.nickname, false);
+        const t = trains.spawnTrain(x, y, z, dir, 1, player.nickname, false, String(msg.lineId || 'classic'));
         if (!t) return;
         if (!store.config.unlimitedBlocks) {
           slot.count -= 1;
@@ -1819,7 +1819,16 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'bag_update', bag: player.bag });
         }
         broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
-        send(ws, { type: 'toast', level: 'success', text: '🚂 기차 기관차를 레일에 올렸습니다! (우클릭: 출발/정지 · 객차로 우클릭: 연결)' });
+        send(ws, { type: 'toast', level: 'success', text: '🚇 기차를 레일에 올렸습니다! (우클릭: 탑승 · 객차 들고 우클릭: 연결)' });
+        break;
+      }
+
+      case 'train_set_line': {
+        if (player.world !== 'sandbox') return;
+        const res = trains.setTrainLine(String(msg.trainId || ''), String(msg.lineId || 'classic'));
+        if (!res) return;
+        broadcast({ type: 'trains_update', trains: trains.serializeAll() }, null, 'sandbox');
+        send(ws, { type: 'toast', level: 'success', text: `🚇 기차 노선을 [${res.line.name}] 색상으로 변경했습니다!` });
         break;
       }
 

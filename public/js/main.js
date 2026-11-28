@@ -8,7 +8,7 @@ import { RegionVisualizer } from './regions.js';
 import { SkySystem } from './sky.js';
 import { SoundEngine } from './sound.js';
 import { AnimalRenderer } from './animals.js';
-import { WorldExtras } from './worldExtras.js?v=20261128f';
+import { WorldExtras } from './worldExtras.js?v=20261128k';
 import { TouchControls } from './touchControls.js?v=20261128b';
 import { GameUI } from './ui.js?v=20261128j';
 import { getBiomeAt, getBiomeLabel } from '../shared/terrainGen.js';
@@ -492,7 +492,71 @@ document.querySelectorAll('#elev-floor-btns .elev-btn').forEach((btn) => {
   });
 });
 
-// Sandbox World: Train Boarding & Retrieval HUD (Elevator-style!)
+// Sandbox World: Train Boarding & Retrieval HUD + Seoul Subway Line Color Picker!
+const SEOUL_SUBWAY_LINES = [
+  { id: 'classic',     name: '기본 증기',   short: '기본', color: '#dc2626' },
+  { id: 'line1',       name: '1호선',       short: '1',    color: '#0052A4' },
+  { id: 'line2',       name: '2호선',       short: '2',    color: '#00A84D' },
+  { id: 'line3',       name: '3호선',       short: '3',    color: '#EF7C1C' },
+  { id: 'line4',       name: '4호선',       short: '4',    color: '#00A5DE' },
+  { id: 'line5',       name: '5호선',       short: '5',    color: '#996CAC' },
+  { id: 'line6',       name: '6호선',       short: '6',    color: '#CD7C2F' },
+  { id: 'line7',       name: '7호선',       short: '7',    color: '#747F00' },
+  { id: 'line8',       name: '8호선',       short: '8',    color: '#E6186C' },
+  { id: 'line9',       name: '9호선',       short: '9',    color: '#BDB092' },
+  { id: 'gyeongui',    name: '경의·중앙선', short: '경의', color: '#77C4A3' },
+  { id: 'gyeongchun',  name: '경춘선',      short: '경춘', color: '#0C8E72' },
+  { id: 'suin',        name: '수인·분당선', short: '수인', color: '#F5A200' },
+  { id: 'shinbundang', name: '신분당선',    short: '신분', color: '#D4003B' },
+  { id: 'arex',        name: '공항철도',    short: '공항', color: '#0090D2' }
+];
+let selectedTrainLineId = localStorage.getItem('boxworld_train_line') || 'line2';
+if (!SEOUL_SUBWAY_LINES.some(l => l.id === selectedTrainLineId)) selectedTrainLineId = 'classic';
+
+function renderSubwayLineChips(containerId, activeId, onPick) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  for (const line of SEOUL_SUBWAY_LINES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'subway-chip' + (line.id === activeId ? ' active' : '');
+    b.style.background = line.color;
+    b.textContent = line.short;
+    b.title = line.name;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onPick(line);
+    });
+    el.appendChild(b);
+  }
+}
+
+let _lastSpawnLineSig = '';
+function syncSpawnLineBar() {
+  const bar = document.getElementById('train-line-bar');
+  if (!bar) return;
+  const held = ui?.getActiveItemId?.();
+  const show = joined && currentWorldMode === 'sandbox' && held === 'train_engine' && !ui.openModalId;
+  const sig = `${show ? 1 : 0}:${selectedTrainLineId}`;
+  if (sig === _lastSpawnLineSig) return;
+  _lastSpawnLineSig = sig;
+  bar.classList.toggle('hidden', !show);
+  if (show) {
+    const cur = SEOUL_SUBWAY_LINES.find(l => l.id === selectedTrainLineId) || SEOUL_SUBWAY_LINES[0];
+    const lbl = document.getElementById('train-line-cur');
+    if (lbl) { lbl.textContent = cur.name; lbl.style.color = cur.color; }
+    renderSubwayLineChips('train-spawn-lines', selectedTrainLineId, (line) => {
+      selectedTrainLineId = line.id;
+      try { localStorage.setItem('boxworld_train_line', line.id); } catch {}
+      syncSpawnLineBar();
+      ui.toast(`🚇 배치할 기차 노선: [${line.name}] 선택됨!`, 'info');
+    });
+  }
+}
+document.getElementById('train-line-bar')?.addEventListener('mousedown', (e) => e.stopPropagation());
+document.getElementById('train-line-bar')?.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+
 let ridingTrain = null; // { trainId, unitIndex }
 let activeNearbyTrain = null;
 let _lastTrainHudSig = '';
@@ -1190,7 +1254,7 @@ function handleRightClickOrInteract(interactOnly = false) {
         fpHand?.triggerSwing();
         const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
         const dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 1 : 3) : (fz < 0 ? 0 : 2);
-        send({ type: 'train_spawn', x: currentHit.x, y: currentHit.y, z: currentHit.z, dir, slotIndex: ui.getActiveBagIndex() });
+        send({ type: 'train_spawn', x: currentHit.x, y: currentHit.y, z: currentHit.z, dir, slotIndex: ui.getActiveBagIndex(), lineId: selectedTrainLineId });
         return;
       }
       if (heldNow === 'train_car' && !ridingTrain) {
@@ -2021,10 +2085,12 @@ function animate(now) {
       const ridePose = ridingTrain ? worldExtras.getTrainUnitPose(ridingTrain.trainId, ridingTrain.unitIndex) : null;
       if (ridingTrain && !ridePose) ridingTrain = null;
       const hudTrain = ridingTrain && ridePose
-        ? { trainId: ridingTrain.trainId, unitCount: ridePose.unitCount, moving: ridePose.moving }
+        ? { trainId: ridingTrain.trainId, unitCount: ridePose.unitCount, moving: ridePose.moving, lineId: ridePose.lineId, lineName: ridePose.lineName }
         : activeNearbyTrain;
       elTrainHud.classList.toggle('hidden', !hudTrain);
       if (hudTrain) {
+        const titleEl = document.getElementById('train-hud-title');
+        if (titleEl) titleEl.textContent = hudTrain.lineId && hudTrain.lineId !== 'classic' ? `🚇 ${hudTrain.lineName}` : '🚂 기차 탑승';
         const statusEl = document.getElementById('train-hud-status');
         if (statusEl) {
           const rideLabel = ridingTrain
@@ -2039,7 +2105,7 @@ function animate(now) {
           toggleBtn.classList.toggle('hidden', !ridingTrain);
           toggleBtn.textContent = hudTrain.moving ? '⏸️ 정지' : '▶️ 출발';
         }
-        const sig = `${hudTrain.trainId}:${hudTrain.unitCount}:${ridingTrain ? ridingTrain.unitIndex : -1}`;
+        const sig = `${hudTrain.trainId}:${hudTrain.unitCount}:${hudTrain.lineId || 'classic'}:${ridingTrain ? ridingTrain.unitIndex : -1}`;
         if (sig !== _lastTrainHudSig) {
           _lastTrainHudSig = sig;
           const row = document.getElementById('train-car-btns');
@@ -2058,9 +2124,13 @@ function animate(now) {
               row.appendChild(b);
             }
           }
+          renderSubwayLineChips('train-hud-lines', hudTrain.lineId || 'classic', (line) => {
+            send({ type: 'train_set_line', trainId: hudTrain.trainId, lineId: line.id });
+          });
         }
       }
     }
+    syncSpawnLineBar();
     sky.update(dt, playerPos, (currentWorldMode === 'job' || currentWorldMode === 'center') ? 4 : 36);
     sound.updateListener(playerPos, yaw);
 
