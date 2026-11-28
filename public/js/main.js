@@ -535,10 +535,12 @@ document.getElementById('train-hud')?.addEventListener('pointerdown', (e) => e.s
 document.getElementById('train-hud')?.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
 document.getElementById('btn-train-toggle')?.addEventListener('click', (e) => {
   e.stopPropagation();
-  const tid = ridingTrain?.trainId || activeNearbyTrain?.trainId;
-  if (!tid) return;
+  if (!ridingTrain) {
+    ui.toast('🚂 먼저 기차를 우클릭해서 탑승한 뒤 출발해 주세요!', 'info');
+    return;
+  }
   sound.playDoor();
-  send({ type: 'train_toggle', trainId: tid });
+  send({ type: 'train_toggle', trainId: ridingTrain.trainId });
 });
 document.getElementById('btn-train-dismount')?.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1086,20 +1088,26 @@ function handleRightClickOrInteract(interactOnly = false) {
     return;
   }
 
-  // 1.5 Check Train interaction on right-click (lead engine: start/stop, passenger car: open cargo storage, holding car when not riding: couple!)
+  // 1.5 Check Train interaction on right-click:
+  // - Outside train: holding train_car couples a car; otherwise right-clicking ANY part boards that car/engine!
+  // - Inside train: right-clicking the locomotive starts/stops the train; right-clicking a passenger car opens cargo storage!
   const trainHit = worldExtras.raycastTrains(eyePos, lookDir, 6.0, ridingTrain);
   if (trainHit) {
     fpHand?.triggerSwing();
     const heldIdNow = ui.getActiveItemId();
-    if (heldIdNow === 'train_car' && !ridingTrain) {
-      send({ type: 'train_couple', trainId: trainHit.trainId, slotIndex: ui.getActiveBagIndex() });
-    } else if (!trainHit.isEngine && trainHit.unitIndex >= 1) {
+    if (!ridingTrain) {
+      if (heldIdNow === 'train_car') {
+        send({ type: 'train_couple', trainId: trainHit.trainId, slotIndex: ui.getActiveBagIndex() });
+      } else {
+        boardTrainUnit(trainHit.trainId, trainHit.unitIndex);
+      }
+    } else if (trainHit.isEngine) {
+      sound.playDoor();
+      send({ type: 'train_toggle', trainId: trainHit.trainId });
+    } else if (trainHit.unitIndex >= 1) {
       if (document.pointerLockElement) document.exitPointerLock();
       sound.playOpen();
       send({ type: 'train_car_open', trainId: trainHit.trainId, unitIndex: trainHit.unitIndex });
-    } else {
-      sound.playDoor();
-      send({ type: 'train_toggle', trainId: trainHit.trainId });
     }
     return;
   }
@@ -2003,7 +2011,10 @@ function animate(now) {
         const disBtn = document.getElementById('btn-train-dismount');
         if (disBtn) disBtn.classList.toggle('hidden', !ridingTrain);
         const toggleBtn = document.getElementById('btn-train-toggle');
-        if (toggleBtn) toggleBtn.textContent = hudTrain.moving ? '⏸️ 정지' : '▶️ 출발';
+        if (toggleBtn) {
+          toggleBtn.classList.toggle('hidden', !ridingTrain);
+          toggleBtn.textContent = hudTrain.moving ? '⏸️ 정지' : '▶️ 출발';
+        }
         const sig = `${hudTrain.trainId}:${hudTrain.unitCount}:${ridingTrain ? ridingTrain.unitIndex : -1}`;
         if (sig !== _lastTrainHudSig) {
           _lastTrainHudSig = sig;
