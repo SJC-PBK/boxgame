@@ -8,7 +8,7 @@ import { RegionVisualizer } from './regions.js';
 import { SkySystem } from './sky.js';
 import { SoundEngine } from './sound.js';
 import { AnimalRenderer } from './animals.js';
-import { WorldExtras } from './worldExtras.js?v=20261128c';
+import { WorldExtras } from './worldExtras.js?v=20261128d';
 import { TouchControls } from './touchControls.js?v=20261128b';
 import { GameUI } from './ui.js';
 import { getBiomeAt, getBiomeLabel } from '../shared/terrainGen.js';
@@ -261,6 +261,14 @@ const touchControls = new TouchControls(canvas, {
   onMineStart: () => {
     if (!joined || ui.openModalId || ui.chatOpen) return;
     const { eyePos, lookDir } = getEyeAndLook();
+    const trainHitL = worldExtras.raycastTrains(eyePos, lookDir, 5.5);
+    if (trainHitL) {
+      fpHand?.triggerSwing();
+      sound.playBreak('stone', trainHitL.point);
+      if (ridingTrain?.trainId === trainHitL.trainId) dismountTrain(false);
+      send({ type: 'train_remove', trainId: trainHitL.trainId });
+      return;
+    }
     const animalHit = animalRenderer.raycast(eyePos, lookDir, 4.8);
     if (animalHit) {
       fpHand?.triggerSwing();
@@ -482,6 +490,67 @@ document.querySelectorAll('#elev-floor-btns .elev-btn').forEach((btn) => {
     const floor = Number(btn.dataset.floor);
     if (floor >= 1 && floor <= 7) send({ type: 'elevator_call', floor });
   });
+});
+
+// Sandbox World: Train Boarding & Retrieval HUD (Elevator-style!)
+let ridingTrain = null; // { trainId, unitIndex }
+let activeNearbyTrain = null;
+let _lastTrainHudSig = '';
+
+function boardTrainUnit(trainId, unitIndex) {
+  const pose = worldExtras.getTrainUnitPose(trainId, unitIndex);
+  if (!pose) return;
+  const clamped = Math.max(0, Math.min(pose.unitCount - 1, Number(unitIndex) || 0));
+  ridingTrain = { trainId, unitIndex: clamped };
+  if (flyMode) {
+    flyMode = false;
+    touchControls.setFlyMode(false);
+  }
+  playerPos.set(pose.x, pose.y + 0.56, pose.z);
+  playerVel.set(0, 0, 0);
+  onGround = true;
+  sound.playDoor();
+  ui.toast(clamped === 0 ? '🚂 기관차에 탑승했습니다! (Space/하차 버튼으로 하차)' : `🚃 기차 ${clamped}번째 객차에 탑승했습니다! (Space/하차 버튼으로 하차)`, 'success');
+}
+
+function dismountTrain(showToast = true) {
+  if (!ridingTrain) return;
+  const pose = worldExtras.getTrainUnitPose(ridingTrain.trainId, ridingTrain.unitIndex);
+  ridingTrain = null;
+  if (pose) {
+    // Step cleanly off to the right side of the car, or slightly above if blocked
+    const sideX = pose.x + Math.cos(pose.yaw || 0) * 1.15;
+    const sideZ = pose.z - Math.sin(pose.yaw || 0) * 1.15;
+    if (!collides(sideX, pose.y + 0.1, sideZ)) {
+      playerPos.set(sideX, pose.y + 0.12, sideZ);
+    } else {
+      playerPos.set(pose.x, pose.y + 1.15, pose.z);
+    }
+    playerVel.set(0, 0, 0);
+  }
+  if (showToast) ui.toast('🚶 기차에서 하차했습니다.', 'info');
+}
+
+document.getElementById('train-hud')?.addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('train-hud')?.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+document.getElementById('btn-train-toggle')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const tid = ridingTrain?.trainId || activeNearbyTrain?.trainId;
+  if (!tid) return;
+  sound.playDoor();
+  send({ type: 'train_toggle', trainId: tid });
+});
+document.getElementById('btn-train-dismount')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  dismountTrain(true);
+});
+document.getElementById('btn-train-retrieve')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const tid = ridingTrain?.trainId || activeNearbyTrain?.trainId;
+  if (!tid) return;
+  if (ridingTrain?.trainId === tid) dismountTrain(false);
+  sound.playBreak('stone', playerPos);
+  send({ type: 'train_remove', trainId: tid });
 });
 
 document.querySelectorAll('.mode-card').forEach((card) => {
@@ -1319,6 +1388,7 @@ canvas.addEventListener('mousedown', (e) => {
     if (trainHitL) {
       fpHand?.triggerSwing();
       sound.playBreak('stone', trainHitL.point);
+      if (ridingTrain?.trainId === trainHitL.trainId) dismountTrain(false);
       send({ type: 'train_remove', trainId: trainHitL.trainId });
       return;
     }
@@ -1441,7 +1511,22 @@ window.addEventListener('keydown', (e) => {
       send({ type: 'elevator_call', floor: n });
       return;
     }
+    const trainCtx = ridingTrain
+      ? { trainId: ridingTrain.trainId, unitCount: worldExtras.getTrainUnitPose(ridingTrain.trainId, 0)?.unitCount || 1 }
+      : (activeNearbyTrain && activeNearbyTrain.dist <= 4.5 ? activeNearbyTrain : null);
+    if (currentWorldMode === 'sandbox' && trainCtx) {
+      if (n === 0 || (n >= 1 && n < trainCtx.unitCount)) {
+        boardTrainUnit(trainCtx.trainId, n);
+        return;
+      }
+    }
     if (e.code.startsWith('Digit') && n >= 1 && n <= 9) ui.setActiveSlot(n - 1);
+  }
+
+  if ((e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') && ridingTrain) {
+    e.preventDefault();
+    dismountTrain(true);
+    return;
   }
 
   if (e.code === 'Space' && !e.repeat) {
@@ -1490,6 +1575,31 @@ function collides(x, y, z) {
 
 function updatePhysics(dt) {
   if (!joined || ui.openModalId || ui.chatOpen) return false;
+  if (ridingTrain) {
+    if (currentWorldMode !== 'sandbox') {
+      ridingTrain = null;
+    } else {
+      const pose = worldExtras.getTrainUnitPose(ridingTrain.trainId, ridingTrain.unitIndex);
+      if (!pose) {
+        ridingTrain = null;
+      } else {
+        if (touchJumpHeld) {
+          dismountTrain(true);
+          return false;
+        }
+        // Allow arrow-key camera look while seated inside the train car
+        const turnSpeed = 2.1 * mouseSensitivity;
+        if (keys.has('ArrowLeft')) yaw += turnSpeed * dt;
+        if (keys.has('ArrowRight')) yaw -= turnSpeed * dt;
+        if (keys.has('ArrowUp')) pitch = Math.min(Math.PI / 2 - 0.01, pitch + turnSpeed * 0.75 * dt);
+        if (keys.has('ArrowDown')) pitch = Math.max(-Math.PI / 2 + 0.01, pitch - turnSpeed * 0.75 * dt);
+        playerPos.set(pose.x, pose.y + 0.56, pose.z);
+        playerVel.set(0, 0, 0);
+        onGround = true;
+        return false;
+      }
+    }
+  }
   _forward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
   _right.set(Math.cos(yaw), 0, -Math.sin(yaw));
   _move.set(0, 0, 0);
@@ -1763,6 +1873,50 @@ function animate(now) {
             const fn = Number(b.dataset.floor);
             b.classList.toggle('active', fn === (es.moving ? es.targetFloor : es.floor));
           });
+        }
+      }
+    }
+    // Update Nearby Train Boarding & Retrieval HUD (Sandbox World, Elevator-style!)
+    const elTrainHud = document.getElementById('train-hud');
+    if (elTrainHud) {
+      activeNearbyTrain = currentWorldMode === 'sandbox' ? worldExtras.getNearestTrain(playerPos, 6.2) : null;
+      const ridePose = ridingTrain ? worldExtras.getTrainUnitPose(ridingTrain.trainId, ridingTrain.unitIndex) : null;
+      if (ridingTrain && !ridePose) ridingTrain = null;
+      const hudTrain = ridingTrain && ridePose
+        ? { trainId: ridingTrain.trainId, unitCount: ridePose.unitCount, moving: ridePose.moving }
+        : activeNearbyTrain;
+      elTrainHud.classList.toggle('hidden', !hudTrain);
+      if (hudTrain) {
+        const statusEl = document.getElementById('train-hud-status');
+        if (statusEl) {
+          const rideLabel = ridingTrain
+            ? (ridingTrain.unitIndex === 0 ? '탑승: 기관차' : `탑승: ${ridingTrain.unitIndex}칸`)
+            : (hudTrain.moving ? '운행 중' : '정지');
+          statusEl.textContent = rideLabel;
+        }
+        const disBtn = document.getElementById('btn-train-dismount');
+        if (disBtn) disBtn.classList.toggle('hidden', !ridingTrain);
+        const toggleBtn = document.getElementById('btn-train-toggle');
+        if (toggleBtn) toggleBtn.textContent = hudTrain.moving ? '⏸️ 정지' : '▶️ 출발';
+        const sig = `${hudTrain.trainId}:${hudTrain.unitCount}:${ridingTrain ? ridingTrain.unitIndex : -1}`;
+        if (sig !== _lastTrainHudSig) {
+          _lastTrainHudSig = sig;
+          const row = document.getElementById('train-car-btns');
+          if (row) {
+            row.innerHTML = '';
+            const maxUnits = Math.min(10, hudTrain.unitCount);
+            for (let u = 0; u < maxUnits; u++) {
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.className = 'elev-btn' + (ridingTrain && ridingTrain.unitIndex === u ? ' active' : '');
+              b.textContent = u === 0 ? '🚂 기관차' : `${u}칸`;
+              b.addEventListener('click', (e) => {
+                e.stopPropagation();
+                boardTrainUnit(hudTrain.trainId, u);
+              });
+              row.appendChild(b);
+            }
+          }
         }
       }
     }

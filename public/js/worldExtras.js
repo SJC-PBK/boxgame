@@ -1332,6 +1332,48 @@ export class WorldExtras {
     return riding;
   }
 
+  getNearestTrain(playerPos, maxDist = 6.5) {
+    if (!playerPos || this._trainMeshes.size === 0) return null;
+    let best = null;
+    let bestDistSq = maxDist * maxDist;
+    for (const [trainId, rec] of this._trainMeshes.entries()) {
+      for (let i = 0; i < rec.unitMeshes.length; i++) {
+        const p = rec.unitMeshes[i].position;
+        const dx = playerPos.x - p.x;
+        const dy = (playerPos.y + 0.5) - (p.y + 0.5);
+        const dz = playerPos.z - p.z;
+        const dSq = dx * dx + dy * dy + dz * dz;
+        if (dSq <= bestDistSq) {
+          bestDistSq = dSq;
+          best = {
+            trainId,
+            unitCount: rec.unitMeshes.length,
+            carCount: Math.max(0, rec.unitMeshes.length - 1),
+            moving: !!rec.moving,
+            dist: Math.sqrt(dSq)
+          };
+        }
+      }
+    }
+    return best;
+  }
+
+  getTrainUnitPose(trainId, unitIndex) {
+    const rec = this._trainMeshes.get(trainId);
+    if (!rec) return null;
+    const idx = Math.max(0, Math.min(rec.unitMeshes.length - 1, Number(unitIndex) || 0));
+    const m = rec.unitMeshes[idx];
+    if (!m) return null;
+    return {
+      x: m.position.x,
+      y: m.position.y,
+      z: m.position.z,
+      yaw: m.rotation.y,
+      moving: !!rec.moving,
+      unitCount: rec.unitMeshes.length
+    };
+  }
+
   raycastTrains(origin, direction, maxDist = 6.0) {
     if (this.trainGroup.children.length === 0) return null;
     if (!this._trainRaycaster) this._trainRaycaster = new THREE.Raycaster();

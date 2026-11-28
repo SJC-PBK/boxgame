@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Boxworld — 웹 3D 멀티플레이 블록 월드</title>
-  <link rel="stylesheet" href="./style.css?v=20261128b" />
+  <link rel="stylesheet" href="./style.css?v=20261128d" />
 </head>
 <body>
   <canvas id="game-canvas"></canvas>
@@ -115,6 +115,21 @@
         <button type="button" class="elev-btn" data-floor="7">7F</button>
       </div>
       <div class="elev-hud-tip">키보드 [1~7] 또는 버튼 클릭으로 층 이동</div>
+    </div>
+
+    <!-- Sandbox World: Nearby Train Boarding & Control HUD (Elevator-style!) -->
+    <div id="train-hud" class="elevator-hud hidden">
+      <div class="elev-hud-header">
+        <span>🚂 기차 탑승</span>
+        <span id="train-hud-status" class="elev-led">정지</span>
+      </div>
+      <div class="train-btn-row" id="train-car-btns"></div>
+      <div class="train-action-row">
+        <button type="button" id="btn-train-toggle" class="elev-btn">▶️ 출발/정지</button>
+        <button type="button" id="btn-train-dismount" class="elev-btn hidden">🚶 하차</button>
+        <button type="button" id="btn-train-retrieve" class="elev-btn danger-btn">🗑️ 기차 회수</button>
+      </div>
+      <div class="elev-hud-tip" id="train-hud-tip">키보드 [1~9] 객차 탑승 · [0] 기관차 · [Space] 하차</div>
     </div>
 
     <!-- Active Blueprint Mini HUD -->
@@ -824,6 +839,6 @@
     </div>
   </div>
 
-  <script type="module" src="./js/main.js?v=20261128c"></script>
+  <script type="module" src="./js/main.js?v=20261128d"></script>
 </body>
 </html>
