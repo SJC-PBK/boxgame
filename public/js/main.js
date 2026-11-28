@@ -1454,6 +1454,17 @@ window.addEventListener('wheel', (e) => {
   else if (e.deltaY < 0) ui.setActiveSlot(ui.activeSlot - 1);
 });
 
+let isKeyLeftDown = false;
+let isKeyRightDown = false;
+
+window.addEventListener('blur', () => {
+  isKeyLeftDown = false;
+  isKeyRightDown = false;
+  isLeftDown = false;
+  isRightDown = false;
+  resetMining();
+});
+
 window.addEventListener('keydown', (e) => {
   if (!joined) return;
   if (e.key === 'Escape') {
@@ -1492,6 +1503,59 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'KeyF') { e.preventDefault(); handleRightClickOrInteract(false); return; }
+  if (e.code === 'Semicolon') {
+    e.preventDefault();
+    if (!e.repeat && !ui.openModalId && !ui.chatOpen) {
+      if (cutMode && currentHit) {
+        send({ type: 'block_cut', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+        setCutMode(false);
+        return;
+      }
+      if (eyedropperMode && currentHit) {
+        send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+        setEyedropperMode(false);
+        return;
+      }
+      const { eyePos, lookDir } = getEyeAndLook();
+      const trainHitL = worldExtras.raycastTrains(eyePos, lookDir, 5.5);
+      if (trainHitL) {
+        fpHand?.triggerSwing();
+        sound.playBreak('stone', trainHitL.point);
+        if (ridingTrain?.trainId === trainHitL.trainId) dismountTrain(false);
+        send({ type: 'train_remove', trainId: trainHitL.trainId });
+        return;
+      }
+      const animalHit = animalRenderer.raycast(eyePos, lookDir, 4.8);
+      if (animalHit) {
+        fpHand?.triggerSwing();
+        sound.playAnimal(animalHit.type, animalHit.point);
+        send({ type: 'animal_interact', id: animalHit.id, action: 'hit' });
+        return;
+      }
+      isKeyLeftDown = true;
+      fpHand?.triggerSwing();
+    }
+    return;
+  }
+  if (e.code === 'Quote') {
+    e.preventDefault();
+    if (!e.repeat && !ui.openModalId && !ui.chatOpen) {
+      if (cutMode && currentHit) {
+        send({ type: 'block_cut', x: currentHit.x, y: currentHit.y, z: currentHit.z });
+        setCutMode(false);
+        return;
+      }
+      if (eyedropperMode && currentHit) {
+        send({ type: 'block_pick', x: currentHit.x, y: currentHit.y, z: currentHit.z, slotIndex: ui.getActiveBagIndex() });
+        setEyedropperMode(false);
+        return;
+      }
+      isKeyRightDown = true;
+      rightPlaceTimer = 0.24;
+      handleRightClickOrInteract(false);
+    }
+    return;
+  }
 
   if (e.code === 'F3') {
     e.preventDefault();
@@ -1553,6 +1617,8 @@ window.addEventListener('keydown', (e) => {
 
 window.addEventListener('keyup', (e) => {
   keys.delete(e.code);
+  if (e.code === 'Semicolon') { isKeyLeftDown = false; resetMining(); }
+  if (e.code === 'Quote') { isKeyRightDown = false; }
   if (!keys.has('KeyW') && !keys.has('KeyA') && !keys.has('KeyS') && !keys.has('KeyD')) {
     doubleTapSprint = false;
   }
@@ -1806,7 +1872,7 @@ function updatePhysics(dt) {
 }
 
 function updateMining(dt) {
-  const activelyMining = (isLeftDown && (pointerLocked || remoteLook)) || (isTouchMining && touchControls.enabled);
+  const activelyMining = (isLeftDown && (pointerLocked || remoteLook)) || (isKeyLeftDown && !ui.openModalId && !ui.chatOpen) || (isTouchMining && touchControls.enabled);
   if (!activelyMining || !currentHit) {
     if (miningTargetKey) resetMining();
     return;
@@ -2014,8 +2080,8 @@ function animate(now) {
       worldRenderer.updateStreaming(playerPos);
       currentHit = worldRenderer.raycast(eyePos, lookDir, 7, ui.getActiveItemId() === 'sabo_sword');
       updateMining(dt);
-      // Continuous right-click block placement while holding RMB!
-      if (isRightDown && pointerLocked && !ui.openModalId && !ui.chatOpen && currentHit) {
+      // Continuous right-click block placement while holding RMB or Quote (') key!
+      if (((isRightDown && pointerLocked) || isKeyRightDown) && !ui.openModalId && !ui.chatOpen && currentHit) {
         rightPlaceTimer -= dt;
         if (rightPlaceTimer <= 0) {
           rightPlaceTimer = 0.17;
@@ -2042,7 +2108,7 @@ function animate(now) {
       worldRenderer.updateParticles(dt);
     }
 
-    if (fpHand) fpHand.update(dt, isMoving, (isLeftDown && pointerLocked) || (isTouchMining && touchControls.enabled));
+    if (fpHand) fpHand.update(dt, isMoving, (isLeftDown && pointerLocked) || isKeyLeftDown || (isTouchMining && touchControls.enabled));
 
     const bx = Math.floor(playerPos.x), by = Math.floor(playerPos.y), bz = Math.floor(playerPos.z);
     const biomePrefix = currentWorldMode === 'sandbox' ? `${getBiomeLabel(getBiomeAt(bx, bz))} ` : '';
